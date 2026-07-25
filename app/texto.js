@@ -70,15 +70,9 @@ export const REEMPLAZOS_BASE = [
   ['0,12 por ciento', 'cero coma doce por ciento'],
   ['4 km²', 'cuatro kilómetros cuadrados'],
   ['4 KM²', 'CUATRO KILÓMETROS CUADRADOS'],
-  ['REF_DELEGACIÓN_07', 'ref delegación cero siete'],
-  ['REF_DELEGACIÓN', 'ref delegación'],
-  ['aula 2-B', 'aula dos B'],
-  ['Aula 2-B', 'Aula dos B'],
+  ['REF_DELEGACIÓN_07', 'REF DELEGACIÓN CERO SIETE'],
+  ['REF_DELEGACIÓN', 'REF DELEGACIÓN'],
   ['G20', 'G veinte'],
-  ['FIN DEL EPISODIO', ''],
-  ['FIN DE LA TEMPORADA 1', ''],
-  ['FIN DEL ARCO 2', ''],
-  ['CONTINUARÁ.', ''],
 ];
 
 const LETRAS = {
@@ -109,6 +103,9 @@ export function normalizarParaVoz(texto, reemplazos) {
 
   // Bloques: A-12 → A doce   ·   Ola 3 se resuelve con la regla de enteros
   t = t.replace(/\b([A-Z])-(\d{1,3})\b/g, (_, l, n) => l + ' ' + enLetras(n));
+
+  // Lotes cortos: 214-B → doscientos catorce be   ·   2-B → dos be
+  t = t.replace(/\b(\d{1,5})-([A-Z])\b/g, (_, n, l) => enLetras(n) + ' ' + (LETRAS[l] || l));
 
   // Horas: 09:12 → las nueve y doce   ·   21:00 → las veintiuna
   // El "las" que ya venga escrito delante se conserva en vez de duplicarse.
@@ -150,6 +147,10 @@ export function normalizarParaVoz(texto, reemplazos) {
 /* ── Limpieza de markdown ───────────────────────────────────── */
 const SEP_ESCENA = '';
 
+// Marcas estructurales del guion: se ven en el archivo, no se narran.
+export const ES_MARCA = (s) =>
+  /^\*{0,2}FIN D(EL|E LA)\b/i.test(s) || /^\*{0,2}CONTINUARÁ/i.test(s);
+
 export function limpiarTexto(t) {
   const out = [];
   for (let ln of String(t).split('\n')) {
@@ -157,6 +158,7 @@ export function limpiarTexto(t) {
     if (s.startsWith('#')) continue;                       // encabezados
     if (/^\*\*Duración/i.test(s)) continue;                // línea de metadatos
     if (/^-{3,}$/.test(s)) continue;                       // separadores
+    if (ES_MARCA(s)) continue;                             // «FIN DEL EPISODIO», «CONTINUARÁ»
     if (/^\*\s*\*\s*\*$/.test(s)) { out.push(SEP_ESCENA); continue; }
     ln = ln.replace(/\*\*([^*]*)\*\*/g, '$1')
       .replace(/\*([^*]*)\*/g, '$1')

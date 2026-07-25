@@ -1,0 +1,578 @@
+// ============================================================
+// api/ep-gemini.js — DIEZMO · Estudio de Anime
+// Runtime: Node.js (crypto para firmar el JWT RS256 y las URLs V4).
+//
+// Modos:
+//   ping     → diagnóstico de configuración
+//   models   → descubre modelos TTS / imagen / video en tu Vertex
+//   tts      → audio de narración (Gemini TTS)
+//   text     → director de IA, JSON estructurado (Gemini)
+//   image    → fotogramas clave, con imágenes de referencia de personaje
+//   video    → Veo: action "start" (predictLongRunning) y "poll"
+//   signurl  → URL firmada V4 para leer un objeto de GCS desde el navegador
+//   fetchgcs → proxy base64 de un objeto pequeño de GCS (respaldo sin CORS)
+//
+// Variables de entorno en Vercel:
+//   GCP_SERVICE_ACCOUNT  (JSON completo de la cuenta de servicio)
+//   GCP_PROJECT_ID
+//   GCS_BUCKET           (opcional pero recomendado — necesario para Veo largo)
+// ============================================================
+
+const crypto = require('crypto');
+
+/* ── Token OAuth2 (cacheado en memoria del proceso) ────────── */
+let _tok = { v: null, exp: 0 };
+
+function serviceAccount() {
+  const raw = process.env.GCP_SERVICE_ACCOUNT;
+  if (!raw) throw new Error('GCP_SERVICE_ACCOUNT no configurado en Vercel');
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    throw new Error('GCP_SERVICE_ACCOUNT no es un JSON válido');
+  }
+}
+
+async function getAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  if (_tok.v && now < _tok.exp - 120) return _tok.v;
+
+  const sa = serviceAccount();
+  const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  const header = b64u({ alg: 'RS256', typ: 'JWT' });
+  const payload = b64u({
+    iss: sa.client_email,
+    scope: 'https://www.googleapis.com/auth/cloud-platform',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  });
+  const signer = crypto.createSign('RSA-SHA256');
+  signer.update(header + '.' + payload);
+  const sig = signer.sign(sa.private_key).toString('base64url');
+  const jwt = header + '.' + payload + '.' + sig;
+
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:
+      'grant_type=' +
+      encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer') +
+      '&assertion=' + jwt,
+  });
+  const j = await r.json();
+  if (!j.access_token) throw new Error('OAuth2 falló: ' + JSON.stringify(j).slice(0, 300));
+  _tok = { v: j.access_token, exp: now + (j.expires_in || 3600) };
+  return _tok.v;
+}
+
+/* ── Helpers Vertex ─────────────────────────────────────────── */
+function host(location) {
+  return location === 'global'
+    ? 'aiplatform.googleapis.com'
+    : location + '-aiplatform.googleapis.com';
+}
+
+function vertexUrl(location, project, model, metodo) {
+  return (
+    'https://' + host(location) + '/v1/projects/' + project +
+    '/locations/' + location + '/publishers/google/models/' +
+    model + ':' + (metodo || 'generateContent')
+  );
+}
+
+async function callVertex(url, token, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const raw = await r.text();
+  let json = null;
+  try { json = JSON.parse(raw); } catch (e) { /* respuesta no-JSON */ }
+  return { ok: r.ok, status: r.status, json, raw };
+}
+
+function pickInlinePart(json) {
+  const parts = json && json.candidates && json.candidates[0] &&
+    json.candidates[0].content && json.candidates[0].content.parts;
+  if (!parts) return null;
+  for (const p of parts) {
+    if (p.inlineData && p.inlineData.data) return p.inlineData;
+    if (p.inline_data && p.inline_data.data) {
+      return { data: p.inline_data.data, mimeType: p.inline_data.mime_type };
+    }
+  }
+  return null;
+}
+
+function textoDe(json) {
+  const parts = json && json.candidates && json.candidates[0] &&
+    json.candidates[0].content && json.candidates[0].content.parts;
+  return (parts || []).map((p) => p.text || '').join('');
+}
+
+// Motivo humano de un bloqueo del filtro de seguridad, si lo hubo.
+function motivoBloqueo(json) {
+  if (!json) return null;
+  if (json.promptFeedback && json.promptFeedback.blockReason) {
+    return 'El prompt fue bloqueado por el filtro (' + json.promptFeedback.blockReason + ')';
+  }
+  const c = json.candidates && json.candidates[0];
+  if (c && c.finishReason && ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'RECITATION', 'IMAGE_SAFETY']
+      .indexOf(c.finishReason) !== -1) {
+    return 'La respuesta fue bloqueada por el filtro (' + c.finishReason + ')';
+  }
+  return null;
+}
+
+// Filtros permisivos dentro de lo que Vertex permite configurar. La serie es
+// seinen oscuro: sin esto, describir una bodega de esclavos dispara falsos positivos.
+const SEGURIDAD = [
+  'HARM_CATEGORY_HATE_SPEECH',
+  'HARM_CATEGORY_DANGEROUS_CONTENT',
+  'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+  'HARM_CATEGORY_HARASSMENT',
+].map((category) => ({ category, threshold: 'BLOCK_ONLY_HIGH' }));
+
+function regionesPara(model, location) {
+  if (location) return [location];
+  if (model.indexOf('gemini-3') === 0) return ['global'];
+  return ['us-central1', 'europe-west4', 'us-east4'];
+}
+
+/* ── URL firmada V4 para Google Cloud Storage ───────────────── */
+function rutaGs(uri) {
+  const m = String(uri || '').match(/^gs:\/\/([^/]+)\/(.+)$/);
+  if (!m) throw new Error('URI de GCS inválida: ' + uri);
+  return { bucket: m[1], objeto: m[2] };
+}
+
+function encodeObjeto(objeto) {
+  return objeto.split('/').map(encodeURIComponent).join('/');
+}
+
+function urlFirmadaV4(gsUri, segundos) {
+  const sa = serviceAccount();
+  const { bucket, objeto } = rutaGs(gsUri);
+  const exp = Math.min(Math.max(parseInt(segundos, 10) || 3600, 60), 604800);
+
+  const ahora = new Date();
+  const iso = ahora.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const fecha = iso.slice(0, 8);
+  const scope = fecha + '/auto/storage/goog4_request';
+
+  const query = [
+    ['X-Goog-Algorithm', 'GOOG4-RSA-SHA256'],
+    ['X-Goog-Credential', sa.client_email + '/' + scope],
+    ['X-Goog-Date', iso],
+    ['X-Goog-Expires', String(exp)],
+    ['X-Goog-SignedHeaders', 'host'],
+  ]
+    .map(([k, v]) => encodeURIComponent(k) + '=' + encodeURIComponent(v))
+    .sort()
+    .join('&');
+
+  const canonical = [
+    'GET',
+    '/' + bucket + '/' + encodeObjeto(objeto),
+    query,
+    'host:storage.googleapis.com',
+    '',
+    'host',
+    'UNSIGNED-PAYLOAD',
+  ].join('\n');
+
+  const hash = crypto.createHash('sha256').update(canonical).digest('hex');
+  const stringToSign = ['GOOG4-RSA-SHA256', iso, scope, hash].join('\n');
+  const firma = crypto.createSign('RSA-SHA256').update(stringToSign).sign(sa.private_key).toString('hex');
+
+  return 'https://storage.googleapis.com/' + bucket + '/' + encodeObjeto(objeto) +
+    '?' + query + '&X-Goog-Signature=' + firma;
+}
+
+/* ── Handler ────────────────────────────────────────────────── */
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Solo POST' });
+
+  try {
+    const body =
+      typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
+    const mode = body.mode;
+
+    /* ════════ PING — diagnóstico de configuración ════════ */
+    if (mode === 'ping') {
+      const estado = {
+        proyecto: !!process.env.GCP_PROJECT_ID,
+        cuentaServicio: !!process.env.GCP_SERVICE_ACCOUNT,
+        bucket: process.env.GCS_BUCKET || null,
+        token: false,
+        cuenta: null,
+      };
+      if (estado.proyecto && estado.cuentaServicio) {
+        try {
+          await getAccessToken();
+          estado.token = true;
+          estado.cuenta = serviceAccount().client_email;
+        } catch (e) {
+          estado.errorToken = (e && e.message) || String(e);
+        }
+      }
+      return res.status(200).json(estado);
+    }
+
+    const project = process.env.GCP_PROJECT_ID;
+    if (!project) {
+      return res.status(500).json({ error: 'GCP_PROJECT_ID no configurado en Vercel' });
+    }
+    const token = await getAccessToken();
+
+    /* ════════ TTS — narración por toma ════════ */
+    if (mode === 'tts') {
+      if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
+
+      const model = body.model || 'gemini-2.5-flash-preview-tts';
+      const location =
+        body.location || (model.indexOf('gemini-3') === 0 ? 'global' : 'us-central1');
+
+      const texto =
+        (body.styleInstruction ? String(body.styleInstruction).trim() + '\n\n' : '') +
+        String(body.text);
+
+      const vBody = {
+        contents: [{ role: 'user', parts: [{ text: texto }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          temperature: typeof body.temperature === 'number' ? body.temperature : 1.0,
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: body.voice || 'Charon' } },
+          },
+        },
+      };
+      if (body.languageCode) {
+        vBody.generationConfig.speechConfig.languageCode = String(body.languageCode);
+      }
+      const seedNum = Number(body.seed);
+      if (body.seed !== undefined && body.seed !== null && body.seed !== '' && isFinite(seedNum)) {
+        vBody.generationConfig.seed = Math.round(seedNum);
+      }
+
+      const out = await callVertex(vertexUrl(location, project, model), token, vBody);
+      if (!out.ok) {
+        return res.status(out.status).json({
+          error: 'Vertex TTS ' + out.status,
+          detail: (out.raw || '').slice(0, 800),
+        });
+      }
+      const inline = pickInlinePart(out.json);
+      if (!inline) {
+        return res.status(502).json({
+          error: motivoBloqueo(out.json) || 'Respuesta de Vertex sin audio',
+          detail: JSON.stringify(out.json).slice(0, 800),
+        });
+      }
+      const mime = inline.mimeType || 'audio/L16;codec=pcm;rate=24000';
+      const m = mime.match(/rate=(\d+)/);
+      return res.status(200).json({
+        audio: inline.data,
+        mimeType: mime,
+        sampleRate: m ? parseInt(m[1], 10) : 24000,
+      });
+    }
+
+    /* ════════ TEXT — director de IA / JSON estructurado ════════ */
+    if (mode === 'text') {
+      if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });
+
+      const model = body.model || 'gemini-2.5-pro';
+      const location =
+        body.location || (model.indexOf('gemini-3') === 0 ? 'global' : 'us-central1');
+
+      const gen = {
+        temperature: typeof body.temperature === 'number' ? body.temperature : 0.6,
+        maxOutputTokens: body.maxOutputTokens || 32768,
+      };
+      if (body.json) gen.responseMimeType = 'application/json';
+      if (body.schema) gen.responseSchema = body.schema;
+
+      const vBody = {
+        contents: [{ role: 'user', parts: [{ text: String(body.prompt) }] }],
+        generationConfig: gen,
+        safetySettings: SEGURIDAD,
+      };
+      if (body.system) vBody.systemInstruction = { parts: [{ text: String(body.system) }] };
+
+      const out = await callVertex(vertexUrl(location, project, model), token, vBody);
+      if (!out.ok) {
+        return res.status(out.status).json({
+          error: 'Vertex texto ' + out.status,
+          detail: (out.raw || '').slice(0, 800),
+        });
+      }
+      const text = textoDe(out.json);
+      if (!text) {
+        return res.status(502).json({
+          error: motivoBloqueo(out.json) || 'Respuesta de Vertex sin texto',
+          detail: JSON.stringify(out.json).slice(0, 800),
+        });
+      }
+      return res.status(200).json({ text, finishReason: (out.json.candidates || [{}])[0].finishReason });
+    }
+
+    /* ════════ IMAGE — fotograma clave con referencias ════════ */
+    if (mode === 'image') {
+      if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });
+
+      const model = body.model || 'gemini-2.5-flash-image';
+      const regiones = regionesPara(model, body.location);
+
+      // Las referencias van ANTES del texto: así el modelo las trata como
+      // material de consulta y no como parte del enunciado.
+      const parts = [];
+      for (const ref of (body.images || []).slice(0, 4)) {
+        if (ref && ref.data) {
+          parts.push({ inlineData: { mimeType: ref.mimeType || 'image/png', data: ref.data } });
+        }
+      }
+      parts.push({ text: String(body.prompt) });
+
+      const imageConfig = { aspectRatio: body.aspectRatio || '16:9' };
+      if (body.imageSize) imageConfig.imageSize = String(body.imageSize);
+
+      const vBody = {
+        contents: [{ role: 'user', parts }],
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig },
+        safetySettings: SEGURIDAD,
+      };
+
+      let last = null;
+      for (const loc of regiones) {
+        const out = await callVertex(vertexUrl(loc, project, model), token, vBody);
+        if (out.ok) {
+          const inline = pickInlinePart(out.json);
+          if (inline) {
+            return res.status(200).json({
+              image: inline.data,
+              mimeType: inline.mimeType || 'image/png',
+              region: loc,
+              nota: textoDe(out.json).slice(0, 400) || undefined,
+            });
+          }
+          last = {
+            status: 502,
+            raw: motivoBloqueo(out.json) || ('Respuesta sin imagen: ' + JSON.stringify(out.json).slice(0, 600)),
+          };
+          break;
+        }
+        last = out;
+        if (out.status !== 429 && out.status !== 503) break; // solo rotar por cuota/capacidad
+      }
+      return res.status((last && last.status) || 500).json({
+        error: 'Vertex imagen ' + ((last && last.status) || '?'),
+        detail: ((last && last.raw) || '').slice(0, 800),
+      });
+    }
+
+    /* ════════ VIDEO — Veo (operación de larga duración) ════════ */
+    if (mode === 'video') {
+      const model = body.model || 'veo-3.1-fast-generate-preview';
+      const location = body.location || 'us-central1';
+      const accion = body.action || 'start';
+
+      if (accion === 'start') {
+        if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });
+
+        const instancia = { prompt: String(body.prompt) };
+        if (body.image && body.image.data) {
+          instancia.image = {
+            bytesBase64Encoded: body.image.data,
+            mimeType: body.image.mimeType || 'image/png',
+          };
+        }
+        if (body.lastFrame && body.lastFrame.data) {
+          instancia.lastFrame = {
+            bytesBase64Encoded: body.lastFrame.data,
+            mimeType: body.lastFrame.mimeType || 'image/png',
+          };
+        }
+
+        const parameters = {
+          aspectRatio: body.aspectRatio || '16:9',
+          durationSeconds: Math.min(Math.max(parseInt(body.durationSeconds, 10) || 8, 4), 8),
+          sampleCount: 1,
+          generateAudio: body.generateAudio === true,
+          personGeneration: body.personGeneration || 'allow_adult',
+        };
+        if (body.resolution) parameters.resolution = String(body.resolution);
+        if (body.negativePrompt) parameters.negativePrompt = String(body.negativePrompt);
+
+        // Con bucket, Veo escribe en GCS y el navegador lo lee con URL firmada:
+        // así no chocamos con el límite de tamaño de respuesta de la función.
+        const bucket = process.env.GCS_BUCKET;
+        if (bucket && body.storage !== 'inline') {
+          const carpeta = (body.storagePrefix || 'diezmo/video').replace(/^\/+|\/+$/g, '');
+          parameters.storageUri = 'gs://' + bucket + '/' + carpeta + '/';
+        }
+
+        const out = await callVertex(
+          vertexUrl(location, project, model, 'predictLongRunning'),
+          token,
+          { instances: [instancia], parameters }
+        );
+        if (!out.ok) {
+          return res.status(out.status).json({
+            error: 'Veo inicio ' + out.status,
+            detail: (out.raw || '').slice(0, 800),
+          });
+        }
+        if (!out.json || !out.json.name) {
+          return res.status(502).json({
+            error: 'Veo no devolvió operación',
+            detail: (out.raw || '').slice(0, 800),
+          });
+        }
+        return res.status(200).json({ operationName: out.json.name, model, location });
+      }
+
+      if (accion === 'poll') {
+        if (!body.operationName) return res.status(400).json({ error: 'Falta "operationName"' });
+
+        const out = await callVertex(
+          vertexUrl(location, project, model, 'fetchPredictOperation'),
+          token,
+          { operationName: String(body.operationName) }
+        );
+        if (!out.ok) {
+          return res.status(out.status).json({
+            error: 'Veo consulta ' + out.status,
+            detail: (out.raw || '').slice(0, 800),
+          });
+        }
+        const j = out.json || {};
+        if (!j.done) return res.status(200).json({ done: false });
+
+        if (j.error) {
+          return res.status(200).json({
+            done: true,
+            error: j.error.message || JSON.stringify(j.error).slice(0, 400),
+          });
+        }
+
+        const resp = j.response || {};
+        const videos = resp.videos || resp.generatedSamples || [];
+        if (!videos.length) {
+          const filtrado = resp.raiMediaFilteredReasons || resp.raiMediaFilteredCount;
+          return res.status(200).json({
+            done: true,
+            error: filtrado
+              ? 'Veo filtró el clip: ' + JSON.stringify(filtrado).slice(0, 300)
+              : 'Operación terminada sin video',
+            detail: JSON.stringify(resp).slice(0, 600),
+          });
+        }
+
+        const v = videos[0];
+        const gcsUri = v.gcsUri || (v.video && v.video.uri) || null;
+        const salida = { done: true, mimeType: v.mimeType || 'video/mp4' };
+        if (gcsUri) {
+          salida.gcsUri = gcsUri;
+          try { salida.url = urlFirmadaV4(gcsUri, body.expires || 21600); } catch (e) {
+            salida.errorFirma = (e && e.message) || String(e);
+          }
+        } else if (v.bytesBase64Encoded) {
+          salida.video = v.bytesBase64Encoded;
+        }
+        return res.status(200).json(salida);
+      }
+
+      return res.status(400).json({ error: 'Acción de video desconocida: ' + accion });
+    }
+
+    /* ════════ SIGNURL — renovar el enlace de un clip ════════ */
+    if (mode === 'signurl') {
+      if (!body.gcsUri) return res.status(400).json({ error: 'Falta "gcsUri"' });
+      return res.status(200).json({ url: urlFirmadaV4(body.gcsUri, body.expires || 21600) });
+    }
+
+    /* ════════ FETCHGCS — respaldo si el bucket no tiene CORS ════════ */
+    if (mode === 'fetchgcs') {
+      if (!body.gcsUri) return res.status(400).json({ error: 'Falta "gcsUri"' });
+      const { bucket, objeto } = rutaGs(body.gcsUri);
+      const u = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
+        '/o/' + encodeURIComponent(objeto) + '?alt=media';
+      const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
+      if (!r.ok) {
+        return res.status(r.status).json({ error: 'GCS ' + r.status, detail: (await r.text()).slice(0, 400) });
+      }
+      const buf = Buffer.from(await r.arrayBuffer());
+      // Por encima de ~4 MB la respuesta de la función no pasa: mejor decirlo claro.
+      if (buf.length > 4 * 1024 * 1024) {
+        return res.status(413).json({
+          error: 'El archivo pesa ' + (buf.length / 1048576).toFixed(1) + ' MB y no cabe en el proxy. ' +
+            'Activa CORS en el bucket y usa la URL firmada.',
+        });
+      }
+      return res.status(200).json({
+        data: buf.toString('base64'),
+        mimeType: r.headers.get('content-type') || 'application/octet-stream',
+        bytes: buf.length,
+      });
+    }
+
+    /* ════════ MODELS — descubrimiento en Model Garden ════════ */
+    if (mode === 'models') {
+      const base = {
+        tts: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
+        image: ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview',
+                'imagen-4.0-generate-001', 'imagen-4.0-ultra-generate-001'],
+        video: ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview',
+                'veo-3.0-fast-generate-001', 'veo-3.0-generate-001', 'veo-2.0-generate-001'],
+        text: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3-pro-preview'],
+      };
+      const sets = {
+        tts: new Set(base.tts), image: new Set(base.image),
+        video: new Set(base.video), text: new Set(base.text),
+      };
+      let fuente = 'lista base (no se pudo consultar Model Garden)';
+      try {
+        let pageToken = '';
+        let alguna = false;
+        for (let pag = 0; pag < 8; pag++) {
+          const u = 'https://us-central1-aiplatform.googleapis.com/v1beta1/publishers/google/models?pageSize=200' +
+            (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+          const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
+          if (!r.ok) break;
+          alguna = true;
+          const j = await r.json();
+          for (const m of (j.publisherModels || [])) {
+            const id = String(m.name || '').split('/').pop();
+            const l = id.toLowerCase();
+            if (l.indexOf('tts') !== -1) sets.tts.add(id);
+            else if (l.indexOf('veo') === 0) sets.video.add(id);
+            else if (l.indexOf('image') !== -1 || l.indexOf('imagen') === 0) sets.image.add(id);
+            else if (l.indexOf('gemini') === 0) sets.text.add(id);
+          }
+          pageToken = j.nextPageToken || '';
+          if (!pageToken) break;
+        }
+        if (alguna) fuente = 'Vertex Model Garden + lista base';
+      } catch (e) { /* silencioso: cae a la lista base */ }
+
+      return res.status(200).json({
+        fuente,
+        tts: Array.from(sets.tts).sort(),
+        image: Array.from(sets.image).sort(),
+        video: Array.from(sets.video).sort(),
+        text: Array.from(sets.text).sort(),
+      });
+    }
+
+    return res.status(400).json({ error: 'Modo desconocido: ' + mode });
+  } catch (e) {
+    return res.status(500).json({ error: (e && e.message) || String(e) });
+  }
+};

@@ -120,63 +120,124 @@ async function comprobarConexion() {
         esc(r.errorToken) + '</td></tr>';
     }
     const ok = r.proyecto && r.cuentaServicio && r.token;
-    $('chipConexion').className = 'chip ' + (ok ? 'ok' : 'e');
-    $('chipConexion').textContent = ok ? 'Vertex conectado' : 'revisar conexión';
+    marcarConexion(ok ? 'ok' : 'mal');
   } catch (e) {
     t.innerHTML = '<tr><td>Error</td><td><span class="chip e">' + esc(e.message) + '</span></td></tr>';
-    $('chipConexion').className = 'chip e';
-    $('chipConexion').textContent = 'sin conexión';
+    marcarConexion('mal');
   }
+}
+
+/** El botón de la cabecera lleva un punto de color con el estado. */
+function marcarConexion(estado) {
+  const b = $('btnConexion');
+  if (!b) return;
+  const previo = b.querySelector('.punto');
+  if (previo) previo.remove();
+  const p = document.createElement('span');
+  p.className = 'punto';
+  p.style.background = estado === 'ok' ? 'var(--verde)' : 'var(--rojo)';
+  p.title = estado === 'ok' ? 'Vertex conectado' : 'Revisa la conexión';
+  b.appendChild(p);
+  b.setAttribute('aria-label', p.title);
+}
+
+/* ── Catálogo de modelos ────────────────────────────────────
+   Lista cerrada. Solo generación de imagen nativa de Gemini: es la
+   única que acepta imágenes de referencia, y por tanto la única que
+   mantiene el mismo rostro en los doce episodios.                   */
+
+const MODELOS = {
+  imagen: [
+    ['gemini-2.5-flash-image', 'Nano Banana — estable y rápido'],
+    ['gemini-3.1-flash-image', 'Nano Banana 2 — nuevo y rápido'],
+    ['gemini-3-pro-image', 'Nano Banana Pro — máxima calidad'],
+  ],
+  video: [
+    ['veo-3.1-lite-generate-001', 'Veo 3.1 Lite — el más económico'],
+    ['veo-3.1-fast-generate-001', 'Veo 3.1 Fast — equilibrado'],
+    ['veo-3.1-generate-001', 'Veo 3.1 — máxima calidad'],
+    ['veo-2.0-generate-001', 'Veo 2 — generación anterior'],
+  ],
+  texto: [
+    ['gemini-3.1-pro-preview', 'Gemini 3.1 Pro — el mejor director'],
+    ['gemini-2.5-pro', 'Gemini 2.5 Pro'],
+    ['gemini-2.5-flash', 'Gemini 2.5 Flash — rápido y barato'],
+  ],
+  voz: [
+    ['gemini-2.5-flash-preview-tts', 'Gemini 2.5 Flash TTS'],
+    ['gemini-2.5-pro-preview-tts', 'Gemini 2.5 Pro TTS'],
+  ],
+};
+
+const NOTA_MODELO = {
+  'gemini-2.5-flash-image': 'Región us-central1. El más rápido y barato; buena consistencia de personaje.',
+  'gemini-3.1-flash-image': 'Endpoint global. Más nuevo que el 2.5 y casi igual de rápido.',
+  'gemini-3-pro-image': 'Endpoint global. La mejor calidad y el único que admite 2K y 4K. Más caro y más lento.',
+  'veo-3.1-lite-generate-001': 'El más barato. Suficiente para planos de movimiento contenido.',
+  'veo-3.1-fast-generate-001': 'Equilibrio entre precio y calidad. Recomendado para la mayoría de las tomas.',
+  'veo-3.1-generate-001': 'Máxima calidad de animación. Resérvalo para los planos que llevan el peso del episodio.',
+  'veo-2.0-generate-001': 'Generación anterior. Más barata, sin audio y con menos control de cámara.',
+};
+
+function llenarSelect(sel, pares, valor) {
+  if (!sel) return;
+  sel.innerHTML = '';
+  for (const par of pares) {
+    const [v, etiqueta] = Array.isArray(par) ? par : [par, par];
+    const o = document.createElement('option');
+    o.value = v;
+    o.textContent = etiqueta;
+    sel.appendChild(o);
+  }
+  const validos = pares.map((p) => (Array.isArray(p) ? p[0] : p));
+  sel.value = validos.indexOf(valor) !== -1 ? valor : validos[0];
+}
+
+function poblarModelos() {
+  // La voz sí se puede descubrir en tu Vertex; imagen y video son lista cerrada.
+  const voces = (modelos && Array.isArray(modelos.tts) && modelos.tts.length)
+    ? modelos.tts.map((m) => [m, m]) : MODELOS.voz;
+
+  llenarSelect($('cfgModeloTts'), voces, P.config.modeloTts);
+  llenarSelect($('cfgModeloTexto'), MODELOS.texto, P.config.modeloTexto);
+  for (const id of ['cfgModeloImagen', 'selModImgProd', 'selModImgBiblia']) {
+    llenarSelect($(id), MODELOS.imagen, P.config.modeloImagen);
+  }
+  for (const id of ['cfgModeloVideo', 'selModVidProd']) {
+    llenarSelect($(id), MODELOS.video, P.config.modeloVideo);
+  }
+  pintarNotasModelo();
+}
+
+function pintarNotasModelo() {
+  const n = (id, modelo) => { if ($(id)) $(id).textContent = NOTA_MODELO[modelo] || ''; };
+  n('pistaModImg', P.config.modeloImagen);
+  n('pistaModImgBiblia', P.config.modeloImagen);
+  n('pistaModVid', P.config.modeloVideo);
+}
+
+/** Un cambio en cualquier selector de modelo se refleja en todos. */
+function fijarModelo(tipo, valor) {
+  if (tipo === 'imagen') P.config.modeloImagen = valor;
+  else if (tipo === 'video') P.config.modeloVideo = valor;
+  else if (tipo === 'texto') P.config.modeloTexto = valor;
+  poblarModelos();
+  guardar();
+  pintarCoste();
 }
 
 async function descubrirModelos() {
   $('notaModelos').textContent = 'consultando tu Vertex…';
   try {
-    modelos = await api.modelos();
-    await store.guardar('modelos', modelos);
+    const r = await api.modelos();
+    modelos = r;
+    await store.guardar('modelos', r);
     poblarModelos();
-    $('notaModelos').textContent =
-      'voz ' + modelos.tts.length + ' · imagen ' + modelos.image.length +
-      ' · video ' + modelos.video.length + ' · texto ' + modelos.text.length +
-      ' — fuente: ' + modelos.fuente;
+    $('notaModelos').textContent = (r.tts || []).length +
+      ' modelos de voz disponibles en tu proyecto — fuente: ' + (r.fuente || '?');
   } catch (e) {
-    $('notaModelos').textContent = 'no se pudo consultar (' + e.message + '); se usan las listas base';
+    $('notaModelos').textContent = 'no se pudo consultar (' + e.message + '); se usa la lista base';
   }
-}
-
-function llenarSelect(sel, lista, valor) {
-  sel.innerHTML = '';
-  const vistos = new Set();
-  for (const m of lista) {
-    if (vistos.has(m)) continue;
-    vistos.add(m);
-    const o = document.createElement('option');
-    o.value = m; o.textContent = m;
-    sel.appendChild(o);
-  }
-  if (valor && !vistos.has(valor)) {
-    const o = document.createElement('option');
-    o.value = valor; o.textContent = valor + ' (guardado)';
-    sel.insertBefore(o, sel.firstChild);
-  }
-  sel.value = valor || sel.value;
-}
-
-const MODELOS_BASE = {
-  tts: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
-  image: ['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'],
-  video: ['veo-3.1-generate-001', 'veo-3.1-fast-generate-001', 'veo-3.1-lite-generate-001', 'veo-2.0-generate-001'],
-  text: ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
-};
-
-function poblarModelos() {
-  // Cada lista se valida por separado: un caché a medias no debe tumbar la página.
-  const lista = (k) => (modelos && Array.isArray(modelos[k]) && modelos[k].length)
-    ? modelos[k] : MODELOS_BASE[k];
-  llenarSelect($('cfgModeloTts'), lista('tts'), P.config.modeloTts);
-  llenarSelect($('cfgModeloImagen'), lista('image'), P.config.modeloImagen);
-  llenarSelect($('cfgModeloVideo'), lista('video'), P.config.modeloVideo);
-  llenarSelect($('cfgModeloTexto'), lista('text'), P.config.modeloTexto);
 }
 
 /* ── Episodios ──────────────────────────────────────────────── */
@@ -540,6 +601,198 @@ function pintarResumenTemporada() {
   c.innerHTML = filas;
 }
 
+/* ── Panel ──────────────────────────────────────────────────── */
+
+const ICONO = {
+  libro: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 012-2h13v18H6a2 2 0 01-2-2z"/><path d="M9 3v18"/></svg>',
+  pluma: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4C11 5 6 10 5 19l3-3c6-1 10-5 12-12z"/></svg>',
+  gente: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>',
+  mapa: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6l7-3 6 3 7-3v15l-7 3-6-3-7 3z"/><path d="M9 3v15M15 6v15"/></svg>',
+  bandera: '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>',
+  flecha: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  check: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12B76A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/></svg>',
+  play: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M10.5 9l5 3-5 3z"/></svg>',
+  chispa: '<svg width="18" height="18" viewBox="0 0 24 24" fill="#F79009"><path d="M12 2l2.1 6.1L20 10l-5.4 3.8L16.5 20 12 16.6 7.5 20l1.9-6.2L4 10l5.9-1.9z"/></svg>',
+  tilde: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>',
+  candado: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',
+};
+
+/** Fracción terminada de un episodio, contando las tres fases. */
+function avanceEpisodio(ep) {
+  const s = estadoEpisodio(ep);
+  if (!s.tomas) return 0;
+  const partes = [s.voz / s.tomas, s.imagen / s.tomas];
+  if (s.movimiento) partes.push(s.video / s.movimiento);
+  return partes.reduce((a, b) => a + b, 0) / partes.length;
+}
+
+async function pintarPanel() {
+  if (!P.episodios.length) {
+    $('panelStats').innerHTML = '';
+    $('panelCarrusel').innerHTML = '<p class="nota">Cargando los guiones…</p>';
+    return;
+  }
+
+  const avances = P.episodios.map(avanceEpisodio);
+  const general = Math.round((avances.reduce((a, b) => a + b, 0) / avances.length) * 100);
+  const listos = avances.filter((a) => a >= 0.999).length;
+
+  // ── Tarjetas de cifra
+  const circ = 2 * Math.PI * 19;
+  $('panelStats').innerHTML =
+    '<div class="stat"><div class="ico az">' + ICONO.libro + '</div><div class="txt">' +
+    '<div class="rot">Episodios</div><div class="val">' + P.episodios.length + '</div>' +
+    '<div class="pie2">' + listos + ' terminados</div></div></div>' +
+
+    '<div class="stat"><div class="anillo"><svg width="46" height="46">' +
+    '<circle cx="23" cy="23" r="19" fill="none" stroke="#EAECF0" stroke-width="5"/>' +
+    '<circle cx="23" cy="23" r="19" fill="none" stroke="#2563EB" stroke-width="5" stroke-linecap="round" ' +
+    'stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' +
+    (circ * (1 - general / 100)).toFixed(1) + '"/></svg><span>' + general + '%</span></div>' +
+    '<div class="txt"><div class="rot">Progreso general</div><div class="pie2">de la temporada</div></div></div>' +
+
+    '<div class="stat"><div class="ico vd">' + ICONO.pluma + '</div><div class="txt">' +
+    '<div class="rot">Tomas</div><div class="val">' +
+    P.episodios.reduce((a, e) => a + e.tomas.length, 0).toLocaleString('es') + '</div>' +
+    '<div class="pie2">' + fmtDur(P.episodios.reduce((a, e) =>
+      a + e.tomas.reduce((x, t) => x + (t.segundos || t.segEstimados || 0), 0), 0)) + ' de serie</div></div></div>';
+
+  // ── Carrusel de episodios
+  const c = $('panelCarrusel');
+  c.innerHTML = '';
+  P.episodios.forEach((ep, k) => {
+    const a = avances[k];
+    const pct = Math.round(a * 100);
+    const estado = a >= 0.999 ? 'done' : (a > 0 ? 'wip' : 'lock');
+    const d = document.createElement('div');
+    d.className = 'ep-card' + (ep.num === P.sel ? ' sel' : '');
+    d.innerHTML =
+      '<div class="velo"></div>' +
+      '<div class="num">' + pad2(ep.num) + '</div>' +
+      '<div class="cuerpo"><div class="tit">' + esc(ep.titulo) + '</div>' +
+      (estado === 'done'
+        ? '<span class="badge done">' + ICONO.tilde + ' TERMINADO</span>'
+        : estado === 'wip'
+          ? '<span class="badge wip">EN PROGRESO</span>' +
+            '<div class="barra"><i style="width:' + pct + '%"></i></div>' +
+            '<div class="pct">' + pct + ' %</div>'
+          : '<span class="badge lock">' + ICONO.candado + ' SIN EMPEZAR</span>') +
+      '</div>';
+    d.addEventListener('click', () => { P.sel = ep.num; guardar(); pintarTodo(); irA('episodios'); });
+    c.appendChild(d);
+
+    // La carátula es el primer fotograma que exista del episodio.
+    const conImagen = ep.tomas.find((t) => t.imagen && t.imagen.ok);
+    if (conImagen) {
+      assets.url(clave.imagen(ep.num, conImagen.i)).then((u) => {
+        if (u) d.insertAdjacentHTML('afterbegin', '<img src="' + u + '" alt="">');
+      });
+    }
+  });
+
+  // ── Línea de progreso
+  const pasos = $('panelPasos');
+  pasos.innerHTML = '';
+  P.episodios.forEach((ep, k) => {
+    const a = avances[k];
+    const cls = a >= 0.999 ? 'hecho' : (a > 0 ? 'curso' : '');
+    const d = document.createElement('div');
+    d.className = 'paso ' + cls;
+    d.innerHTML = '<div class="linea"></div><div class="bolita">' +
+      (cls === 'hecho' ? ICONO.tilde : (cls === '' ? ICONO.candado : '')) +
+      '</div><div class="n">' + ep.num + '</div>';
+    d.addEventListener('click', () => { P.sel = ep.num; guardar(); pintarTodo(); irA('episodios'); });
+    pasos.appendChild(d);
+  });
+
+  // ── Siguiente paso: lo primero que falta, en orden
+  const sinRefs = P.elenco.filter((p) => p.principal && (!p.refs || !p.refs.length));
+  const k = avances.findIndex((a) => a < 0.999);
+  const ep = k >= 0 ? P.episodios[k] : null;
+  let texto, destino, accion;
+  if (sinRefs.length) {
+    texto = 'Genera las hojas de referencia de los ' + sinRefs.length + ' personajes principales que faltan.';
+    destino = 'biblia'; accion = 'Ir a la biblia';
+  } else if (ep && !ep.tomas.some((t) => t.plano)) {
+    texto = 'El episodio ' + pad2(ep.num) + ' aún no está dirigido.';
+    destino = 'episodios'; accion = 'Dirigirlo';
+  } else if (ep) {
+    texto = 'Continúa la producción del episodio ' + pad2(ep.num) + ' · ' + ep.titulo + '.';
+    destino = 'episodios'; accion = 'Continuar';
+  } else {
+    texto = 'La temporada está completa. Ve al archivo y exporta los doce episodios.';
+    destino = 'archivo'; accion = 'Exportar';
+  }
+  $('panelSiguiente').textContent = texto;
+  $('btnPanelContinuar').textContent = accion;
+  $('btnPanelContinuar').dataset.destino = destino;
+  if (ep) P.sel = P.sel || ep.num;
+
+  // ── Accesos a la biblia
+  const conRef = P.elenco.filter((p) => p.refs && p.refs.length);
+  const conFondo = P.lugares.filter((l) => l.ref);
+  const miniaturas = async (nodo, lista, campo) => {
+    const caja = nodo.querySelector('.miniaturas');
+    for (const it of lista.slice(0, 4)) {
+      const s = document.createElement('span');
+      s.textContent = it.nombre.slice(0, 1);
+      caja.appendChild(s);
+      const idAsset = campo === 'refs' ? (it.refs && it.refs[0]) : it.ref;
+      if (idAsset) {
+        const u = await assets.url(idAsset);
+        if (u) s.innerHTML = '<img src="' + u + '" alt="">';
+      }
+    }
+  };
+  const acc = $('panelAccesos');
+  acc.innerHTML =
+    ['<div class="acceso" data-ir="biblia"><div class="cab">' + ICONO.gente + ' Personajes <span class="n">' +
+      P.elenco.length + '</span></div><div class="miniaturas"></div>' +
+      '<div class="des">' + conRef.length + ' con hoja de referencia' + ICONO.flecha + '</div></div>',
+     '<div class="acceso" data-ir="biblia"><div class="cab">' + ICONO.mapa + ' Lugares <span class="n">' +
+      P.lugares.length + '</span></div><div class="miniaturas"></div>' +
+      '<div class="des">' + conFondo.length + ' con fondo maestro' + ICONO.flecha + '</div></div>',
+     '<div class="acceso" data-ir="sala"><div class="cab">' + ICONO.bandera + ' Arcos <span class="n">3</span></div>' +
+      '<div class="miniaturas"></div>' +
+      '<div class="des">La Llegada · El Puente · El Rebaño' + ICONO.flecha + '</div></div>',
+    ].join('');
+  const cajas = acc.querySelectorAll('.acceso');
+  miniaturas(cajas[0], conRef.length ? conRef : P.elenco, 'refs');
+  miniaturas(cajas[1], conFondo.length ? conFondo : P.lugares, 'ref');
+  cajas.forEach((n) => n.addEventListener('click', () => irA(n.dataset.ir)));
+
+  // ── Actividad reciente
+  const act = [];
+  for (const e of P.episodios) {
+    const s = estadoEpisodio(e);
+    if (s.video) act.push([ICONO.play, 'Episodio ' + pad2(e.num) + ': ' + s.video + ' clips animados', s.video]);
+    if (s.imagen) act.push([ICONO.chispa, 'Episodio ' + pad2(e.num) + ': ' + s.imagen + ' fotogramas', s.imagen]);
+    if (s.voz) act.push([ICONO.check, 'Episodio ' + pad2(e.num) + ': voz de ' + s.voz + ' tomas', s.voz]);
+  }
+  const ul = $('panelActividad');
+  ul.innerHTML = act.length
+    ? act.sort((a, b) => b[2] - a[2]).slice(0, 6)
+      .map(([ico, txt]) => '<li><span class="ico">' + ico + '</span><span class="qu">' + esc(txt) + '</span></li>').join('')
+    : '<li><span class="ico">' + ICONO.chispa + '</span><span class="qu">Todavía no hay material generado. Empieza por la biblia visual.</span></li>';
+
+  // ── Cabecera: nombre y portada
+  $('heroNombre').textContent = P.config.nombre || 'Estudio';
+  const tokio = P.lugares.find((l) => l.id === 'tokio' && l.ref) || P.lugares.find((l) => l.ref);
+  if (tokio) {
+    const u = await assets.url(tokio.ref);
+    if (u) {
+      $('hero').style.backgroundImage =
+        'linear-gradient(180deg, rgba(9,14,26,.34) 0%, rgba(9,14,26,.72) 62%, var(--fondo) 100%), url(' + u + ')';
+    }
+  }
+}
+
+function irA(fase) {
+  const b = document.querySelector('nav.abajo button[data-fase="' + fase + '"]');
+  if (b) b.click();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 /* ── Presupuesto ────────────────────────────────────────────── */
 
 function costeEpisodio(ep) {
@@ -606,6 +859,12 @@ function pintarTodo() {
   pintarCoste();
   pintarResumenTemporada();
   pintarAlmacen();
+  pintarPanel();
+  const ep = epActual();
+  $('cuentaGuion').textContent = ep ? ep.tomas.length + ' tomas' : '';
+  $('cuentaProd').textContent = ep ? ep.tomas.length + ' tomas' : '';
+  $('cuentaElenco').textContent = P.elenco.length;
+  $('cuentaLugares').textContent = P.lugares.length;
 }
 
 /* ── Ajustes ────────────────────────────────────────────────── */
@@ -628,6 +887,7 @@ function abrirAjustes() {
   $('cfgTempVoz').value = c.temperaturaVoz;
   $('valTempVoz').textContent = Number(c.temperaturaVoz).toFixed(2);
   $('cfgSemilla').value = c.semillaVoz;
+  $('cfgNombre').value = c.nombre || '';
   $('cfgInstruccionVoz').value = c.instruccionVoz;
   $('cfgNormalizar').checked = c.normalizarVoz;
   $('cfgAnunciar').checked = c.anunciarTitulo;
@@ -647,6 +907,7 @@ function guardarAjustes() {
   c.resolucionVideo = $('cfgResVideo').value;
   c.temperaturaVoz = parseFloat($('cfgTempVoz').value);
   c.semillaVoz = $('cfgSemilla').value;
+  c.nombre = $('cfgNombre').value.trim();
   c.instruccionVoz = $('cfgInstruccionVoz').value.trim();
   c.normalizarVoz = $('cfgNormalizar').checked;
   c.anunciarTitulo = $('cfgAnunciar').checked;
@@ -685,17 +946,30 @@ function mostrarDiferencias() {
 /* ── Eventos ────────────────────────────────────────────────── */
 
 function cablear() {
-  // Navegación
-  document.querySelectorAll('nav.fases button').forEach((b) => {
+  // Navegación inferior
+  document.querySelectorAll('nav.abajo button').forEach((b) => {
     b.addEventListener('click', () => {
-      document.querySelectorAll('nav.fases button').forEach((x) => x.classList.remove('on'));
+      document.querySelectorAll('nav.abajo button').forEach((x) => x.classList.remove('on'));
       document.querySelectorAll('section.fase').forEach((x) => x.classList.remove('on'));
       b.classList.add('on');
       $('fase-' + b.dataset.fase).classList.add('on');
+      if (b.dataset.fase === 'panel') pintarPanel();
       if (b.dataset.fase === 'biblia') pintarFichas();
       if (b.dataset.fase === 'sala') { prepararSala(); const ep = epActual(); if (ep) proyector.cargar(ep); }
     });
   });
+  $('btnVerEpisodios').addEventListener('click', () => irA('episodios'));
+  $('btnConexion').addEventListener('click', () => { irA('archivo'); comprobarConexion(); });
+  $('btnPanelContinuar').addEventListener('click', (ev) => irA(ev.currentTarget.dataset.destino || 'episodios'));
+
+  // Selectores de modelo: los tres puntos de generación comparten valor
+  for (const id of ['cfgModeloImagen', 'selModImgProd', 'selModImgBiblia']) {
+    $(id).addEventListener('change', (e) => fijarModelo('imagen', e.target.value));
+  }
+  for (const id of ['cfgModeloVideo', 'selModVidProd']) {
+    $(id).addEventListener('change', (e) => fijarModelo('video', e.target.value));
+  }
+  $('cfgModeloTexto').addEventListener('change', (e) => fijarModelo('texto', e.target.value));
 
   // Proyecto
   $('btnPing').addEventListener('click', comprobarConexion);
@@ -815,7 +1089,10 @@ function cablear() {
     P.config.proporcionMovimiento = Number(e.target.value) / 100;
     await guardar();
   });
-  $('cfgModeloTexto').addEventListener('change', (e) => { P.config.modeloTexto = e.target.value; guardar(); });
+  $('cfgFormato').addEventListener('change', async (e) => {
+    P.config.formato = e.target.value;
+    await guardar(); pintarTodo();
+  });
 
   // Producción
   $('selEpProd').addEventListener('change', (e) => { P.sel = Number(e.target.value); guardar(); pintarTodo(); });

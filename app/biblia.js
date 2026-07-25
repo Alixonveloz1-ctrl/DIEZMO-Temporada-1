@@ -257,14 +257,17 @@ export const MOVIMIENTOS = [
 /* ── Configuración por defecto del proyecto ─────────────────── */
 
 export const CONFIG_DEFECTO = {
+  // Solo para el saludo de la cabecera. Vive en este dispositivo.
+  nombre: '',
+
   // Formato
   formato: '16:9',
   imageSize: '2K',
 
   // Modelos
   modeloTexto: 'gemini-3.1-pro-preview',
-  modeloImagen: 'gemini-3-pro-image',
-  modeloVideo: 'veo-3.1-fast-generate-001',
+  modeloImagen: 'gemini-2.5-flash-image',
+  modeloVideo: 'veo-3.1-lite-generate-001',
   modeloTts: 'gemini-2.5-flash-preview-tts',
 
   // Voz

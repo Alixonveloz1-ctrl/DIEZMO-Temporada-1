@@ -359,7 +359,10 @@ module.exports = async (req, res) => {
       }
 
       const imageConfig = { aspectRatio: body.aspectRatio || '16:9' };
-      if (body.imageSize && esG3) imageConfig.imageSize = String(body.imageSize);
+      // Solo Nano Banana Pro admite elegir la resolución.
+      if (body.imageSize && model === 'gemini-3-pro-image') {
+        imageConfig.imageSize = String(body.imageSize);
+      }
 
       const vBody = {
         contents: [{ role: 'user', parts }],

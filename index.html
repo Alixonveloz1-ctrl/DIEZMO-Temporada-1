@@ -3,565 +3,587 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>DIEZMO · Estudio de Anime</title>
+<meta name="theme-color" content="#F7F8FA">
+<title>DIEZMO · Estudio de Episodios</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════════════════
-   DIEZMO · Estudio de Anime — capa visual
-   Paleta: la noche de bronce. Negro cálido, hueso, ámbar,
-   brasa para el peligro, verde mar para lo terminado.
+   DIEZMO · Estudio de Episodios
    ═══════════════════════════════════════════════════════════ */
-
 :root{
-  --noche:#0E0B08;
-  --sup-1:#171210;
-  --sup-2:#1F1815;
-  --sup-3:#2A211B;
-  --hueso:#F2E9DA;
-  --hueso-2:#C9BCA9;
-  --ceniza:#8E7F6D;
-  --linea:rgba(242,233,218,.09);
-  --linea-2:rgba(242,233,218,.16);
-  --ambar:#F0A93A;
-  --ambar-2:#FFC868;
-  --brasa:#D9522C;
-  --mar:#63A088;
-  --sombra:0 2px 4px rgba(0,0,0,.4), 0 12px 32px rgba(0,0,0,.34);
-  --sombra-2:0 1px 2px rgba(0,0,0,.5), 0 6px 18px rgba(0,0,0,.4);
-  --r-s:10px; --r-m:14px; --r-l:20px;
-  --transicion:180ms cubic-bezier(.4,0,.2,1);
+  --fondo:#F7F8FA;
+  --carta:#FFFFFF;
+  --carta-2:#FBFCFD;
+  --tinta:#101828;
+  --tinta-2:#475467;
+  --tinta-3:#98A2B3;
+  --linea:#EAECF0;
+  --linea-2:#D0D5DD;
+  --azul:#2563EB;
+  --azul-2:#3B82F6;
+  --azul-suave:#EFF4FF;
+  --verde:#12B76A;
+  --verde-suave:#ECFDF3;
+  --ambar:#F79009;
+  --ambar-suave:#FFFAEB;
+  --rojo:#F04438;
+  --rojo-suave:#FEF3F2;
+  --violeta:#7C3AED;
+  --s1:0 1px 2px rgba(16,24,40,.05);
+  --s2:0 1px 3px rgba(16,24,40,.08), 0 1px 2px rgba(16,24,40,.04);
+  --s3:0 4px 8px -2px rgba(16,24,40,.08), 0 2px 4px -2px rgba(16,24,40,.04);
+  --s4:0 12px 20px -4px rgba(16,24,40,.10), 0 4px 6px -2px rgba(16,24,40,.03);
+  --r-s:10px; --r-m:14px; --r-l:18px; --r-xl:24px;
+  --tr:180ms cubic-bezier(.4,0,.2,1);
 }
-
 *{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+html{-webkit-text-size-adjust:100%}
 body{
-  margin:0;color:var(--hueso);
-  background:
-    radial-gradient(1200px 620px at 78% -8%, rgba(240,169,58,.10), transparent 62%),
-    radial-gradient(900px 520px at 4% 4%, rgba(217,82,44,.07), transparent 60%),
-    var(--noche);
-  background-attachment:fixed;
-  font-family:'Archivo',system-ui,-apple-system,sans-serif;
-  font-size:15.5px;line-height:1.55;letter-spacing:-.006em;
-  padding-bottom:104px;
+  margin:0;background:var(--fondo);color:var(--tinta);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  font-size:15px;line-height:1.5;letter-spacing:-.008em;
+  padding-bottom:calc(78px + env(safe-area-inset-bottom));
   -webkit-font-smoothing:antialiased;
 }
-.mono{font-family:'Space Mono',ui-monospace,monospace;letter-spacing:-.02em}
-a{color:var(--ambar);text-decoration:none}
-::selection{background:rgba(240,169,58,.28)}
+.serif{font-family:'Cormorant Garamond',Georgia,serif}
+a{color:var(--azul);text-decoration:none}
+::selection{background:#D3E2FF}
+img{max-width:100%}
 
-/* ── Cabecera ─────────────────────────────────────────────── */
-header.top{
-  position:sticky;top:0;z-index:40;
-  background:linear-gradient(180deg, rgba(14,11,8,.94), rgba(14,11,8,.80));
-  backdrop-filter:blur(20px) saturate(140%);
-  -webkit-backdrop-filter:blur(20px) saturate(140%);
-  border-bottom:1px solid var(--linea);
+/* ── Cabecera con portada ─────────────────────────────────── */
+.hero{
+  position:relative;padding:18px 18px 24px;overflow:hidden;color:#fff;
+  background:
+    linear-gradient(180deg, rgba(9,14,26,.30) 0%, rgba(9,14,26,.62) 62%, var(--fondo) 100%),
+    radial-gradient(120% 90% at 78% 6%, #3C5A86 0%, #24344F 42%, #141C2B 100%);
+  background-size:cover;background-position:center;
 }
-.top-in{
-  max-width:1240px;margin:0 auto;padding:16px 18px 2px;
-  display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;
+.hero.con-imagen{background-blend-mode:normal}
+.hero-barra{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.marca{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0}
+.marca .dz{
+  font-family:'Cormorant Garamond',serif;font-weight:400;font-size:29px;
+  letter-spacing:.30em;line-height:1;text-indent:.30em;
 }
-.dz{
-  font-weight:900;font-stretch:118%;font-size:23px;letter-spacing:.16em;line-height:1;
-  background:linear-gradient(160deg,#FFF6E6,#C9BCA9);
-  -webkit-background-clip:text;background-clip:text;color:transparent;
+.marca .sub{
+  font-size:9px;letter-spacing:.28em;opacity:.82;margin-top:6px;
+  text-transform:uppercase;font-weight:500;text-indent:.28em;
 }
-.dz .pt{
-  color:var(--ambar);-webkit-text-fill-color:var(--ambar);
-  text-shadow:0 0 18px rgba(240,169,58,.75);
+.icono-btn{
+  width:40px;height:40px;border-radius:50%;border:none;flex:none;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.92);color:#1D2939;box-shadow:var(--s2);
+  transition:var(--tr);
 }
-.sub{
-  display:block;font-family:'Space Mono',monospace;font-size:9.5px;
-  letter-spacing:.22em;color:var(--ceniza);margin-top:7px;text-transform:uppercase;
+.icono-btn:active{transform:scale(.94)}
+.icono-btn.oscuro{background:#141C2B;color:#F0C674}
+.icono-btn .punto{
+  position:absolute;margin:-18px 0 0 18px;width:9px;height:9px;border-radius:50%;
+  background:var(--ambar);border:2px solid #fff;
+}
+.saludo{margin-top:26px}
+.saludo .hola{font-size:15px;opacity:.88;font-weight:400}
+.saludo .nombre{
+  font-family:'Cormorant Garamond',serif;font-weight:500;font-size:40px;
+  line-height:1.05;margin-top:2px;letter-spacing:-.01em;
+}
+.lema{
+  margin:14px 0 0;padding-left:16px;position:relative;
+  font-family:'Cormorant Garamond',serif;font-size:19px;line-height:1.4;opacity:.95;
+}
+.lema::before{
+  content:'\201C';position:absolute;left:-2px;top:-4px;
+  font-size:34px;opacity:.5;font-family:'Cormorant Garamond',serif;
 }
 
-/* ── Navegación por fases ─────────────────────────────────── */
-nav.fases{
-  max-width:1240px;margin:0 auto;padding:12px 18px 12px;
-  display:flex;gap:5px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
-}
-nav.fases::-webkit-scrollbar{display:none}
-nav.fases button{
-  appearance:none;border:1px solid transparent;border-radius:999px;
-  background:transparent;color:var(--ceniza);
-  font-family:'Archivo',sans-serif;font-size:13px;font-weight:600;letter-spacing:.01em;
-  padding:8px 15px;cursor:pointer;white-space:nowrap;
-  display:inline-flex;align-items:center;gap:7px;
-  transition:var(--transicion);
-}
-nav.fases button:hover{color:var(--hueso-2);background:rgba(242,233,218,.05)}
-nav.fases button.on{
-  color:#241703;
-  background:linear-gradient(165deg,var(--ambar-2),var(--ambar));
-  border-color:transparent;
-  box-shadow:0 2px 14px rgba(240,169,58,.34);
-}
-nav.fases button .n{
-  font-family:'Space Mono',monospace;font-size:9.5px;opacity:.55;font-weight:700;
-}
-nav.fases button.on .n{opacity:.62}
+/* ── Contenedor ───────────────────────────────────────────── */
+main{max-width:1080px;margin:0 auto;padding:0 16px}
+.hero-in{max-width:1080px;margin:0 auto}
+section.fase{display:none}
+section.fase.on{display:block;animation:sube 280ms cubic-bezier(.2,.7,.3,1)}
+@keyframes sube{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
-main{max-width:1240px;margin:0 auto;padding:6px 18px 0}
-section.fase{display:none;animation:entra 300ms cubic-bezier(.2,.7,.3,1)}
-section.fase.on{display:block}
-@keyframes entra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-
-/* ── Paneles ──────────────────────────────────────────────── */
+/* ── Tarjetas ─────────────────────────────────────────────── */
 .panel{
-  background:linear-gradient(168deg,var(--sup-2),var(--sup-1) 62%);
-  border:1px solid var(--linea);border-radius:var(--r-l);
-  padding:20px;margin:16px 0;box-shadow:var(--sombra);
-  position:relative;overflow:hidden;
+  background:var(--carta);border:1px solid var(--linea);border-radius:var(--r-xl);
+  padding:18px;margin:14px 0;box-shadow:var(--s2);
 }
-.panel::before{
-  content:'';position:absolute;inset:0 0 auto 0;height:1px;
-  background:linear-gradient(90deg,transparent,rgba(240,169,58,.30),transparent);
-}
+.panel.sinborde{border:none;box-shadow:none;background:transparent;padding:0}
 h2{
-  font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;
-  color:var(--ceniza);font-weight:700;margin:0 0 16px;
-  display:flex;align-items:center;gap:10px;
+  font-size:11px;letter-spacing:.10em;text-transform:uppercase;color:var(--tinta-2);
+  font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:9px;
 }
-h2::after{content:'';flex:1;height:1px;background:var(--linea)}
-h3{font-size:16px;font-weight:800;font-stretch:110%;margin:0 0 6px}
-.nota{color:var(--ceniza);font-size:13px;margin:12px 0 0;line-height:1.55}
-.nota.chica{font-size:12px}
-.pie{
-  color:var(--ceniza);font-size:10.5px;text-align:center;margin:34px 0 12px;
-  font-family:'Space Mono',monospace;letter-spacing:.14em;opacity:.6;
+h2 .cuenta{margin-left:auto;color:var(--tinta-3);font-weight:600;letter-spacing:0}
+h3{font-size:17px;font-weight:600;margin:0 0 6px}
+.nota{color:var(--tinta-2);font-size:13px;margin:12px 0 0;line-height:1.55}
+.nota.chica{font-size:12px;color:var(--tinta-3)}
+.pie{color:var(--tinta-3);font-size:11px;text-align:center;margin:24px 0 8px;letter-spacing:.1em}
+.rejilla2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.rejilla3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 14px}
+@media (max-width:760px){.rejilla2,.rejilla3{grid-template-columns:1fr}}
+.enlace-mas{
+  margin-left:auto;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--azul);
+  text-transform:uppercase;cursor:pointer;background:none;border:none;padding:0;
+  display:inline-flex;align-items:center;gap:4px;font-family:inherit;
 }
-.rejilla2{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
-.rejilla3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 16px}
-@media (max-width:780px){.rejilla2,.rejilla3{grid-template-columns:1fr}}
 
 /* ── Botones ──────────────────────────────────────────────── */
 .btn{
-  appearance:none;border:1px solid var(--linea-2);
-  background:linear-gradient(168deg,var(--sup-3),var(--sup-2));
-  color:var(--hueso);
-  font-family:'Archivo',sans-serif;font-size:14px;font-weight:600;letter-spacing:-.005em;
-  padding:11px 17px;border-radius:var(--r-s);cursor:pointer;
-  display:inline-flex;align-items:center;justify-content:center;gap:8px;
-  transition:var(--transicion);box-shadow:var(--sombra-2);
+  appearance:none;border:1px solid var(--linea-2);background:var(--carta);color:var(--tinta);
+  font-family:'Inter',sans-serif;font-size:14px;font-weight:600;letter-spacing:-.01em;
+  padding:10px 16px;border-radius:var(--r-s);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  transition:var(--tr);box-shadow:var(--s1);
 }
-.btn:hover{border-color:rgba(242,233,218,.28);transform:translateY(-1px)}
-.btn:active{transform:translateY(0) scale(.985)}
-.btn.primario{
-  background:linear-gradient(165deg,var(--ambar-2),var(--ambar));
-  border-color:transparent;color:#241703;font-weight:700;
-  box-shadow:0 2px 6px rgba(0,0,0,.3), 0 6px 22px rgba(240,169,58,.30);
-}
-.btn.primario:hover{box-shadow:0 2px 6px rgba(0,0,0,.3), 0 10px 30px rgba(240,169,58,.42)}
-.btn.brasa{
-  background:linear-gradient(165deg,#E8663D,var(--brasa));
-  border-color:transparent;color:#fff;
-  box-shadow:0 2px 6px rgba(0,0,0,.3), 0 6px 22px rgba(217,82,44,.34);
-}
-.btn.fantasma{background:transparent;box-shadow:none}
-.btn.fantasma:hover{background:rgba(242,233,218,.05)}
-.btn.txt{background:transparent;border-color:transparent;color:var(--ceniza);padding:7px 9px;box-shadow:none}
-.btn.peligro{background:transparent;border-color:transparent;color:var(--brasa);box-shadow:none}
-.btn.peligro:hover{background:rgba(217,82,44,.12);border-color:rgba(217,82,44,.3)}
-.btn.grande{width:100%;padding:15px;font-size:15px}
+.btn:hover{background:var(--carta-2);border-color:var(--linea-2)}
+.btn:active{transform:scale(.985)}
+.btn.primario{background:var(--azul);border-color:var(--azul);color:#fff;box-shadow:0 1px 2px rgba(37,99,235,.24)}
+.btn.primario:hover{background:#1D4FD8}
+.btn.brasa{background:var(--rojo);border-color:var(--rojo);color:#fff}
+.btn.fantasma{background:transparent;border-color:var(--linea-2);box-shadow:none}
+.btn.txt{background:none;border-color:transparent;color:var(--azul);box-shadow:none;padding:7px 8px}
+.btn.peligro{background:transparent;border-color:transparent;color:var(--rojo);box-shadow:none}
+.btn.peligro:hover{background:var(--rojo-suave)}
+.btn.grande{width:100%;padding:14px;font-size:15px}
 .btn.chico{padding:7px 12px;font-size:12.5px;border-radius:8px}
-.btn[disabled]{opacity:.35;cursor:default;transform:none!important;box-shadow:none}
-.fila-btn{display:flex;flex-wrap:wrap;gap:10px}
-:focus-visible{outline:2px solid var(--ambar);outline-offset:3px;border-radius:4px}
+.btn[disabled]{opacity:.42;cursor:default;transform:none!important}
+.fila-btn{display:flex;flex-wrap:wrap;gap:9px}
+:focus-visible{outline:3px solid #B9D0FF;outline-offset:1px;border-radius:6px}
 
 /* ── Campos ───────────────────────────────────────────────── */
-.campo{margin:0 0 16px}
+.campo{margin:0 0 14px}
 .campo label{
-  display:block;font-size:11px;letter-spacing:.09em;color:var(--ceniza);
-  margin-bottom:7px;text-transform:uppercase;font-weight:600;
+  display:block;font-size:12px;color:var(--tinta-2);margin-bottom:6px;font-weight:600;
 }
 .campo input[type=text],.campo input[type=number],.campo select,.campo textarea{
-  width:100%;background:rgba(0,0,0,.32);border:1px solid var(--linea-2);
-  border-radius:var(--r-s);color:var(--hueso);
-  font-family:'Archivo',sans-serif;font-size:14.5px;padding:12px 13px;
-  transition:var(--transicion);
+  width:100%;background:var(--carta);border:1px solid var(--linea-2);border-radius:var(--r-s);
+  color:var(--tinta);font-family:'Inter',sans-serif;font-size:14.5px;padding:11px 12px;
+  transition:var(--tr);box-shadow:var(--s1);
 }
 .campo input:focus,.campo select:focus,.campo textarea:focus{
-  outline:none;border-color:rgba(240,169,58,.55);
-  box-shadow:0 0 0 3px rgba(240,169,58,.14);background:rgba(0,0,0,.42);
+  outline:none;border-color:var(--azul-2);box-shadow:0 0 0 4px #DDE9FF;
 }
-.campo textarea{min-height:92px;resize:vertical;line-height:1.55}
-.campo textarea.alto{min-height:160px}
-.campo select{appearance:none;
-  background-image:linear-gradient(45deg,transparent 50%,var(--ceniza) 50%),linear-gradient(135deg,var(--ceniza) 50%,transparent 50%);
-  background-position:calc(100% - 18px) 52%, calc(100% - 13px) 52%;
-  background-size:5px 5px, 5px 5px;background-repeat:no-repeat;padding-right:36px;
+.campo textarea{min-height:88px;resize:vertical;line-height:1.55}
+.campo textarea.alto{min-height:150px}
+.campo select{
+  appearance:none;padding-right:34px;
+  background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%2398A2B3' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 11px center;
 }
-.campo.check{display:flex;align-items:center;gap:11px;margin-bottom:14px}
-.campo.check label{margin:0;text-transform:none;font-size:14px;color:var(--hueso);letter-spacing:0;font-weight:400}
-.campo.check input{width:19px;height:19px;accent-color:var(--ambar);flex:none}
-.rango{display:flex;align-items:center;gap:14px}
-.rango input[type=range]{flex:1;accent-color:var(--ambar);height:28px}
-.rango .val{
-  font-family:'Space Mono',monospace;font-size:12px;color:var(--ambar);
-  min-width:56px;text-align:right;font-weight:700;
+.campo.check{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.campo.check label{margin:0;font-size:14px;color:var(--tinta);font-weight:400}
+.campo.check input{width:19px;height:19px;accent-color:var(--azul);flex:none}
+.rango{display:flex;align-items:center;gap:12px}
+.rango input[type=range]{flex:1;accent-color:var(--azul);height:26px}
+.rango .val{font-size:12.5px;color:var(--azul);min-width:52px;text-align:right;font-weight:700}
+details summary{color:var(--tinta-2);font-size:13px;cursor:pointer;font-weight:600}
+
+/* ── Selector de modelo ───────────────────────────────────── */
+.selector-modelo{
+  background:var(--azul-suave);border:1px solid #D3E2FF;border-radius:var(--r-m);
+  padding:12px 13px;margin:0 0 14px;
 }
-details summary{color:var(--ceniza);font-size:13px}
-details summary::marker{color:var(--ambar)}
+.selector-modelo .cab{
+  display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;
+  letter-spacing:.07em;text-transform:uppercase;color:var(--azul);margin-bottom:9px;
+}
+.selector-modelo select{background:var(--carta)}
+.selector-modelo .pista{font-size:11.5px;color:var(--tinta-2);margin:8px 0 0;line-height:1.45}
 
 /* ── Chips ────────────────────────────────────────────────── */
 .chip{
-  font-family:'Space Mono',monospace;font-size:10px;letter-spacing:.02em;
-  padding:4px 10px;border-radius:999px;white-space:nowrap;
-  border:1px solid var(--linea-2);color:var(--ceniza);
-  background:rgba(242,233,218,.04);display:inline-block;font-weight:700;
+  font-size:11px;font-weight:600;padding:4px 10px;border-radius:999px;white-space:nowrap;
+  border:1px solid var(--linea);color:var(--tinta-2);background:var(--fondo);display:inline-flex;
+  align-items:center;gap:5px;
 }
-.chip.ok{border-color:rgba(99,160,136,.45);color:var(--mar);background:rgba(99,160,136,.11)}
-.chip.g{border-color:rgba(240,169,58,.45);color:var(--ambar);background:rgba(240,169,58,.11)}
-.chip.e{border-color:rgba(217,82,44,.5);color:#F08A66;background:rgba(217,82,44,.13)}
-.chip.m{border-style:dashed;opacity:.75}
+.chip.ok{border-color:#A6F4C5;color:#027A48;background:var(--verde-suave)}
+.chip.g{border-color:#FEDF89;color:#B54708;background:var(--ambar-suave)}
+.chip.e{border-color:#FECDCA;color:#B42318;background:var(--rojo-suave)}
+.chip.m{border-style:dashed;color:var(--tinta-3)}
+.estado{font-size:13.5px;margin:13px 0 0;padding:12px 14px;border-radius:var(--r-m);display:none}
+.estado.err{display:block;background:var(--rojo-suave);border:1px solid #FECDCA;color:#B42318}
+.estado.ok{display:block;background:var(--verde-suave);border:1px solid #A6F4C5;color:#027A48}
+.estado.info{display:block;background:var(--azul-suave);border:1px solid #D3E2FF;color:#1D4FD8}
 
-.estado{font-size:13.5px;margin:14px 0 0;padding:12px 14px;border-radius:var(--r-m);display:none;line-height:1.5}
-.estado.err{display:block;background:rgba(217,82,44,.11);border:1px solid rgba(217,82,44,.42);color:#F5C4B2}
-.estado.ok{display:block;background:rgba(99,160,136,.11);border:1px solid rgba(99,160,136,.4);color:#B6D6C7}
-.estado.info{display:block;background:rgba(240,169,58,.07);border:1px solid rgba(240,169,58,.26);color:var(--hueso-2)}
+/* ── Panel: tarjetas de cifra ─────────────────────────────── */
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:-40px 0 0;position:relative;z-index:2}
+@media (max-width:620px){.stats{grid-template-columns:1fr;gap:9px}}
+.stat{
+  background:var(--carta);border:1px solid var(--linea);border-radius:var(--r-l);
+  padding:15px;box-shadow:var(--s3);display:flex;align-items:center;gap:12px;
+}
+.stat .ico{
+  width:42px;height:42px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+}
+.stat .ico.az{background:var(--azul);color:#fff}
+.stat .ico.vd{background:var(--verde);color:#fff}
+.stat .txt{min-width:0}
+.stat .rot{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--tinta-3);font-weight:700}
+.stat .val{font-size:22px;font-weight:700;line-height:1.15;margin-top:1px}
+.stat .pie2{font-size:12px;color:var(--tinta-2)}
+.anillo{position:relative;width:46px;height:46px;flex:none}
+.anillo svg{transform:rotate(-90deg)}
+.anillo span{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:var(--azul);
+}
+
+/* ── Panel: carrusel de episodios ─────────────────────────── */
+.carrusel{
+  display:flex;gap:11px;overflow-x:auto;padding:2px 2px 8px;
+  scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.carrusel::-webkit-scrollbar{display:none}
+.ep-card{
+  flex:0 0 152px;scroll-snap-align:start;border-radius:var(--r-l);overflow:hidden;
+  position:relative;cursor:pointer;aspect-ratio:3/4;
+  background:linear-gradient(160deg,#33465F,#141C2B);
+  box-shadow:var(--s3);transition:var(--tr);border:2px solid transparent;
+}
+.ep-card:active{transform:scale(.98)}
+.ep-card.sel{border-color:var(--azul-2);box-shadow:0 0 0 4px #DDE9FF, var(--s3)}
+.ep-card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.ep-card .velo{
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(9,14,26,.10) 0%,rgba(9,14,26,.20) 40%,rgba(9,14,26,.88) 100%);
+}
+.ep-card .num{
+  position:absolute;top:10px;left:10px;width:30px;height:30px;border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.85);color:#fff;font-size:11.5px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);
+  background:rgba(9,14,26,.32);
+}
+.ep-card .cuerpo{position:absolute;left:0;right:0;bottom:0;padding:11px 11px 12px;color:#fff}
+.ep-card .tit{
+  font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;line-height:1.2;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ep-card .badge{
+  display:inline-flex;align-items:center;gap:4px;margin-top:7px;padding:3px 8px;
+  border-radius:999px;font-size:10px;font-weight:700;letter-spacing:.03em;
+}
+.ep-card .badge.done{background:rgba(18,183,106,.22);color:#6CE9A6;border:1px solid rgba(108,233,166,.4)}
+.ep-card .badge.wip{background:transparent;color:#84ADFF;padding:0;border:none}
+.ep-card .badge.lock{background:rgba(255,255,255,.12);color:rgba(255,255,255,.7)}
+.ep-card .barra{height:5px;border-radius:3px;background:rgba(255,255,255,.26);margin-top:6px;overflow:hidden;display:flex;align-items:center}
+.ep-card .barra i{display:block;height:100%;background:var(--azul-2);border-radius:3px}
+.ep-card .pct{font-size:10.5px;font-weight:700;margin-top:4px;color:#fff;opacity:.9}
+
+/* ── Panel: línea de progreso ─────────────────────────────── */
+.pasos{display:flex;align-items:flex-start;overflow-x:auto;padding:14px 2px 4px;scrollbar-width:none}
+.pasos::-webkit-scrollbar{display:none}
+.paso{display:flex;flex-direction:column;align-items:center;flex:1 0 auto;min-width:44px;position:relative}
+.paso .bolita{
+  width:23px;height:23px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:var(--carta);border:2px solid var(--linea-2);color:var(--tinta-3);z-index:2;cursor:pointer;
+  transition:var(--tr);
+}
+.paso.hecho .bolita{background:var(--verde);border-color:var(--verde);color:#fff}
+.paso.curso .bolita{background:var(--carta);border-color:var(--azul-2);border-width:3px}
+.paso .linea{position:absolute;top:11px;left:50%;right:-50%;height:2px;background:var(--linea-2);z-index:1}
+.paso.hecho .linea{background:var(--verde)}
+.paso:last-child .linea{display:none}
+.paso .n{font-size:11px;color:var(--tinta-3);margin-top:7px;font-weight:600}
+.paso.curso .n{color:var(--azul);font-weight:700}
+
+.cta{
+  display:flex;align-items:center;gap:12px;background:var(--carta-2);
+  border:1px solid var(--linea);border-radius:var(--r-l);padding:14px;margin-top:12px;
+}
+.cta .txt{flex:1;min-width:0}
+.cta .rot{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--azul);font-weight:700;display:flex;align-items:center;gap:6px}
+.cta .des{font-size:13px;color:var(--tinta-2);margin-top:3px}
+
+/* ── Panel: accesos de biblia ─────────────────────────────── */
+.accesos{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:700px){.accesos{grid-template-columns:1fr}}
+.acceso{
+  background:var(--carta);border:1px solid var(--linea);border-radius:var(--r-l);
+  padding:15px;box-shadow:var(--s2);cursor:pointer;transition:var(--tr);
+}
+.acceso:hover{box-shadow:var(--s3);transform:translateY(-2px)}
+.acceso .cab{display:flex;align-items:center;gap:8px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--tinta-2)}
+.acceso .cab .n{margin-left:auto;color:var(--tinta-3)}
+.acceso .miniaturas{display:flex;gap:-8px;margin:12px 0 10px}
+.acceso .miniaturas span{
+  width:42px;height:42px;border-radius:50%;border:2px solid var(--carta);margin-right:-10px;
+  background:linear-gradient(150deg,#3C5A86,#141C2B);overflow:hidden;flex:none;
+  display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:13px;font-weight:600;
+}
+.acceso .miniaturas span img{width:100%;height:100%;object-fit:cover}
+.acceso .des{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tinta-2)}
+.acceso .des svg{margin-left:auto;flex:none;color:var(--tinta-3)}
+
+/* ── Panel: actividad ─────────────────────────────────────── */
+.actividad{list-style:none;margin:0;padding:0}
+.actividad li{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--linea)}
+.actividad li:last-child{border-bottom:none}
+.actividad .ico{width:26px;height:26px;flex:none;display:flex;align-items:center;justify-content:center}
+.actividad .qu{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.actividad .cu{font-size:12px;color:var(--tinta-3);white-space:nowrap}
 
 /* ── Lista de episodios ───────────────────────────────────── */
-#listaEps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+#listaEps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
 .card{
-  display:flex;align-items:center;gap:14px;
-  background:linear-gradient(168deg,var(--sup-2),var(--sup-1));
-  border:1px solid var(--linea);border-radius:var(--r-m);
-  padding:13px 15px;cursor:pointer;transition:var(--transicion);
-  position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:12px;background:var(--carta);
+  border:1px solid var(--linea);border-radius:var(--r-m);padding:12px 13px;
+  cursor:pointer;transition:var(--tr);
 }
-.card:hover{border-color:var(--linea-2);transform:translateX(2px)}
-.card.sel{
-  border-color:rgba(240,169,58,.55);
-  background:linear-gradient(168deg,rgba(240,169,58,.10),var(--sup-1));
-}
-.card.sel::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
-  background:linear-gradient(180deg,var(--ambar-2),var(--brasa));
-}
+.card:hover{border-color:var(--linea-2);box-shadow:var(--s2)}
+.card.sel{border-color:var(--azul-2);background:var(--azul-suave)}
 .card .num{
-  color:var(--ambar);font-family:'Space Mono',monospace;font-size:11.5px;
-  font-weight:700;white-space:nowrap;letter-spacing:-.02em;
+  width:34px;height:34px;border-radius:50%;flex:none;background:var(--fondo);
+  border:1px solid var(--linea);display:flex;align-items:center;justify-content:center;
+  font-size:11.5px;font-weight:700;color:var(--tinta-2);
 }
-.card .cm{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
-.card .cm strong{font-weight:650;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card .cm .sub2{font-family:'Space Mono',monospace;font-size:10px;color:var(--ceniza)}
-.card .chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:50%}
-@media (max-width:600px){
-  .card{flex-wrap:wrap}
-  .card .chips{max-width:100%;justify-content:flex-start;width:100%}
+.card.sel .num{background:var(--azul);border-color:var(--azul);color:#fff}
+.card .cm{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.card .cm strong{
+  font-family:'Cormorant Garamond',serif;font-weight:600;font-size:17px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
+.card .cm .sub2{font-size:11.5px;color:var(--tinta-3)}
+.card .chips{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:48%}
+@media (max-width:600px){.card{flex-wrap:wrap}.card .chips{max-width:100%;width:100%;justify-content:flex-start}}
+.medidor{display:flex;gap:4px;margin-top:6px}
+.medidor .m{height:3px;border-radius:2px;background:var(--linea);flex:1;overflow:hidden}
+.medidor .m i{display:block;height:100%;background:var(--azul-2);border-radius:2px;transition:width 400ms}
+.medidor .m.voz i{background:var(--verde)}
+.medidor .m.vid i{background:var(--violeta)}
 
-.medidor{display:flex;gap:4px;align-items:center;margin-top:7px}
-.medidor .m{height:3px;border-radius:2px;background:rgba(242,233,218,.09);flex:1;overflow:hidden}
-.medidor .m i{display:block;height:100%;background:var(--ambar);border-radius:2px;transition:width 400ms ease}
-.medidor .m.voz i{background:var(--mar)}
-.medidor .m.vid i{background:var(--brasa)}
-
-/* ── Fichas de personaje y lugar ──────────────────────────── */
-.fichas{display:grid;grid-template-columns:repeat(auto-fill,minmax(212px,1fr));gap:14px}
+/* ── Fichas ───────────────────────────────────────────────── */
+.fichas{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:12px}
 .ficha{
-  background:linear-gradient(168deg,var(--sup-2),var(--sup-1));
-  border:1px solid var(--linea);border-radius:var(--r-m);
-  overflow:hidden;display:flex;flex-direction:column;
-  transition:var(--transicion);box-shadow:var(--sombra-2);
+  background:var(--carta);border:1px solid var(--linea);border-radius:var(--r-l);
+  overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--s2);transition:var(--tr);
 }
-.ficha:hover{transform:translateY(-3px);border-color:var(--linea-2);box-shadow:var(--sombra)}
+.ficha:hover{box-shadow:var(--s3);transform:translateY(-2px)}
 .ficha .lienzo{
-  aspect-ratio:16/9;background:radial-gradient(circle at 50% 40%,var(--sup-3),#0A0806);
+  aspect-ratio:16/9;background:linear-gradient(150deg,#33465F,#141C2B);
   display:flex;align-items:center;justify-content:center;overflow:hidden;
 }
 .ficha .lienzo img{width:100%;height:100%;object-fit:cover;display:block}
-.ficha .lienzo .vacio{
-  color:var(--ceniza);font-family:'Space Mono',monospace;font-size:9.5px;
-  letter-spacing:.18em;opacity:.5;
-}
-.ficha .cuerpo{padding:12px 13px 8px;flex:1;display:flex;flex-direction:column;gap:7px}
-.ficha .cuerpo strong{font-size:14.5px;font-weight:650;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ficha .lienzo .vacio{color:rgba(255,255,255,.55);font-size:10px;letter-spacing:.14em;font-weight:600}
+.ficha .cuerpo{padding:12px 13px 8px;flex:1;display:flex;flex-direction:column;gap:6px}
+.ficha .cuerpo strong{font-size:15px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
 .ficha .cuerpo p{
-  margin:0;font-size:11.5px;color:var(--ceniza);line-height:1.5;
+  margin:0;font-size:12px;color:var(--tinta-2);line-height:1.5;
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
 }
 .ficha .acc{display:flex;gap:7px;padding:0 13px 13px;flex-wrap:wrap}
 
-/* ── Rejilla de tomas ─────────────────────────────────────── */
-.tomas{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+/* ── Tomas ────────────────────────────────────────────────── */
+.tomas{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:11px}
 .toma{
-  background:linear-gradient(168deg,var(--sup-2),var(--sup-1));
-  border:1px solid var(--linea);border-radius:var(--r-m);
-  overflow:hidden;display:flex;flex-direction:column;cursor:pointer;
-  position:relative;transition:var(--transicion);
+  background:var(--carta);border:1px solid var(--linea);border-radius:var(--r-m);
+  overflow:hidden;display:flex;flex-direction:column;cursor:pointer;position:relative;
+  transition:var(--tr);box-shadow:var(--s1);
 }
-.toma:hover{transform:translateY(-3px);border-color:var(--linea-2);box-shadow:var(--sombra)}
-.toma.sel{border-color:rgba(240,169,58,.65);box-shadow:0 0 0 1px rgba(240,169,58,.28), var(--sombra)}
-.toma.err{border-color:rgba(217,82,44,.55)}
-.toma .lienzo{
-  aspect-ratio:16/9;background:radial-gradient(circle at 50% 45%,var(--sup-3),#0A0806);
-  position:relative;overflow:hidden;
-}
+.toma:hover{box-shadow:var(--s3);transform:translateY(-2px)}
+.toma.sel{border-color:var(--azul-2);box-shadow:0 0 0 3px #DDE9FF}
+.toma.err{border-color:#FDA29B}
+.toma .lienzo{aspect-ratio:16/9;background:linear-gradient(150deg,#E4E7EC,#CFD4DC);position:relative;overflow:hidden}
 .toma.v916 .lienzo{aspect-ratio:9/16}
 .toma .lienzo img{width:100%;height:100%;object-fit:cover;display:block}
-.toma .lienzo::after{
-  content:'';position:absolute;inset:0;pointer-events:none;
-  background:linear-gradient(180deg,rgba(0,0,0,.42) 0%,transparent 34%,transparent 74%,rgba(0,0,0,.30) 100%);
-}
 .toma .lienzo .ph{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  color:var(--ceniza);font-family:'Space Mono',monospace;font-size:9.5px;
-  letter-spacing:.14em;text-align:center;padding:10px;opacity:.55;
+  color:var(--tinta-3);font-size:10px;letter-spacing:.08em;text-align:center;padding:8px;font-weight:600;
 }
 .toma .n{
-  position:absolute;top:7px;left:7px;z-index:2;
-  background:rgba(10,8,6,.78);backdrop-filter:blur(6px);
-  color:var(--ambar);font-family:'Space Mono',monospace;font-size:9.5px;font-weight:700;
-  padding:3px 7px;border-radius:6px;border:1px solid rgba(240,169,58,.24);
+  position:absolute;top:6px;left:6px;z-index:2;background:rgba(16,24,40,.72);
+  color:#fff;font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;
 }
-.toma .marcas{position:absolute;top:8px;right:7px;z-index:2;display:flex;gap:4px}
-.toma .marcas i{
-  width:7px;height:7px;border-radius:50%;display:block;
-  background:rgba(10,8,6,.7);border:1px solid rgba(242,233,218,.22);
-}
-.toma .marcas i.on{background:var(--mar);border-color:var(--mar);box-shadow:0 0 7px rgba(99,160,136,.75)}
-.toma .marcas i.img.on{background:var(--ambar);border-color:var(--ambar);box-shadow:0 0 7px rgba(240,169,58,.75)}
-.toma .marcas i.vid.on{background:var(--brasa);border-color:var(--brasa);box-shadow:0 0 7px rgba(217,82,44,.75)}
+.toma .marcas{position:absolute;top:7px;right:6px;z-index:2;display:flex;gap:4px}
+.toma .marcas i{width:7px;height:7px;border-radius:50%;display:block;background:rgba(255,255,255,.55);box-shadow:0 0 0 1px rgba(16,24,40,.18)}
+.toma .marcas i.on{background:var(--verde);box-shadow:0 0 0 1px rgba(255,255,255,.7)}
+.toma .marcas i.img.on{background:var(--azul-2)}
+.toma .marcas i.vid.on{background:var(--violeta)}
 .toma .txt{
-  padding:9px 11px 6px;font-size:11.5px;color:var(--hueso-2);line-height:1.45;
-  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:54px;
+  padding:9px 10px 5px;font-size:11.5px;color:var(--tinta-2);line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:52px;
 }
-.toma .meta{
-  padding:0 11px 10px;font-family:'Space Mono',monospace;font-size:9px;color:var(--ceniza);
-  display:flex;justify-content:space-between;gap:6px;letter-spacing:-.01em;
-}
-.toma .meta .mov{color:var(--brasa);font-weight:700}
+.toma .meta{padding:0 10px 9px;font-size:10px;color:var(--tinta-3);display:flex;justify-content:space-between;gap:6px;font-weight:600}
+.toma .meta .mov{color:var(--violeta)}
 
-/* ── Detalle de toma ──────────────────────────────────────── */
-.det-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px}
+/* ── Detalle ──────────────────────────────────────────────── */
+.det-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px}
 @media (max-width:880px){.det-grid{grid-template-columns:1fr}}
-.det-vista{
-  background:#0A0806;border:1px solid var(--linea);border-radius:var(--r-m);
-  overflow:hidden;box-shadow:var(--sombra-2);
-}
+.det-vista{background:#0D1117;border:1px solid var(--linea);border-radius:var(--r-m);overflow:hidden}
 .det-vista img,.det-vista video{width:100%;display:block;background:#000}
 .det-vista audio{width:100%;display:block}
 .det-texto{
-  background:linear-gradient(100deg,rgba(240,169,58,.09),transparent);
-  border-left:3px solid var(--ambar);padding:13px 15px;
-  font-size:14px;line-height:1.65;white-space:pre-wrap;margin:0 0 16px;
-  border-radius:0 var(--r-s) var(--r-s) 0;
+  background:var(--azul-suave);border-left:3px solid var(--azul-2);padding:13px 15px;
+  font-size:14px;line-height:1.65;white-space:pre-wrap;margin:0 0 14px;border-radius:0 var(--r-s) var(--r-s) 0;
 }
 
-/* ── Sala de proyección ───────────────────────────────────── */
-.sala{
-  background:#000;border:1px solid var(--linea-2);border-radius:var(--r-m);
-  overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.6);
-}
+/* ── Sala ─────────────────────────────────────────────────── */
+.sala{background:#0D1117;border-radius:var(--r-l);overflow:hidden;position:relative;box-shadow:var(--s4)}
 .sala .marco{position:relative;width:100%;aspect-ratio:16/9;background:#000;overflow:hidden}
-.sala.v916 .marco{aspect-ratio:9/16;max-height:72vh;margin:0 auto;width:auto}
+.sala.v916 .marco{aspect-ratio:9/16;max-height:70vh;margin:0 auto;width:auto}
 .sala .marco img,.sala .marco video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 @keyframes kenburns{from{transform:scale(1) translate(0,0)}to{transform:scale(1.07) translate(-1%,-1%)}}
 .sala .sub{
-  position:absolute;left:0;right:0;bottom:0;padding:34px 24px 22px;margin:0;
-  background:linear-gradient(transparent,rgba(0,0,0,.86));
-  font-size:16px;line-height:1.5;color:#fff;text-shadow:0 2px 10px #000;
-  letter-spacing:0;font-family:'Archivo',sans-serif;text-align:center;text-transform:none;
+  position:absolute;left:0;right:0;bottom:0;padding:32px 22px 20px;margin:0;
+  background:linear-gradient(transparent,rgba(0,0,0,.85));font-size:15.5px;line-height:1.5;
+  color:#fff;text-shadow:0 2px 10px #000;text-align:center;
 }
-.sala .pista{height:3px;background:rgba(242,233,218,.09)}
-.sala .pista i{display:block;height:100%;background:linear-gradient(90deg,var(--brasa),var(--ambar));width:0;transition:width 200ms linear}
-.sala-info{font-family:'Space Mono',monospace;font-size:10.5px;color:var(--ceniza);margin:14px 0 0;text-align:center;letter-spacing:.03em}
+.sala .pista{height:3px;background:rgba(255,255,255,.16)}
+.sala .pista i{display:block;height:100%;background:var(--azul-2);width:0;transition:width 200ms linear}
+.sala-info{font-size:12px;color:var(--tinta-3);margin:12px 0 0;text-align:center}
 
 /* ── Barra de trabajo ─────────────────────────────────────── */
 #jobBar{
-  position:fixed;left:0;right:0;bottom:0;z-index:60;
-  background:linear-gradient(180deg,rgba(14,11,8,.86),rgba(14,11,8,.98));
-  border-top:1px solid rgba(240,169,58,.24);
-  padding:13px 18px calc(13px + env(safe-area-inset-bottom));
-  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-  box-shadow:0 -8px 32px rgba(0,0,0,.5);
+  position:fixed;left:0;right:0;bottom:calc(70px + env(safe-area-inset-bottom));z-index:50;
+  margin:0 12px;background:var(--carta);border:1px solid var(--linea);
+  border-radius:var(--r-l);padding:12px 14px;box-shadow:var(--s4);
 }
-.jb-in{max-width:1240px;margin:0 auto;display:flex;align-items:center;gap:16px}
+.jb-in{max-width:1056px;margin:0 auto;display:flex;align-items:center;gap:13px}
 .jb-info{flex:1;min-width:0}
-.jb-info .mono{color:var(--ambar);font-size:9.5px;font-weight:700;letter-spacing:.16em}
-.jb-info span#jbTxt{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
-.jb-track{height:4px;background:rgba(242,233,218,.1);border-radius:3px;margin-top:8px;overflow:hidden}
-.jb-fill{
-  height:100%;width:0%;border-radius:3px;transition:width 320ms ease;
-  background:linear-gradient(90deg,var(--brasa),var(--ambar-2));
-  box-shadow:0 0 12px rgba(240,169,58,.55);
-}
+.jb-info .mono{color:var(--azul);font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.jb-info span#jbTxt{display:block;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.jb-track{height:5px;background:var(--linea);border-radius:3px;margin-top:7px;overflow:hidden}
+.jb-fill{height:100%;width:0%;background:var(--azul);border-radius:3px;transition:width 320ms ease}
 
-/* ── Consola ──────────────────────────────────────────────── */
+/* ── Navegación inferior ──────────────────────────────────── */
+nav.abajo{
+  position:fixed;left:0;right:0;bottom:0;z-index:60;background:rgba(255,255,255,.97);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:1px solid var(--linea);
+  padding:6px 6px calc(6px + env(safe-area-inset-bottom));
+  display:flex;justify-content:space-around;
+}
+nav.abajo button{
+  appearance:none;background:none;border:none;cursor:pointer;flex:1;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:7px 2px 5px;color:var(--tinta-3);font-family:'Inter',sans-serif;
+  font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  position:relative;transition:var(--tr);
+}
+nav.abajo button.on{color:var(--azul)}
+nav.abajo button.on::after{
+  content:'';position:absolute;bottom:-6px;width:32px;height:3px;border-radius:3px 3px 0 0;background:var(--azul);
+}
+nav.abajo button svg{width:23px;height:23px}
+
+/* ── Consola y tablas ─────────────────────────────────────── */
 #consola{
-  max-height:200px;overflow:auto;background:rgba(0,0,0,.42);
-  border:1px solid var(--linea);border-radius:var(--r-m);padding:11px 13px;
-  font-family:'Space Mono',monospace;font-size:10.5px;line-height:1.75;
+  max-height:190px;overflow:auto;background:#0D1117;color:#9AA6B8;
+  border-radius:var(--r-m);padding:11px 13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;line-height:1.7;
 }
-#consola div{color:var(--ceniza);padding:2px 0}
-#consola div.ok{color:var(--mar)}
-#consola div.err{color:#F08A66}
-
-/* ── Tablas ───────────────────────────────────────────────── */
+#consola div.ok{color:#6CE9A6}
+#consola div.err{color:#FDA29B}
 table.cfg{width:100%;border-collapse:collapse;font-size:13.5px}
-table.cfg td{padding:9px 0;border-bottom:1px solid var(--linea);vertical-align:top}
+table.cfg td{padding:10px 0;border-bottom:1px solid var(--linea);vertical-align:middle}
 table.cfg tr:last-child td{border-bottom:none}
-table.cfg td:first-child{color:var(--ceniza);width:44%}
+table.cfg td:first-child{color:var(--tinta-2);width:52%}
 
 /* ── Diálogos ─────────────────────────────────────────────── */
 dialog{
-  background:linear-gradient(168deg,var(--sup-2),var(--sup-1));
-  color:var(--hueso);border:1px solid var(--linea-2);border-radius:var(--r-l);
-  padding:22px;width:min(660px,calc(100vw - 24px));max-height:88vh;overflow:auto;
-  box-shadow:0 24px 80px rgba(0,0,0,.7);
+  background:var(--carta);color:var(--tinta);border:none;border-radius:var(--r-xl);
+  padding:22px;width:min(640px,calc(100vw - 24px));max-height:88vh;overflow:auto;
+  box-shadow:0 24px 60px rgba(16,24,40,.24);
 }
-dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
-.dlg-pie{display:flex;gap:10px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+dialog::backdrop{background:rgba(16,24,40,.5);backdrop-filter:blur(3px)}
+dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;color:var(--tinta);margin-bottom:16px}
+dialog h2::after{display:none}
+.dlg-pie{display:flex;gap:9px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
 
 ::-webkit-scrollbar{width:9px;height:9px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:rgba(242,233,218,.14);border-radius:5px}
-::-webkit-scrollbar-thumb:hover{background:rgba(242,233,218,.24)}
-
+::-webkit-scrollbar-thumb{background:var(--linea-2);border-radius:5px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
 </style>
 </head>
 <body>
 
-<header class="top">
-  <div class="top-in">
-    <div>
-      <div class="dz">DIEZMO<span class="pt">.</span></div>
-      <span class="sub">ESTUDIO DE ANIME · TEMPORADA 1</span>
+<!-- ══════════ CABECERA ══════════ -->
+<header class="hero" id="hero">
+  <div class="hero-in">
+    <div class="hero-barra">
+      <button class="icono-btn" id="btnAjustes" aria-label="Ajustes" style="background:rgba(255,255,255,.16);color:#fff">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+      </button>
+      <div class="marca">
+        <div class="dz">DIEZMO</div>
+        <div class="sub">Estudio de Episodios</div>
+      </div>
+      <button class="icono-btn oscuro" id="btnConexion" aria-label="Estado de conexión">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M12 2v20M12 6l-4 3M12 6l4 3M8 14h8"/></svg>
+      </button>
     </div>
-    <div class="fila-btn">
-      <span class="chip" id="chipConexion">comprobando…</span>
-      <button class="btn fantasma chico" id="btnAjustes">Ajustes</button>
+
+    <div class="saludo">
+      <div class="hola">Bienvenido de nuevo,</div>
+      <div class="nombre" id="heroNombre">Estudio</div>
     </div>
+    <p class="lema" id="heroLema">Un sí comprado con mentiras pesa lo mismo que un sí libre.<br>Su cerebro no distingue. El nuestro tampoco.</p>
   </div>
-  <nav class="fases">
-    <button data-fase="proyecto" class="on"><span class="n">01</span>Proyecto</button>
-    <button data-fase="biblia"><span class="n">02</span>Biblia visual</button>
-    <button data-fase="guion"><span class="n">03</span>Guion técnico</button>
-    <button data-fase="produccion"><span class="n">04</span>Producción</button>
-    <button data-fase="sala"><span class="n">05</span>Sala</button>
-    <button data-fase="entrega"><span class="n">06</span>Entrega</button>
-  </nav>
 </header>
 
 <main>
 
-<!-- ══════════ 01 · PROYECTO ══════════ -->
-<section class="fase on" id="fase-proyecto">
-  <div class="panel" id="panelConexion">
-    <h2>Conexión con Vertex AI</h2>
-    <table class="cfg" id="tablaConexion"><tr><td>Comprobando…</td><td></td></tr></table>
-    <div class="fila-btn" style="margin-top:12px">
-      <button class="btn" id="btnPing">Volver a comprobar</button>
-      <button class="btn fantasma" id="btnDescubrir">Descubrir modelos disponibles</button>
-    </div>
-    <p class="nota" id="notaModelos"></p>
-  </div>
+<!-- ══════════ PANEL ══════════ -->
+<section class="fase on" id="fase-panel">
+  <div class="stats" id="panelStats"></div>
 
   <div class="panel">
-    <h2>Episodios</h2>
-    <div class="fila-btn">
-      <button class="btn fantasma" id="btnCargarSerie">Recargar los guiones</button>
-      <label class="btn fantasma" for="fileInput">Añadir archivos .md
+    <h2>Episodios <button class="enlace-mas" id="btnVerEpisodios">Ver todos ›</button></h2>
+    <div class="carrusel" id="panelCarrusel"></div>
+    <div class="pasos" id="panelPasos"></div>
+    <div class="cta">
+      <div class="txt">
+        <div class="rot">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.2 6.3L20.5 10l-5.3 3.8L17 20l-5-3.4L7 20l1.8-6.2L3.5 10l6.3-1.7z"/></svg>
+          Siguiente paso
+        </div>
+        <div class="des" id="panelSiguiente">—</div>
+      </div>
+      <button class="btn primario" id="btnPanelContinuar">Continuar</button>
+    </div>
+  </div>
+
+  <div class="accesos" id="panelAccesos"></div>
+
+  <div class="panel">
+    <h2>Actividad reciente</h2>
+    <ul class="actividad" id="panelActividad"></ul>
+  </div>
+  <p class="pie">DIEZMO · VOZ, IMAGEN Y MOVIMIENTO SOBRE VERTEX AI</p>
+</section>
+
+<!-- ══════════ EPISODIOS ══════════ -->
+<section class="fase" id="fase-episodios">
+  <div class="panel">
+    <h2>Los doce guiones</h2>
+    <ul id="listaEps"></ul>
+    <div class="fila-btn" style="margin-top:14px">
+      <button class="btn fantasma chico" id="btnCargarSerie">Recargar los guiones</button>
+      <label class="btn fantasma chico" for="fileInput">Añadir .md
         <input type="file" id="fileInput" multiple accept=".md,.txt" hidden>
       </label>
-      <button class="btn fantasma" id="btnRecalcular">Recalcular tomas</button>
+      <button class="btn fantasma chico" id="btnRecalcular">Recalcular tomas</button>
     </div>
-    <p class="nota">Los doce guiones viven en <span class="mono">/episodios</span> dentro del repositorio y se cargan solos al abrir el estudio. «Recargar» solo hace falta si cambio el texto de algún episodio.</p>
-    <ul id="listaEps" style="margin-top:14px"></ul>
   </div>
 
   <div class="panel">
-    <h2>Almacenamiento</h2>
-    <p class="nota chica" id="infoAlmacen">—</p>
-    <div class="fila-btn" style="margin-top:10px">
-      <button class="btn fantasma chico" id="btnPersistir">Proteger del borrado automático</button>
-      <button class="btn peligro chico" id="btnVaciar">Vaciar todo lo generado</button>
-    </div>
-  </div>
-</section>
-
-<!-- ══════════ 02 · BIBLIA ══════════ -->
-<section class="fase" id="fase-biblia">
-  <div class="panel">
-    <h2>Dirección de arte</h2>
-    <div class="campo">
-      <label for="cfgEstilo">Estilo visual — se antepone a cada imagen de la serie</label>
-      <textarea id="cfgEstilo" class="alto"></textarea>
-    </div>
-    <div class="campo">
-      <label for="cfgNegativo">Qué evitar siempre</label>
-      <textarea id="cfgNegativo"></textarea>
-    </div>
-    <div class="rejilla3">
-      <div class="campo">
-        <label for="cfgFormato">Formato</label>
-        <select id="cfgFormato">
-          <option value="16:9">16:9 — panorámico</option>
-          <option value="9:16">9:16 — vertical</option>
-          <option value="1:1">1:1 — cuadrado</option>
-        </select>
+    <h2>Guion técnico</h2>
+    <div class="campo"><select id="selEpGuion"></select></div>
+    <div class="selector-modelo">
+      <div class="cab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+        Modelo que dirigirá las tomas
       </div>
-      <div class="campo">
-        <label for="cfgTamano">Resolución de imagen</label>
-        <select id="cfgTamano">
-          <option value="1K">1K — rápida y barata</option>
-          <option value="2K">2K — recomendada</option>
-          <option value="4K">4K — solo si el modelo lo admite</option>
-        </select>
-      </div>
-      <div class="campo">
-        <label for="cfgMaxRefs">Referencias por fotograma</label>
-        <select id="cfgMaxRefs">
-          <option value="1">1 personaje</option>
-          <option value="2">2 personajes</option>
-          <option value="3">3 personajes (máximo útil)</option>
-        </select>
-      </div>
-    </div>
-    <button class="btn" id="btnGuardarArte">Guardar dirección de arte</button>
-  </div>
-
-  <div class="panel">
-    <h2>Elenco — hojas de referencia</h2>
-    <p class="nota" style="margin-top:0">Cada personaje necesita su hoja antes de producir. Después, cada fotograma donde aparezca llevará esa imagen adjunta: es lo que mantiene la cara igual durante los doce episodios.</p>
-    <div class="fila-btn" style="margin:12px 0">
-      <button class="btn primario" id="btnRefsPrincipales">Generar hojas de los principales</button>
-      <button class="btn" id="btnRefsTodos">Generar todas las que falten</button>
-      <button class="btn fantasma" id="btnNuevoPersonaje">Añadir personaje</button>
-    </div>
-    <div class="fichas" id="fichasElenco"></div>
-  </div>
-
-  <div class="panel">
-    <h2>Localizaciones — fondos maestros</h2>
-    <div class="fila-btn" style="margin-bottom:12px">
-      <button class="btn" id="btnFondos">Generar los fondos que falten</button>
-      <button class="btn fantasma" id="btnNuevoLugar">Añadir localización</button>
-    </div>
-    <div class="fichas" id="fichasLugares"></div>
-  </div>
-</section>
-
-<!-- ══════════ 03 · GUION TÉCNICO ══════════ -->
-<section class="fase" id="fase-guion">
-  <div class="panel">
-    <h2>Episodio</h2>
-    <div class="campo" style="margin-bottom:10px">
-      <select id="selEpGuion"></select>
+      <select id="cfgModeloTexto"></select>
     </div>
     <div class="fila-btn">
       <button class="btn primario" id="btnDirigir">Dirigir este episodio</button>
       <button class="btn" id="btnDirigirTodo">Dirigir los doce</button>
       <button class="btn fantasma" id="btnRepartir">Recalcular qué se anima</button>
-      <button class="btn fantasma" id="btnVerTexto">Ver texto normalizado</button>
+      <button class="btn fantasma" id="btnVerTexto">Ver texto narrado</button>
     </div>
-    <div class="rejilla3" style="margin-top:14px">
+    <div class="rejilla3" style="margin-top:16px">
       <div class="campo">
         <label for="cfgSegToma">Segundos por toma</label>
         <div class="rango"><input type="range" id="cfgSegToma" min="4" max="20" step="1"><span class="val" id="valSegToma">8 s</span></div>
@@ -571,8 +593,12 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
         <div class="rango"><input type="range" id="cfgMovim" min="0" max="100" step="5"><span class="val" id="valMovim">35 %</span></div>
       </div>
       <div class="campo">
-        <label for="cfgModeloTexto">Modelo del director</label>
-        <select id="cfgModeloTexto"></select>
+        <label for="cfgFormato">Formato</label>
+        <select id="cfgFormato">
+          <option value="16:9">16:9 — panorámico</option>
+          <option value="9:16">9:16 — vertical</option>
+          <option value="1:1">1:1 — cuadrado</option>
+        </select>
       </div>
     </div>
     <div class="estado" id="estadoGuion"></div>
@@ -580,18 +606,32 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
   </div>
 
   <div class="panel">
-    <h2>Escaleta</h2>
+    <h2>Escaleta <span class="cuenta" id="cuentaGuion"></span></h2>
     <div class="tomas" id="rejillaGuion"></div>
   </div>
-</section>
 
-<!-- ══════════ 04 · PRODUCCIÓN ══════════ -->
-<section class="fase" id="fase-produccion">
   <div class="panel">
     <h2>Producir</h2>
-    <div class="campo" style="margin-bottom:10px">
-      <select id="selEpProd"></select>
+    <div class="campo"><select id="selEpProd"></select></div>
+
+    <div class="selector-modelo">
+      <div class="cab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M3 17l5-4 4 3 3-2 6 5"/></svg>
+        Modelo de imagen
+      </div>
+      <select id="selModImgProd"></select>
+      <p class="pista" id="pistaModImg">—</p>
     </div>
+
+    <div class="selector-modelo">
+      <div class="cab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>
+        Modelo de video
+      </div>
+      <select id="selModVidProd"></select>
+      <p class="pista" id="pistaModVid">—</p>
+    </div>
+
     <div class="fila-btn">
       <button class="btn primario" id="btnProdTodo">Producir episodio completo</button>
       <button class="btn" id="btnProdVoz">Solo voz</button>
@@ -599,41 +639,29 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
       <button class="btn" id="btnProdVid">Solo movimiento</button>
       <button class="btn brasa" id="btnDetenerProd">Detener</button>
     </div>
-    <p class="nota">Se genera únicamente lo que falta. Puedes detener en cualquier momento y reanudar: lo terminado queda guardado.</p>
+    <p class="nota">Se genera únicamente lo que falta. Puedes detener cuando quieras y reanudar: lo terminado queda guardado.</p>
     <div class="estado" id="estadoProd"></div>
-    <div id="consola" style="margin-top:12px"></div>
+    <div id="consola" style="margin-top:13px"></div>
   </div>
 
   <div class="panel">
     <h2>Presupuesto estimado</h2>
     <div id="tablaCoste"></div>
     <details style="margin-top:12px">
-      <summary class="nota" style="cursor:pointer">Ajustar precios unitarios</summary>
-      <div class="rejilla2" style="margin-top:10px">
-        <div class="campo">
-          <label for="pxImagen">Dólares por fotograma</label>
-          <input type="number" id="pxImagen" step="0.01" min="0">
-        </div>
-        <div class="campo">
-          <label for="pxVideo">Dólares por segundo de video</label>
-          <input type="number" id="pxVideo" step="0.01" min="0">
-        </div>
-        <div class="campo">
-          <label for="pxVoz">Dólares por cada mil caracteres de voz</label>
-          <input type="number" id="pxVoz" step="0.001" min="0">
-        </div>
-        <div class="campo">
-          <label for="pxTexto">Dólares por episodio dirigido</label>
-          <input type="number" id="pxTexto" step="0.01" min="0">
-        </div>
+      <summary>Ajustar precios unitarios</summary>
+      <div class="rejilla2" style="margin-top:12px">
+        <div class="campo"><label for="pxImagen">Dólares por fotograma</label><input type="number" id="pxImagen" step="0.01" min="0"></div>
+        <div class="campo"><label for="pxVideo">Dólares por segundo de video</label><input type="number" id="pxVideo" step="0.01" min="0"></div>
+        <div class="campo"><label for="pxVoz">Dólares por mil caracteres de voz</label><input type="number" id="pxVoz" step="0.001" min="0"></div>
+        <div class="campo"><label for="pxTexto">Dólares por episodio dirigido</label><input type="number" id="pxTexto" step="0.01" min="0"></div>
       </div>
       <button class="btn chico" id="btnGuardarPrecios">Guardar precios</button>
-      <p class="nota chica">Los valores de partida son orientativos. Consulta la tarifa vigente de Vertex AI para tu proyecto y ajústalos aquí: el cálculo se rehace solo.</p>
+      <p class="nota chica">Valores orientativos. Consulta la tarifa vigente de Vertex AI y ajústalos: el cálculo se rehace solo.</p>
     </details>
   </div>
 
   <div class="panel">
-    <h2>Tomas</h2>
+    <h2>Tomas <span class="cuenta" id="cuentaProd"></span></h2>
     <div class="fila-btn" style="margin-bottom:12px">
       <button class="btn fantasma chico" id="filtroTodas">Todas</button>
       <button class="btn fantasma chico" id="filtroFaltan">Sin terminar</button>
@@ -652,7 +680,7 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
           <button class="btn chico" id="btnRegenImg">Regenerar fotograma</button>
           <button class="btn chico" id="btnRegenVoz">Regenerar voz</button>
           <button class="btn chico" id="btnRegenVid">Generar movimiento</button>
-          <button class="btn fantasma chico" id="btnAlternarTipo">Cambiar fijo/movimiento</button>
+          <button class="btn fantasma chico" id="btnAlternarTipo">Fijo / movimiento</button>
           <button class="btn fantasma chico" id="btnBloquear">Bloquear</button>
         </div>
       </div>
@@ -664,22 +692,84 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
         </div>
         <div class="campo">
           <label for="detAccion">Movimiento para Veo</label>
-          <textarea id="detAccion" style="min-height:60px"></textarea>
+          <textarea id="detAccion" style="min-height:58px"></textarea>
         </div>
-        <button class="btn chico" id="btnGuardarToma">Guardar cambios de la toma</button>
+        <button class="btn chico" id="btnGuardarToma">Guardar cambios</button>
         <p class="nota chica" id="detMeta">—</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ══════════ 05 · SALA ══════════ -->
+<!-- ══════════ BIBLIA ══════════ -->
+<section class="fase" id="fase-biblia">
+  <div class="panel">
+    <h2>Dirección de arte</h2>
+    <div class="campo">
+      <label for="cfgEstilo">Estilo visual — encabeza cada imagen de la serie</label>
+      <textarea id="cfgEstilo" class="alto"></textarea>
+    </div>
+    <div class="campo">
+      <label for="cfgNegativo">Qué evitar siempre</label>
+      <textarea id="cfgNegativo"></textarea>
+    </div>
+    <div class="rejilla2">
+      <div class="campo">
+        <label for="cfgTamano">Resolución de imagen</label>
+        <select id="cfgTamano">
+          <option value="1K">1K — rápida y barata</option>
+          <option value="2K">2K — recomendada</option>
+          <option value="4K">4K — solo en Nano Banana Pro</option>
+        </select>
+      </div>
+      <div class="campo">
+        <label for="cfgMaxRefs">Referencias por fotograma</label>
+        <select id="cfgMaxRefs">
+          <option value="1">1 personaje</option>
+          <option value="2">2 personajes</option>
+          <option value="3">3 personajes (máximo útil)</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" id="btnGuardarArte">Guardar dirección de arte</button>
+  </div>
+
+  <div class="panel">
+    <h2>Elenco <span class="cuenta" id="cuentaElenco"></span></h2>
+    <p class="nota" style="margin-top:0">Cada personaje necesita su hoja de referencia antes de producir. Después, cada fotograma donde aparezca llevará esa imagen adjunta: es lo que mantiene la misma cara durante los doce episodios.</p>
+
+    <div class="selector-modelo" style="margin-top:14px">
+      <div class="cab">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M3 17l5-4 4 3 3-2 6 5"/></svg>
+        Modelo para personajes y lugares
+      </div>
+      <select id="selModImgBiblia"></select>
+      <p class="pista" id="pistaModImgBiblia">—</p>
+    </div>
+
+    <div class="fila-btn" style="margin-bottom:14px">
+      <button class="btn primario" id="btnRefsPrincipales">Generar hojas de los principales</button>
+      <button class="btn" id="btnRefsTodos">Generar las que falten</button>
+      <button class="btn fantasma" id="btnNuevoPersonaje">Añadir personaje</button>
+    </div>
+    <div class="fichas" id="fichasElenco"></div>
+  </div>
+
+  <div class="panel">
+    <h2>Localizaciones <span class="cuenta" id="cuentaLugares"></span></h2>
+    <div class="fila-btn" style="margin-bottom:14px">
+      <button class="btn" id="btnFondos">Generar los fondos que falten</button>
+      <button class="btn fantasma" id="btnNuevoLugar">Añadir localización</button>
+    </div>
+    <div class="fichas" id="fichasLugares"></div>
+  </div>
+</section>
+
+<!-- ══════════ SALA ══════════ -->
 <section class="fase" id="fase-sala">
   <div class="panel">
     <h2>Sala de proyección</h2>
-    <div class="campo" style="margin-bottom:12px">
-      <select id="selEpSala"></select>
-    </div>
+    <div class="campo"><select id="selEpSala"></select></div>
     <div class="sala" id="sala">
       <div class="marco">
         <img id="salaImg" alt="">
@@ -689,11 +779,11 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
       <div class="pista"><i id="salaBarra"></i></div>
     </div>
     <audio id="salaAud" hidden></audio>
-    <p class="sala-info mono" id="salaInfo">—</p>
+    <p class="sala-info" id="salaInfo">—</p>
     <div class="fila-btn" style="margin-top:12px;justify-content:center">
-      <button class="btn" id="btnSalaAtras">◀ Toma anterior</button>
+      <button class="btn" id="btnSalaAtras">‹ Anterior</button>
       <button class="btn primario" id="btnSalaPlay">Reproducir</button>
-      <button class="btn" id="btnSalaAdelante">Toma siguiente ▶</button>
+      <button class="btn" id="btnSalaAdelante">Siguiente ›</button>
     </div>
     <div class="campo check" style="margin-top:14px;justify-content:center">
       <input type="checkbox" id="cfgSubs" checked>
@@ -702,106 +792,116 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
   </div>
 </section>
 
-<!-- ══════════ 06 · ENTREGA ══════════ -->
-<section class="fase" id="fase-entrega">
+<!-- ══════════ ARCHIVO ══════════ -->
+<section class="fase" id="fase-archivo">
+  <div class="panel">
+    <h2>Conexión con Vertex AI</h2>
+    <table class="cfg" id="tablaConexion"><tr><td>Comprobando…</td><td></td></tr></table>
+    <div class="fila-btn" style="margin-top:14px">
+      <button class="btn" id="btnPing">Volver a comprobar</button>
+      <button class="btn fantasma" id="btnDescubrir">Buscar modelos de voz disponibles</button>
+    </div>
+    <p class="nota chica" id="notaModelos"></p>
+    <p class="nota chica">Aquí solo se ve si cada pieza responde. Los identificadores, correos y nombres de bucket viven en las variables de entorno y nunca bajan al navegador.</p>
+  </div>
+
   <div class="panel">
     <h2>Exportar</h2>
-    <div class="campo" style="margin-bottom:12px">
-      <select id="selEpExport"></select>
-    </div>
+    <div class="campo"><select id="selEpExport"></select></div>
     <div class="fila-btn">
       <button class="btn primario" id="btnExportEp">Exportar episodio (.zip)</button>
-      <button class="btn" id="btnExportAudio">Solo la voz completa (.wav)</button>
-      <button class="btn" id="btnExportGuion">Solo el guion técnico (.md)</button>
-      <button class="btn fantasma" id="btnExportProyecto">Copia de seguridad del proyecto (.json)</button>
+      <button class="btn" id="btnExportAudio">Solo la voz (.wav)</button>
+      <button class="btn" id="btnExportGuion">Solo el guion técnico</button>
+      <button class="btn fantasma" id="btnExportProyecto">Copia de seguridad (.json)</button>
       <label class="btn fantasma" for="fileProyecto">Restaurar copia
         <input type="file" id="fileProyecto" accept=".json" hidden>
       </label>
     </div>
     <div class="estado" id="estadoExport"></div>
-    <p class="nota">El .zip trae los fotogramas, los clips, las voces, la hoja de montaje en JSON, el guion técnico y un <span class="mono">montar.sh</span> que arma el episodio con ffmpeg en un solo comando.</p>
+    <p class="nota">El .zip trae los fotogramas, los clips, las voces, la hoja de montaje, el guion técnico y un <code>montar.sh</code> que arma el episodio con ffmpeg en un comando.</p>
   </div>
 
   <div class="panel">
     <h2>Estado de la temporada</h2>
     <div id="resumenTemporada"></div>
   </div>
+
+  <div class="panel">
+    <h2>Almacenamiento</h2>
+    <p class="nota chica" id="infoAlmacen">—</p>
+    <div class="fila-btn" style="margin-top:10px">
+      <button class="btn fantasma chico" id="btnPersistir">Proteger del borrado automático</button>
+      <button class="btn peligro chico" id="btnVaciar">Vaciar todo lo generado</button>
+    </div>
+  </div>
 </section>
 
-<p class="pie">DIEZMO · ESTUDIO DE ANIME — VOZ, IMAGEN Y MOVIMIENTO SOBRE VERTEX AI</p>
 </main>
 
 <footer id="jobBar" hidden>
   <div class="jb-in">
     <div class="jb-info">
-      <span class="mono" id="jbFase">TRABAJO</span>
+      <span class="mono" id="jbFase">Trabajo</span>
       <span id="jbTxt">—</span>
       <div class="jb-track"><div class="jb-fill" id="jbFill"></div></div>
     </div>
-    <button class="btn brasa" id="btnDetenerGlobal">Detener</button>
+    <button class="btn brasa chico" id="btnDetenerGlobal">Detener</button>
   </div>
 </footer>
+
+<nav class="abajo">
+  <button data-fase="panel" class="on">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10l9-7 9 7v10a1 1 0 01-1 1h-5v-7H9v7H4a1 1 0 01-1-1z"/></svg>
+    Panel
+  </button>
+  <button data-fase="episodios">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 9l5 3-5 3z"/></svg>
+    Episodios
+  </button>
+  <button data-fase="biblia">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+    Biblia
+  </button>
+  <button data-fase="sala">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 7l6-3 8 3 6-3v13l-6 3-8-3-6 3z"/><path d="M8 4v13M16 7v13"/></svg>
+    Sala
+  </button>
+  <button data-fase="archivo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 001 1h12a1 1 0 001-1V9M10 13h4"/></svg>
+    Archivo
+  </button>
+</nav>
 
 <!-- ── Diálogo: ajustes ── -->
 <dialog id="dlgAjustes">
   <h2>Ajustes</h2>
+  <div class="campo">
+    <label for="cfgNombre">Tu nombre (solo para el saludo; se guarda en este dispositivo)</label>
+    <input type="text" id="cfgNombre" placeholder="Estudio">
+  </div>
   <div class="rejilla2">
-    <div class="campo">
-      <label for="cfgVoz">Voz del narrador</label>
-      <select id="cfgVoz"></select>
+    <div class="campo"><label for="cfgVoz">Voz del narrador</label><select id="cfgVoz"></select></div>
+    <div class="campo"><label for="cfgIdioma">Idioma / acento</label><select id="cfgIdioma"></select></div>
+    <div class="campo"><label for="cfgModeloTts">Modelo de voz</label><select id="cfgModeloTts"></select></div>
+    <div class="campo"><label for="cfgResVideo">Resolución del video</label>
+      <select id="cfgResVideo"><option value="720p">720p</option><option value="1080p">1080p</option></select>
     </div>
-    <div class="campo">
-      <label for="cfgIdioma">Idioma / acento</label>
-      <select id="cfgIdioma"></select>
-    </div>
-    <div class="campo">
-      <label for="cfgModeloTts">Modelo de voz</label>
-      <select id="cfgModeloTts"></select>
-    </div>
-    <div class="campo">
-      <label for="cfgModeloImagen">Modelo de imagen</label>
-      <select id="cfgModeloImagen"></select>
-    </div>
-    <div class="campo">
-      <label for="cfgModeloVideo">Modelo de video</label>
-      <select id="cfgModeloVideo"></select>
-    </div>
-    <div class="campo">
-      <label for="cfgResVideo">Resolución del video</label>
-      <select id="cfgResVideo">
-        <option value="720p">720p</option>
-        <option value="1080p">1080p</option>
-      </select>
-    </div>
+    <div class="campo"><label for="cfgModeloImagen">Modelo de imagen por defecto</label><select id="cfgModeloImagen"></select></div>
+    <div class="campo"><label for="cfgModeloVideo">Modelo de video por defecto</label><select id="cfgModeloVideo"></select></div>
     <div class="campo">
       <label for="cfgTempVoz">Temperatura de la voz</label>
       <div class="rango"><input type="range" id="cfgTempVoz" min="0" max="2" step="0.05"><span class="val" id="valTempVoz">0.90</span></div>
     </div>
-    <div class="campo">
-      <label for="cfgSemilla">Semilla de voz (misma semilla = tono más estable)</label>
-      <input type="number" id="cfgSemilla" placeholder="vacío = aleatoria">
-    </div>
+    <div class="campo"><label for="cfgSemilla">Semilla de voz</label><input type="number" id="cfgSemilla" placeholder="vacío = aleatoria"></div>
   </div>
   <div class="campo">
     <label for="cfgInstruccionVoz">Instrucción de estilo de narración</label>
     <textarea id="cfgInstruccionVoz"></textarea>
   </div>
-  <div class="campo check">
-    <input type="checkbox" id="cfgNormalizar">
-    <label for="cfgNormalizar">Convertir cifras y símbolos a letras antes de narrar (recomendado)</label>
-  </div>
-  <div class="campo check">
-    <input type="checkbox" id="cfgAnunciar">
-    <label for="cfgAnunciar">Anunciar el título al empezar cada episodio</label>
-  </div>
-  <div class="campo check">
-    <input type="checkbox" id="cfgAudioVeo">
-    <label for="cfgAudioVeo">Dejar que Veo genere ambiente sonoro en los clips</label>
-  </div>
-  <div class="campo">
-    <label for="cfgSilencio">Silencio en los cortes de escena (segundos)</label>
-    <input type="number" id="cfgSilencio" min="0" max="3" step="0.1">
-  </div>
+  <div class="campo check"><input type="checkbox" id="cfgNormalizar"><label for="cfgNormalizar">Convertir cifras y símbolos a letras antes de narrar</label></div>
+  <div class="campo check"><input type="checkbox" id="cfgAnunciar"><label for="cfgAnunciar">Anunciar el título al empezar cada episodio</label></div>
+  <div class="campo check"><input type="checkbox" id="cfgAudioVeo"><label for="cfgAudioVeo">Dejar que Veo genere ambiente sonoro</label></div>
+  <div class="campo"><label for="cfgSilencio">Silencio en los cortes de escena (segundos)</label><input type="number" id="cfgSilencio" min="0" max="3" step="0.1"></div>
   <div class="dlg-pie">
     <button class="btn fantasma" id="btnProbarVoz">Probar la voz</button>
     <button class="btn fantasma" id="btnAjCancelar">Cerrar</button>
@@ -813,22 +913,10 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
 <!-- ── Diálogo: ficha ── -->
 <dialog id="dlgFicha">
   <h2 id="fichaTitulo">Ficha</h2>
-  <div class="campo">
-    <label for="fichaNombre">Nombre</label>
-    <input type="text" id="fichaNombre">
-  </div>
-  <div class="campo">
-    <label for="fichaAlias">Otros nombres con que aparece (separados por coma)</label>
-    <input type="text" id="fichaAlias">
-  </div>
-  <div class="campo">
-    <label for="fichaTexto">Descripción canónica — se manda con cada imagen</label>
-    <textarea id="fichaTexto" class="alto"></textarea>
-  </div>
-  <div class="campo check">
-    <input type="checkbox" id="fichaPrincipal">
-    <label for="fichaPrincipal">Personaje principal</label>
-  </div>
+  <div class="campo"><label for="fichaNombre">Nombre</label><input type="text" id="fichaNombre"></div>
+  <div class="campo"><label for="fichaAlias">Otros nombres con que aparece (separados por coma)</label><input type="text" id="fichaAlias"></div>
+  <div class="campo"><label for="fichaTexto">Descripción canónica — se manda con cada imagen</label><textarea id="fichaTexto" class="alto"></textarea></div>
+  <div class="campo check"><input type="checkbox" id="fichaPrincipal"><label for="fichaPrincipal">Personaje principal</label></div>
   <div class="dlg-pie">
     <button class="btn peligro" id="btnFichaBorrar">Eliminar</button>
     <button class="btn fantasma" id="btnFichaCancelar">Cancelar</button>
@@ -836,13 +924,11 @@ dialog::backdrop{background:rgba(8,5,3,.78);backdrop-filter:blur(4px)}
   </div>
 </dialog>
 
-<!-- ── Diálogo: texto normalizado ── -->
+<!-- ── Diálogo: texto narrado ── -->
 <dialog id="dlgTexto">
   <h2>Texto tal como lo va a leer la voz</h2>
-  <p class="nota chica" style="margin-top:0">Comparación del guion original con la versión normalizada. Los archivos <span class="mono">.md</span> no se tocan.</p>
   <div class="campo">
-    <label>Diferencias encontradas</label>
-    <div id="difTexto" style="max-height:46vh;overflow:auto;background:var(--noche);border:1px solid var(--linea);border-radius:8px;padding:10px;font-size:12.5px"></div>
+    <div id="difTexto" style="max-height:52vh;overflow:auto;background:var(--fondo);border:1px solid var(--linea);border-radius:12px;padding:12px;font-size:13px"></div>
   </div>
   <div class="dlg-pie"><button class="btn primario" id="btnTextoCerrar">Cerrar</button></div>
 </dialog>

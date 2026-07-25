@@ -81,12 +81,10 @@ function vertexUrl(location, project, model, metodo) {
   );
 }
 
-async function callVertex(url, token, body) {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+async function callVertex(url, token, body, project) {
+  const headers = { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' };
+  if (project) headers['X-Goog-User-Project'] = project;
+  const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
   const raw = await r.text();
   let json = null;
   try { json = JSON.parse(raw); } catch (e) { /* respuesta no-JSON */ }
@@ -135,10 +133,17 @@ const SEGURIDAD = [
   'HARM_CATEGORY_HARASSMENT',
 ].map((category) => ({ category, threshold: 'BLOCK_ONLY_HIGH' }));
 
+// Los Gemini 3.x solo responden en el endpoint global; el 2.5, en regiones.
 function regionesPara(model, location) {
   if (location) return [location];
   if (model.indexOf('gemini-3') === 0) return ['global'];
   return ['us-central1', 'europe-west4', 'us-east4'];
+}
+
+// Acepta GCS_BUCKET o GCS_OUTPUT_BUCKET, con o sin el prefijo gs://.
+function nombreBucket() {
+  const raw = process.env.GCS_BUCKET || process.env.GCS_OUTPUT_BUCKET || '';
+  return raw.replace(/^gs:\/\//, '').replace(/\/.*$/, '').trim();
 }
 
 /* ── URL firmada V4 para Google Cloud Storage ───────────────── */
@@ -205,21 +210,24 @@ module.exports = async (req, res) => {
     const mode = body.mode;
 
     /* ════════ PING — diagnóstico de configuración ════════ */
+    // Devuelve solo si cada pieza está bien o mal. Nunca el identificador del
+    // proyecto, ni el correo de la cuenta de servicio, ni el nombre del bucket:
+    // son datos privados del usuario y no tienen por qué llegar al navegador.
     if (mode === 'ping') {
       const estado = {
         proyecto: !!process.env.GCP_PROJECT_ID,
         cuentaServicio: !!process.env.GCP_SERVICE_ACCOUNT,
-        bucket: process.env.GCS_BUCKET || null,
+        bucket: !!nombreBucket(),
         token: false,
-        cuenta: null,
       };
       if (estado.proyecto && estado.cuentaServicio) {
         try {
           await getAccessToken();
           estado.token = true;
-          estado.cuenta = serviceAccount().client_email;
         } catch (e) {
-          estado.errorToken = (e && e.message) || String(e);
+          // El mensaje de error de Google puede incluir el correo de la cuenta.
+          estado.errorToken = 'La autenticación con Google Cloud falló. ' +
+            'Revisa que GCP_SERVICE_ACCOUNT contenga el JSON completo y sin recortar.';
         }
       }
       return res.status(200).json(estado);
@@ -328,30 +336,45 @@ module.exports = async (req, res) => {
       if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });
 
       const model = body.model || 'gemini-2.5-flash-image';
-      const regiones = regionesPara(model, body.location);
+      const esG3 = model.indexOf('gemini-3') === 0;
 
-      // Las referencias van ANTES del texto: así el modelo las trata como
-      // material de consulta y no como parte del enunciado.
-      const parts = [];
+      // Solo Gemini genera imagen aceptando referencias visuales. Imagen quedó
+      // retirado y además nunca admitió imágenes de personaje como entrada.
+      if (!/^gemini-/.test(model)) {
+        return res.status(400).json({
+          error: 'Modelo de imagen no admitido: ' + model,
+          detail: 'Usa un modelo Gemini de imagen (gemini-3-pro-image, ' +
+            'gemini-3.1-flash-image o gemini-2.5-flash-image). Son los únicos que ' +
+            'aceptan imágenes de referencia, que es lo que mantiene el mismo rostro ' +
+            'en todos los episodios.',
+        });
+      }
+
+      // Primero el enunciado, después las referencias de personaje y lugar.
+      const parts = [{ text: String(body.prompt) }];
       for (const ref of (body.images || []).slice(0, 4)) {
         if (ref && ref.data) {
           parts.push({ inlineData: { mimeType: ref.mimeType || 'image/png', data: ref.data } });
         }
       }
-      parts.push({ text: String(body.prompt) });
 
       const imageConfig = { aspectRatio: body.aspectRatio || '16:9' };
-      if (body.imageSize) imageConfig.imageSize = String(body.imageSize);
+      if (body.imageSize && esG3) imageConfig.imageSize = String(body.imageSize);
 
       const vBody = {
         contents: [{ role: 'user', parts }],
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig },
+        generationConfig: {
+          // El 3.x exige TEXT+IMAGE; el 2.5 solo acepta IMAGE.
+          responseModalities: esG3 ? ['TEXT', 'IMAGE'] : ['IMAGE'],
+          imageConfig,
+          temperature: typeof body.temperature === 'number' ? body.temperature : 1.0,
+        },
         safetySettings: SEGURIDAD,
       };
 
       let last = null;
-      for (const loc of regiones) {
-        const out = await callVertex(vertexUrl(loc, project, model), token, vBody);
+      for (const loc of regionesPara(model, body.location)) {
+        const out = await callVertex(vertexUrl(loc, project, model), token, vBody, project);
         if (out.ok) {
           const inline = pickInlinePart(out.json);
           if (inline) {
@@ -379,7 +402,7 @@ module.exports = async (req, res) => {
 
     /* ════════ VIDEO — Veo (operación de larga duración) ════════ */
     if (mode === 'video') {
-      const model = body.model || 'veo-3.1-fast-generate-preview';
+      const model = body.model || 'veo-3.1-fast-generate-001';
       const location = body.location || 'us-central1';
       const accion = body.action || 'start';
 
@@ -412,7 +435,7 @@ module.exports = async (req, res) => {
 
         // Con bucket, Veo escribe en GCS y el navegador lo lee con URL firmada:
         // así no chocamos con el límite de tamaño de respuesta de la función.
-        const bucket = process.env.GCS_BUCKET;
+        const bucket = nombreBucket();
         if (bucket && body.storage !== 'inline') {
           const carpeta = (body.storagePrefix || 'diezmo/video').replace(/^\/+|\/+$/g, '');
           parameters.storageUri = 'gs://' + bucket + '/' + carpeta + '/';
@@ -421,7 +444,8 @@ module.exports = async (req, res) => {
         const out = await callVertex(
           vertexUrl(location, project, model, 'predictLongRunning'),
           token,
-          { instances: [instancia], parameters }
+          { instances: [instancia], parameters },
+          project
         );
         if (!out.ok) {
           return res.status(out.status).json({
@@ -441,11 +465,15 @@ module.exports = async (req, res) => {
       if (accion === 'poll') {
         if (!body.operationName) return res.status(400).json({ error: 'Falta "operationName"' });
 
-        const out = await callVertex(
-          vertexUrl(location, project, model, 'fetchPredictOperation'),
-          token,
-          { operationName: String(body.operationName) }
-        );
+        // La región y el modelo se derivan del propio nombre de la operación:
+        // así la consulta funciona con cualquier Veo, sin depender del cliente.
+        const op = String(body.operationName);
+        const recurso = op.split('/operations/')[0];
+        const mReg = /\/locations\/([^/]+)\//.exec(op);
+        const region = mReg ? mReg[1] : location;
+        const url = 'https://' + host(region) + '/v1/' + recurso + ':fetchPredictOperation';
+
+        const out = await callVertex(url, token, { operationName: op }, project);
         if (!out.ok) {
           return res.status(out.status).json({
             error: 'Veo consulta ' + out.status,
@@ -525,13 +553,14 @@ module.exports = async (req, res) => {
 
     /* ════════ MODELS — descubrimiento en Model Garden ════════ */
     if (mode === 'models') {
+      // Sin Imagen: quedó retirado y nunca aceptó imágenes de referencia,
+      // que es justo lo que sostiene la consistencia de los personajes.
       const base = {
         tts: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
-        image: ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview',
-                'imagen-4.0-generate-001', 'imagen-4.0-ultra-generate-001'],
-        video: ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview',
-                'veo-3.0-fast-generate-001', 'veo-3.0-generate-001', 'veo-2.0-generate-001'],
-        text: ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-3-pro-preview'],
+        image: ['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'],
+        video: ['veo-3.1-generate-001', 'veo-3.1-fast-generate-001',
+                'veo-3.1-lite-generate-001', 'veo-2.0-generate-001'],
+        text: ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
       };
       const sets = {
         tts: new Set(base.tts), image: new Set(base.image),
@@ -551,9 +580,10 @@ module.exports = async (req, res) => {
           for (const m of (j.publisherModels || [])) {
             const id = String(m.name || '').split('/').pop();
             const l = id.toLowerCase();
+            if (l.indexOf('imagen') === 0) continue;              // retirado
             if (l.indexOf('tts') !== -1) sets.tts.add(id);
             else if (l.indexOf('veo') === 0) sets.video.add(id);
-            else if (l.indexOf('image') !== -1 || l.indexOf('imagen') === 0) sets.image.add(id);
+            else if (l.indexOf('gemini') === 0 && l.indexOf('image') !== -1) sets.image.add(id);
             else if (l.indexOf('gemini') === 0) sets.text.add(id);
           }
           pageToken = j.nextPageToken || '';

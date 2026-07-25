@@ -262,9 +262,9 @@ export const CONFIG_DEFECTO = {
   imageSize: '2K',
 
   // Modelos
-  modeloTexto: 'gemini-2.5-pro',
-  modeloImagen: 'gemini-3-pro-image-preview',
-  modeloVideo: 'veo-3.1-fast-generate-preview',
+  modeloTexto: 'gemini-3.1-pro-preview',
+  modeloImagen: 'gemini-3-pro-image',
+  modeloVideo: 'veo-3.1-fast-generate-001',
   modeloTts: 'gemini-2.5-flash-preview-tts',
 
   // Voz

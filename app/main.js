@@ -106,14 +106,19 @@ async function comprobarConexion() {
   t.innerHTML = '<tr><td>Comprobando…</td><td></td></tr>';
   try {
     const r = await api.ping();
+    // Solo el estado de cada pieza. Ni identificadores, ni correos, ni nombres
+    // de bucket: eso vive en las variables de entorno y ahí se queda.
     const fila = (k, v, ok) =>
       '<tr><td>' + k + '</td><td><span class="chip ' + (ok ? 'ok' : 'e') + '">' + esc(v) + '</span></td></tr>';
     t.innerHTML =
-      fila('Proyecto de Google Cloud', r.proyecto ? 'configurado' : 'FALTA GCP_PROJECT_ID', r.proyecto) +
-      fila('Cuenta de servicio', r.cuentaServicio ? 'configurada' : 'FALTA GCP_SERVICE_ACCOUNT', r.cuentaServicio) +
-      fila('Autenticación', r.token ? 'correcta' : (r.errorToken || 'falla'), r.token) +
-      fila('Bucket para video', r.bucket || 'sin GCS_BUCKET — Veo devolverá clips pequeños en línea', !!r.bucket) +
-      (r.cuenta ? '<tr><td>Identidad</td><td class="mono" style="font-size:11px">' + esc(r.cuenta) + '</td></tr>' : '');
+      fila('Proyecto de Google Cloud', r.proyecto ? 'configurado' : 'falta configurar', r.proyecto) +
+      fila('Cuenta de servicio', r.cuentaServicio ? 'configurada' : 'falta configurar', r.cuentaServicio) +
+      fila('Autenticación', r.token ? 'correcta' : 'falla', r.token) +
+      fila('Bucket para video', r.bucket ? 'configurado' : 'sin bucket — los clips vendrán en línea', !!r.bucket);
+    if (!r.token && r.errorToken) {
+      t.innerHTML += '<tr><td colspan="2" style="color:var(--ceniza);font-size:12.5px">' +
+        esc(r.errorToken) + '</td></tr>';
+    }
     const ok = r.proyecto && r.cuentaServicio && r.token;
     $('chipConexion').className = 'chip ' + (ok ? 'ok' : 'e');
     $('chipConexion').textContent = ok ? 'Vertex conectado' : 'revisar conexión';
@@ -159,9 +164,9 @@ function llenarSelect(sel, lista, valor) {
 
 const MODELOS_BASE = {
   tts: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
-  image: ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'],
-  video: ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview', 'veo-3.0-generate-001'],
-  text: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+  image: ['gemini-3-pro-image', 'gemini-3.1-flash-image', 'gemini-2.5-flash-image'],
+  video: ['veo-3.1-generate-001', 'veo-3.1-fast-generate-001', 'veo-3.1-lite-generate-001', 'veo-2.0-generate-001'],
+  text: ['gemini-3.1-pro-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
 };
 
 function poblarModelos() {

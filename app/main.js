@@ -3,6 +3,7 @@
    ============================================================ */
 
 import { proyecto as store, assets, cuota, pedirPersistencia } from './db.js';
+import { nube, guardarPronto, vaciarCola, alGuardar } from './nube.js';
 import { api, crearWav, extraerPCM, b64aBytes } from './api.js';
 import {
   limpiarTexto, tituloDe, segmentar, verificarCobertura,
@@ -45,6 +46,7 @@ function proyectoNuevo() {
 
 async function guardar() {
   await store.guardar('actual', P);
+  if (nube.disponible) guardarPronto(estadoCompacto);
 }
 
 async function cargar() {
@@ -58,6 +60,81 @@ async function cargar() {
 }
 
 const epActual = () => P.episodios.find((e) => e.num === P.sel) || P.episodios[0] || null;
+
+/* ── El proyecto en Google Cloud ─────────────────────────────
+   Se guarda sin los textos: el guion vive en el repositorio y las
+   tomas se vuelven a cortar igual, porque el corte es determinista.
+   Así el archivo pesa una fracción y viaja rápido.                  */
+
+function estadoCompacto() {
+  return {
+    version: 2,
+    sel: P.sel,
+    config: P.config,
+    elenco: P.elenco.map((p) => ({ ...p })),
+    lugares: P.lugares.map((l) => ({ ...l })),
+    episodios: P.episodios.map((e) => ({
+      num: e.num,
+      titulo: e.titulo,
+      tomas: (e.tomas || []).map((t) => ({
+        i: t.i,
+        plano: t.plano || null,
+        audio: t.audio || null,
+        imagen: t.imagen || null,
+        video: t.video || null,
+        segundos: t.segundos || null,
+        bloqueada: !!t.bloqueada,
+        promptImagen: t.promptEditado ? t.promptImagen : null,
+        promptEditado: !!t.promptEditado,
+      })),
+    })),
+  };
+}
+
+/** Reconstruye el proyecto: textos del repositorio, trabajo de la nube. */
+async function rehidratar(compacto) {
+  P = proyectoNuevo();
+  P.config = { ...CONFIG_DEFECTO, ...(compacto.config || {}) };
+  if (compacto.elenco && compacto.elenco.length) P.elenco = compacto.elenco;
+  if (compacto.lugares && compacto.lugares.length) P.lugares = compacto.lugares;
+  P.sel = compacto.sel || 1;
+  P.episodios = [];
+
+  for (const ce of (compacto.episodios || [])) {
+    try {
+      const r = await fetch('./episodios/ep' + pad2(ce.num) + '.md');
+      if (!r.ok) continue;
+      const ep = añadirEpisodio('ep' + pad2(ce.num) + '.md', await r.text());
+      ep.titulo = ce.titulo || ep.titulo;
+      (ce.tomas || []).forEach((ct, k) => {
+        const t = ep.tomas[k];
+        if (!t) return;
+        t.plano = ct.plano || null;
+        t.audio = ct.audio || null;
+        t.imagen = ct.imagen || null;
+        t.video = ct.video || null;
+        if (ct.segundos) t.segundos = ct.segundos;
+        t.bloqueada = !!ct.bloqueada;
+        if (ct.promptEditado) { t.promptImagen = ct.promptImagen; t.promptEditado = true; }
+      });
+    } catch (e) { /* episodio que no se pudo leer */ }
+  }
+}
+
+function pintarEstadoNube(estado, detalle) {
+  const n = document.getElementById('estadoNube');
+  if (!n) return;
+  const textos = {
+    guardando: ['g', 'guardando en Google Cloud'],
+    guardado: ['ok', 'guardado en Google Cloud'],
+    error: ['e', 'no se pudo guardar: ' + (detalle || '')],
+    local: ['m', 'sin bucket: solo en este navegador'],
+    leyendo: ['g', 'recuperando el proyecto'],
+  };
+  const par = textos[estado] || textos.guardado;
+  n.className = 'chip ' + par[0];
+  n.textContent = par[1];
+}
 
 /* ── Barra de trabajo ───────────────────────────────────────── */
 
@@ -143,6 +220,8 @@ async function comprobarConexion() {
       t.innerHTML += '<tr><td colspan="2" style="padding-top:12px">' +
         '<div class="estado err" style="display:block;margin:0">' + esc(problema) + '</div></td></tr>';
     }
+    nube.marcarDisponible(!!r.bucket);
+    if (!r.bucket) pintarEstadoNube('local');
     const ok = r.proyecto && r.cuentaServicio && r.token && r.vertex;
     if (!ok && problema) aviso(problema, 'err', 9000);
     marcarConexion(ok ? 'ok' : 'mal');
@@ -1060,9 +1139,10 @@ function cablear() {
       : 'El navegador no concedió almacenamiento persistente. Exporta a menudo.';
   });
   $('btnVaciar').addEventListener('click', async () => {
-    if (!confirm('Esto borra TODO el material generado (voces, fotogramas y clips). Los guiones y el guion técnico se conservan. ¿Seguir?')) return;
+    if (!confirm('Esto borra TODO el material generado (voces, fotogramas y clips), tanto en este navegador como en Google Cloud. Los guiones y el guion técnico se conservan. ¿Seguir?')) return;
     const ks = await assets.claves();
     for (const k of ks) await assets.borrar(k);
+    if (nube.disponible) { try { await nube.vaciar(); } catch (e) { /* seguimos */ } }
     for (const ep of P.episodios) {
       for (const t of ep.tomas) { t.audio = null; t.imagen = null; t.video = null; t.segundos = null; }
     }
@@ -1345,8 +1425,67 @@ function cablear() {
   });
 
   window.addEventListener('beforeunload', (ev) => {
+    vaciarCola();
     if (motor && motor.activo) { ev.preventDefault(); ev.returnValue = ''; }
   });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') vaciarCola();
+  });
+}
+
+
+/** Trae el proyecto del bucket y reconcilia lo que ya hay generado. */
+async function recuperarDeNube() {
+  let hayBucket = false;
+  try {
+    const r = await api.ping();
+    hayBucket = !!r.bucket;
+    nube.marcarDisponible(hayBucket);
+  } catch (e) { nube.marcarDisponible(false); }
+
+  if (!hayBucket) { pintarEstadoNube('local'); return; }
+
+  pintarEstadoNube('leyendo');
+  try {
+    const remoto = await nube.leerEstado();
+    if (remoto && remoto.episodios && remoto.episodios.length) {
+      await rehidratar(remoto);
+      await store.guardar('actual', P);
+      log('proyecto recuperado de Google Cloud', 'ok');
+    }
+    // Lo que exista en el bucket cuenta como generado, aunque este
+    // navegador no lo tenga: se descargará cuando haga falta verlo.
+    const inventario = await nube.listar();
+    if (inventario.size) {
+      let recuperados = 0;
+      for (const ep of P.episodios) {
+        for (const t of ep.tomas) {
+          if (!(t.audio && t.audio.ok) && inventario.has(clave.audio(ep.num, t.i))) {
+            t.audio = { ok: true, dur: t.segundos || t.segEstimados }; recuperados++;
+          }
+          if (!(t.imagen && t.imagen.ok) && inventario.has(clave.imagen(ep.num, t.i))) {
+            t.imagen = { ok: true }; recuperados++;
+          }
+          if (!(t.video && t.video.ok) && inventario.has(clave.video(ep.num, t.i))) {
+            t.video = { ok: true, local: false }; recuperados++;
+          }
+        }
+      }
+      for (const per of P.elenco) {
+        const hoja = clave.refPersonaje(per.id, 'hoja');
+        const rostro = clave.refPersonaje(per.id, 'rostro');
+        per.refs = [hoja, rostro].filter((k) => inventario.has(k));
+      }
+      for (const lug of P.lugares) {
+        lug.ref = inventario.has(clave.refLugar(lug.id)) ? clave.refLugar(lug.id) : lug.ref;
+      }
+      if (recuperados) log(inventario.size + ' archivos encontrados en Google Cloud', 'ok');
+    }
+    pintarEstadoNube('guardado');
+  } catch (e) {
+    pintarEstadoNube('error', e.message);
+    log('no se pudo leer el proyecto de Google Cloud: ' + e.message, 'err');
+  }
 }
 
 /* ── Arranque ───────────────────────────────────────────────── */
@@ -1370,10 +1509,15 @@ async function iniciar() {
   $('pxTexto').value = P.config.precios.episodio;
 
   poblarModelos();
+  alGuardar(pintarEstadoNube);
   cablear();
   pintarTodo();
   pintarFichas();
   comprobarConexion();
+
+  // El proyecto vive en Google Cloud: al abrir se recupera de ahí, y el
+  // navegador queda solo como copia rápida.
+  await recuperarDeNube();
 
   // Los guiones viven en el repositorio: no tiene sentido pedir un clic para algo
   // que siempre hay que hacer. La primera vez se cargan solos.

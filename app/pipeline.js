@@ -9,6 +9,7 @@
 
 import { api, generarVideo, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64 } from './api.js';
 import { assets } from './db.js';
+import { nube } from './nube.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
 import { promptImagen, promptVideo, promptReferencia, promptLugar } from './director.js';
 
@@ -97,14 +98,15 @@ export class Motor {
           this._prog(hecho, total, per.nombre + ' · ' + v);
           const prompt = promptReferencia(per, cfg, v);
           try {
+            const k = clave.refPersonaje(per.id, v);
             const r = await api.imagen({
               prompt,
               model: cfg.modeloImagen,
               aspectRatio: v === 'hoja' ? '16:9' : '1:1',
               imageSize: cfg.imageSize,
+              guardarComo: k,
             }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(per.nombre + ': ' + m) });
 
-            const k = clave.refPersonaje(per.id, v);
             await assets.guardar(k, b64toBlob(r.image, r.mimeType), { personaje: per.id, variante: v });
             if (per.refs.indexOf(k) === -1) per.refs.push(k);
             this._log('referencia lista: ' + per.nombre + ' (' + v + ')', 'ok');
@@ -128,13 +130,14 @@ export class Motor {
         if (this.señal.aborted) return;
         this._prog(hecho, objetivo.length, lug.nombre);
         try {
+          const k = clave.refLugar(lug.id);
           const r = await api.imagen({
             prompt: promptLugar(lug, cfg),
             model: cfg.modeloImagen,
             aspectRatio: cfg.formato,
             imageSize: cfg.imageSize,
+            guardarComo: k,
           }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(lug.nombre + ': ' + m) });
-          const k = clave.refLugar(lug.id);
           await assets.guardar(k, b64toBlob(r.image, r.mimeType), { lugar: lug.id });
           lug.ref = k;
           this._log('fondo listo: ' + lug.nombre, 'ok');
@@ -265,6 +268,7 @@ export class Motor {
         model: cfg.modeloImagen,
         aspectRatio: cfg.formato,
         imageSize: cfg.imageSize,
+        guardarComo: clave.imagen(ep.num, t.i),
       }, { intentos: 3, señal: this.señal, aviso: (m) => this._log('toma ' + (t.i + 1) + ': ' + m) });
 
       await assets.guardar(clave.imagen(ep.num, t.i), b64toBlob(r.image, r.mimeType),
@@ -331,7 +335,8 @@ export class Motor {
           { ep: ep.num, toma: t.i });
         t.video = { ok: true, dur, local: true };
       } else if (r.clip) {
-        // El clip viaja por el backend: el navegador nunca ve dónde está guardado.
+        // El clip se archiva en el bucket bajo su clave y se trae una copia local.
+        try { await nube.archivarClip(r.clip, clave.video(ep.num, t.i)); } catch (e) { /* sigue igual */ }
         const blob = await bajarClip(r.clip, this.señal);
         await assets.guardar(clave.video(ep.num, t.i), blob, { ep: ep.num, toma: t.i });
         t.video = { ok: true, dur, local: true };

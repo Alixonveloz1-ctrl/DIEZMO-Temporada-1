@@ -7,6 +7,8 @@
    y una producción.
    ============================================================ */
 
+import { nube } from './nube.js';
+
 const NOMBRE = 'diezmo-estudio';
 const VERSION = 1;
 
@@ -64,9 +66,19 @@ export const assets = {
     return v || null;
   },
 
+  /**
+   * El navegador es una copia rápida; el bucket es la verdad. Si algo no
+   * está aquí pero sí allá, se trae y se guarda para la próxima vez.
+   */
   async blob(id) {
     const v = await assets.leer(id);
-    return v ? v.blob : null;
+    if (v) return v.blob;
+    if (!nube.disponible) return null;
+    try {
+      const b = await nube.leer(id);
+      if (b && b.size) { await assets.guardar(id, b, { deNube: true }); return b; }
+    } catch (e) { /* no está en el almacén */ }
+    return null;
   },
 
   /** URL de objeto reutilizable; se cachea para no multiplicar handles. */

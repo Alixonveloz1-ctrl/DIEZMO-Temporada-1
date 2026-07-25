@@ -196,6 +196,76 @@ function urlFirmadaV4(gsUri, segundos) {
     '?' + query + '&X-Goog-Signature=' + firma;
 }
 
+/* ── Almacén en Google Cloud Storage ────────────────────────── */
+/*  El proyecto y todo lo generado viven en el bucket, no en el
+    navegador. Se entra desde cualquier aparato y el trabajo está ahí.  */
+
+const RAIZ = 'diezmo/';
+
+function objUrl(bucket, objeto, sufijo) {
+  return 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
+    '/o/' + encodeURIComponent(objeto) + (sufijo || '');
+}
+
+async function gcsSubir(token, bucket, objeto, cuerpo, mime) {
+  const u = 'https://storage.googleapis.com/upload/storage/v1/b/' + encodeURIComponent(bucket) +
+    '/o?uploadType=media&name=' + encodeURIComponent(objeto);
+  const r = await fetch(u, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': mime || 'application/octet-stream' },
+    body: cuerpo,
+  });
+  if (!r.ok) throw new Error('No se pudo guardar en el almacén (' + r.status + ')');
+  return true;
+}
+
+async function gcsBajar(token, bucket, objeto) {
+  const r = await fetch(objUrl(bucket, objeto, '?alt=media'), {
+    headers: { Authorization: 'Bearer ' + token },
+  });
+  return r;
+}
+
+async function gcsListar(token, bucket, prefijo) {
+  const salida = [];
+  let pageToken = '';
+  for (let p = 0; p < 40; p++) {
+    const u = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
+      '/o?prefix=' + encodeURIComponent(prefijo) + '&maxResults=1000&fields=items(name,size),nextPageToken' +
+      (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
+    const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) throw new Error('No se pudo listar el almacén (' + r.status + ')');
+    const j = await r.json();
+    for (const it of (j.items || [])) {
+      salida.push({ clave: String(it.name).slice(prefijo.length), bytes: Number(it.size) || 0 });
+    }
+    pageToken = j.nextPageToken || '';
+    if (!pageToken) break;
+  }
+  return salida;
+}
+
+async function gcsCopiar(token, bucket, origen, destino) {
+  const u = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
+    '/o/' + encodeURIComponent(origen) + '/copyTo/b/' + encodeURIComponent(bucket) +
+    '/o/' + encodeURIComponent(destino);
+  const r = await fetch(u, { method: 'POST', headers: { Authorization: 'Bearer ' + token } });
+  if (!r.ok) throw new Error('No se pudo copiar en el almacén (' + r.status + ')');
+  return true;
+}
+
+/** Guarda lo recién generado en el bucket, sin interrumpir si falla. */
+async function archivar(token, clave, base64, mime) {
+  const bucket = nombreBucket();
+  if (!bucket || !clave) return false;
+  try {
+    await gcsSubir(token, bucket, RAIZ + 'material/' + clave, Buffer.from(base64, 'base64'), mime);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 /* ── Referencia opaca a un clip ─────────────────────────────── */
 /*  El enlace firmado de Google lleva dentro el bucket y el correo de
     la cuenta. En vez de dárselo al navegador, se cifra la ruta con la
@@ -386,10 +456,12 @@ module.exports = async (req, res) => {
       }
       const mime = inline.mimeType || 'audio/L16;codec=pcm;rate=24000';
       const m = mime.match(/rate=(\d+)/);
+      const guardado = await archivar(token, body.guardarComo, inline.data, 'audio/wav');
       return res.status(200).json({
         audio: inline.data,
         mimeType: mime,
         sampleRate: m ? parseInt(m[1], 10) : 24000,
+        guardado,
       });
     }
 
@@ -482,10 +554,13 @@ module.exports = async (req, res) => {
         if (out.ok) {
           const inline = pickInlinePart(out.json);
           if (inline) {
+            const guardado = await archivar(token, body.guardarComo, inline.data,
+              inline.mimeType || 'image/png');
             return res.status(200).json({
               image: inline.data,
               mimeType: inline.mimeType || 'image/png',
               region: loc,
+              guardado,
               nota: textoDe(out.json).slice(0, 400) || undefined,
             });
           }
@@ -619,6 +694,76 @@ module.exports = async (req, res) => {
       }
 
       return res.status(400).json({ error: 'Acción de video desconocida: ' + accion });
+    }
+
+    /* ════════ NUBE — proyecto y material en el bucket ════════ */
+    if (mode === 'nube') {
+      const bucket = nombreBucket();
+      if (!bucket) {
+        return res.status(400).json({
+          error: 'No hay bucket configurado. Define GCS_BUCKET en Vercel para guardar el ' +
+            'proyecto en Google Cloud y poder continuar desde cualquier aparato.',
+        });
+      }
+      const accion = body.action;
+
+      if (accion === 'estadoGuardar') {
+        if (!body.estado) return res.status(400).json({ error: 'Falta el estado' });
+        await gcsSubir(token, bucket, RAIZ + 'proyecto.json',
+          Buffer.from(JSON.stringify(body.estado), 'utf8'), 'application/json');
+        return res.status(200).json({ guardado: true });
+      }
+
+      if (accion === 'estadoLeer') {
+        const r = await gcsBajar(token, bucket, RAIZ + 'proyecto.json');
+        if (r.status === 404) return res.status(200).json({ estado: null });
+        if (!r.ok) return res.status(r.status).json({ error: 'No se pudo leer el proyecto guardado' });
+        return res.status(200).json({ estado: await r.json() });
+      }
+
+      if (accion === 'listar') {
+        return res.status(200).json({ material: await gcsListar(token, bucket, RAIZ + 'material/') });
+      }
+
+      if (accion === 'leer') {
+        if (!body.clave) return res.status(400).json({ error: 'Falta la clave' });
+        const r = await gcsBajar(token, bucket, RAIZ + 'material/' + body.clave);
+        if (!r.ok) return res.status(r.status).json({ error: 'No se encontró el material' });
+        res.setHeader('Content-Type', r.headers.get('content-type') || 'application/octet-stream');
+        res.setHeader('Cache-Control', 'private, max-age=86400');
+        const lector = r.body.getReader();
+        for (;;) {
+          const { done, value } = await lector.read();
+          if (done) break;
+          res.write(Buffer.from(value));
+        }
+        return res.end();
+      }
+
+      if (accion === 'archivarClip') {
+        if (!body.clip || !body.clave) return res.status(400).json({ error: 'Faltan datos del clip' });
+        let gsUri;
+        try { gsUri = descifrarRuta(body.clip); } catch (e) {
+          return res.status(400).json({ error: 'Referencia de clip inválida' });
+        }
+        const { objeto } = rutaGs(gsUri);
+        await gcsCopiar(token, bucket, objeto, RAIZ + 'material/' + body.clave);
+        return res.status(200).json({ guardado: true });
+      }
+
+      if (accion === 'vaciar') {
+        const lista = await gcsListar(token, bucket, RAIZ + 'material/');
+        let n = 0;
+        for (const it of lista) {
+          const r = await fetch(objUrl(bucket, RAIZ + 'material/' + it.clave), {
+            method: 'DELETE', headers: { Authorization: 'Bearer ' + token },
+          });
+          if (r.ok) n++;
+        }
+        return res.status(200).json({ borrados: n });
+      }
+
+      return res.status(400).json({ error: 'Acción de nube desconocida: ' + accion });
     }
 
     /* ════════ CLIP — entrega el video sin revelar su origen ════════ */

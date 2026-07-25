@@ -32,7 +32,9 @@ function tx(store, modo, fn) {
     const s = t.objectStore(store);
     let resultado;
     try { resultado = fn(s); } catch (e) { reject(e); return; }
-    t.oncomplete = () => resolve(resultado && resultado.result !== undefined ? resultado.result : resultado);
+    // Una clave inexistente devuelve result === undefined: hay que propagar ese
+    // undefined, no la propia petición, o quien llame recibirá un objeto vivo.
+    t.oncomplete = () => resolve(resultado instanceof IDBRequest ? resultado.result : resultado);
     t.onerror = () => reject(t.error);
     t.onabort = () => reject(t.error);
   }));

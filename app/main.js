@@ -157,17 +157,21 @@ function llenarSelect(sel, lista, valor) {
   sel.value = valor || sel.value;
 }
 
+const MODELOS_BASE = {
+  tts: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
+  image: ['gemini-3-pro-image-preview', 'gemini-2.5-flash-image'],
+  video: ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview', 'veo-3.0-generate-001'],
+  text: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+};
+
 function poblarModelos() {
-  const m = modelos || {
-    tts: ['gemini-2.5-flash-preview-tts', 'gemini-2.5-pro-preview-tts'],
-    image: ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'],
-    video: ['veo-3.1-fast-generate-preview', 'veo-3.1-generate-preview', 'veo-3.0-generate-001'],
-    text: ['gemini-2.5-pro', 'gemini-2.5-flash'],
-  };
-  llenarSelect($('cfgModeloTts'), m.tts, P.config.modeloTts);
-  llenarSelect($('cfgModeloImagen'), m.image, P.config.modeloImagen);
-  llenarSelect($('cfgModeloVideo'), m.video, P.config.modeloVideo);
-  llenarSelect($('cfgModeloTexto'), m.text, P.config.modeloTexto);
+  // Cada lista se valida por separado: un caché a medias no debe tumbar la página.
+  const lista = (k) => (modelos && Array.isArray(modelos[k]) && modelos[k].length)
+    ? modelos[k] : MODELOS_BASE[k];
+  llenarSelect($('cfgModeloTts'), lista('tts'), P.config.modeloTts);
+  llenarSelect($('cfgModeloImagen'), lista('image'), P.config.modeloImagen);
+  llenarSelect($('cfgModeloVideo'), lista('video'), P.config.modeloVideo);
+  llenarSelect($('cfgModeloTexto'), lista('text'), P.config.modeloTexto);
 }
 
 /* ── Episodios ──────────────────────────────────────────────── */
@@ -1023,12 +1027,24 @@ async function iniciar() {
   pintarFichas();
   comprobarConexion();
 
+  // Los guiones viven en el repositorio: no tiene sentido pedir un clic para algo
+  // que siempre hay que hacer. La primera vez se cargan solos.
   if (!P.episodios.length) {
-    log('proyecto nuevo: pulsa «Cargar los doce episodios» para empezar');
+    await cargarSerie();
   } else {
     log('proyecto cargado: ' + P.episodios.length + ' episodios, ' +
       P.episodios.reduce((a, e) => a + e.tomas.length, 0) + ' tomas');
   }
 }
 
-iniciar();
+iniciar().catch((e) => {
+  // Un fallo aquí dejaría la página muda y sin botones. Mejor decirlo.
+  jobOcultar();
+  const aviso = document.createElement('div');
+  aviso.className = 'estado err';
+  aviso.style.cssText = 'display:block;margin:16px;position:relative;z-index:50';
+  aviso.textContent = 'El estudio no pudo arrancar: ' + ((e && e.message) || e) +
+    '. Recarga la página; si sigue, pulsa «Vaciar todo lo generado» para empezar limpio.';
+  document.querySelector('main').prepend(aviso);
+  console.error(e);
+});

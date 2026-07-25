@@ -434,6 +434,32 @@ dialog::backdrop{background:rgba(0,0,0,.72);backdrop-filter:blur(4px)}
 dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom:16px}
 .dlg-pie{display:flex;gap:9px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
 
+.aviso{
+  position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));z-index:90;
+  padding:14px 16px;border-radius:var(--r-m);font-size:13.5px;line-height:1.5;
+  box-shadow:var(--s4);cursor:pointer;max-width:640px;margin:0 auto;
+  opacity:0;transform:translateY(-14px);transition:opacity 260ms,transform 260ms;
+}
+.aviso.visible{opacity:1;transform:none}
+.aviso.err{background:#2A1013;border:1px solid rgba(239,68,68,.55);color:#FCA5A5}
+.aviso.ok{background:#0C2117;border:1px solid rgba(34,197,94,.5);color:#86EFAC}
+.aviso.info{background:#0D1A2E;border:1px solid rgba(76,141,255,.45);color:#BFD6FF}
+
+.guia{list-style:none;margin:0;padding:0;counter-reset:g}
+.guia li{
+  display:flex;gap:13px;padding:13px 0;border-bottom:1px solid var(--linea);
+}
+.guia li:last-child{border-bottom:none}
+.guia li::before{
+  counter-increment:g;content:counter(g);flex:none;
+  width:27px;height:27px;border-radius:50%;background:var(--carta-3);
+  border:1px solid var(--linea-2);color:var(--azul-2);
+  font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
+}
+.guia li.hecho::before{background:var(--verde);border-color:var(--verde);color:#052E16;content:'\2713'}
+.guia strong{display:block;font-size:14.5px;font-weight:600;margin-bottom:2px}
+.guia span{font-size:12.5px;color:var(--tinta-2);line-height:1.5}
+
 ::-webkit-scrollbar{width:9px;height:9px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:5px}
@@ -473,6 +499,11 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
 <!-- ══════════ PANEL ══════════ -->
 <section class="fase on" id="fase-panel">
   <div class="stats" id="panelStats"></div>
+
+  <div class="panel">
+    <h2>Cómo se hace un episodio <button class="enlace-mas" id="btnGuiaMas">Detalle ›</button></h2>
+    <ol class="guia" id="panelGuia"></ol>
+  </div>
 
   <div class="panel">
     <h2>Episodios <button class="enlace-mas" id="btnVerEpisodios">Ver todos ›</button></h2>

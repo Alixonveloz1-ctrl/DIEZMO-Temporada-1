@@ -71,7 +71,29 @@ function jobAvance(hecho, total, texto) {
 }
 function jobOcultar() { $('jobBar').hidden = true; }
 
+/** Mensaje flotante: lo que falla se ve donde estás, no en una consola aparte. */
+let _avisoTimer = null;
+function aviso(txt, tipo, ms) {
+  let n = $('avisoFlotante');
+  if (!n) {
+    n = document.createElement('div');
+    n.id = 'avisoFlotante';
+    document.body.appendChild(n);
+  }
+  n.className = 'aviso ' + (tipo || 'info');
+  n.textContent = txt;
+  n.hidden = false;
+  requestAnimationFrame(() => n.classList.add('visible'));
+  clearTimeout(_avisoTimer);
+  _avisoTimer = setTimeout(() => {
+    n.classList.remove('visible');
+    setTimeout(() => { n.hidden = true; }, 300);
+  }, ms || 5000);
+  n.onclick = () => { n.classList.remove('visible'); setTimeout(() => { n.hidden = true; }, 300); };
+}
+
 function log(txt, tipo) {
+  if (tipo === 'err') aviso(txt, 'err', 8000);
   const c = $('consola');
   const d = document.createElement('div');
   d.className = tipo || 'info';
@@ -114,12 +136,15 @@ async function comprobarConexion() {
       fila('Proyecto de Google Cloud', r.proyecto ? 'configurado' : 'falta configurar', r.proyecto) +
       fila('Cuenta de servicio', r.cuentaServicio ? 'configurada' : 'falta configurar', r.cuentaServicio) +
       fila('Autenticación', r.token ? 'correcta' : 'falla', r.token) +
+      fila('API de Vertex AI', r.vertex ? 'responde' : 'no responde', r.vertex) +
       fila('Bucket para video', r.bucket ? 'configurado' : 'sin bucket — los clips vendrán en línea', !!r.bucket);
-    if (!r.token && r.errorToken) {
-      t.innerHTML += '<tr><td colspan="2" style="color:var(--ceniza);font-size:12.5px">' +
-        esc(r.errorToken) + '</td></tr>';
+    const problema = (!r.token && r.errorToken) || (!r.vertex && r.errorVertex);
+    if (problema) {
+      t.innerHTML += '<tr><td colspan="2" style="padding-top:12px">' +
+        '<div class="estado err" style="display:block;margin:0">' + esc(problema) + '</div></td></tr>';
     }
-    const ok = r.proyecto && r.cuentaServicio && r.token;
+    const ok = r.proyecto && r.cuentaServicio && r.token && r.vertex;
+    if (!ok && problema) aviso(problema, 'err', 9000);
     marcarConexion(ok ? 'ok' : 'mal');
   } catch (e) {
     t.innerHTML = '<tr><td>Error</td><td><span class="chip e">' + esc(e.message) + '</span></td></tr>';
@@ -626,7 +651,42 @@ function avanceEpisodio(ep) {
   return partes.reduce((a, b) => a + b, 0) / partes.length;
 }
 
+/** Los cuatro pasos, en orden, con el que toca resaltado. */
+function pintarGuia() {
+  const ul = $('panelGuia');
+  if (!ul) return;
+  const conRefs = P.elenco.filter((p) => p.principal && p.refs && p.refs.length).length;
+  const totRefs = P.elenco.filter((p) => p.principal).length;
+  const dirigidos = P.episodios.filter((e) => e.tomas.length && e.tomas.every((t) => t.plano)).length;
+  const conVoz = P.episodios.filter((e) => estadoEpisodio(e).voz > 0).length;
+  const conImg = P.episodios.filter((e) => estadoEpisodio(e).imagen > 0).length;
+
+  const pasos = [
+    ['Dibujar a los personajes',
+      'Una vez en toda la serie. Se genera la cara de cada personaje y se guarda. Después, cada imagen del episodio lleva esa cara adjunta, y por eso Sōta se ve igual en el episodio uno y en el doce.',
+      conRefs + ' de ' + totRefs + ' principales listos', conRefs >= totRefs && totRefs > 0],
+    ['Dirigir el episodio',
+      'El guion ya está partido en tomas. Aquí una IA decide, para cada toma, qué se ve: si es un primer plano o un plano general, quién sale, dónde ocurre y cómo está iluminado. No toca ni una palabra del texto.',
+      dirigidos + ' de ' + P.episodios.length + ' episodios dirigidos', dirigidos >= P.episodios.length && P.episodios.length > 0],
+    ['Producir',
+      'Tres cosas, en este orden: la voz que narra cada toma, la imagen de cada toma, y el movimiento de las tomas que lo merecen. Se puede parar y seguir cuando quieras.',
+      conVoz + ' con voz · ' + conImg + ' con imagen', conVoz > 0 && conImg > 0],
+    ['Ver y exportar',
+      'En la Sala ves el episodio montado como quedará. En el Archivo lo descargas todo en un .zip con un script que arma el video final.',
+      'cuando lo anterior esté hecho', false],
+  ];
+
+  const actual = pasos.findIndex((p) => !p[3]);
+  ul.innerHTML = pasos.map(([tit, des, dato, hecho], i) =>
+    '<li class="' + (hecho ? 'hecho' : '') + '"><div><strong>' + esc(tit) +
+    (i === actual ? ' <span class="chip g">te toca</span>' : '') + '</strong>' +
+    '<span>' + esc(des) + '</span>' +
+    '<span style="display:block;margin-top:5px;color:var(--tinta-3s)">' + esc(dato) + '</span></div></li>'
+  ).join('');
+}
+
 async function pintarPanel() {
+  pintarGuia();
   if (!P.episodios.length) {
     $('panelStats').innerHTML = '';
     $('panelCarrusel').innerHTML = '<p class="nota">Cargando los guiones…</p>';
@@ -960,6 +1020,11 @@ function cablear() {
     });
   });
   $('btnVerEpisodios').addEventListener('click', () => irA('episodios'));
+  $('btnGuiaMas').addEventListener('click', () => {
+    const b = $('btnPanelContinuar');
+    aviso('Paso actual: ' + $('panelSiguiente').textContent, 'info', 7000);
+    b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
   $('btnConexion').addEventListener('click', () => { irA('archivo'); comprobarConexion(); });
   $('btnPanelContinuar').addEventListener('click', (ev) => irA(ev.currentTarget.dataset.destino || 'episodios'));
 
@@ -1019,6 +1084,8 @@ function cablear() {
     jobMostrar('referencias');
     await nuevoMotor().generarReferencias(P.elenco.filter((p) => p.principal).map((p) => p.id));
     await guardar(); pintarFichas();
+    const n = P.elenco.filter((p) => p.principal && p.refs && p.refs.length).length;
+    aviso(n + ' personajes principales ya tienen su hoja de referencia.', n ? 'ok' : 'err', 6000);
   });
   $('btnRefsTodos').addEventListener('click', async () => {
     jobMostrar('referencias');

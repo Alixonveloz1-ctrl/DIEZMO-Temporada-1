@@ -219,15 +219,42 @@ module.exports = async (req, res) => {
         cuentaServicio: !!process.env.GCP_SERVICE_ACCOUNT,
         bucket: !!nombreBucket(),
         token: false,
+        vertex: false,
       };
       if (estado.proyecto && estado.cuentaServicio) {
+        let tk = null;
         try {
-          await getAccessToken();
+          tk = await getAccessToken();
           estado.token = true;
         } catch (e) {
           // El mensaje de error de Google puede incluir el correo de la cuenta.
           estado.errorToken = 'La autenticación con Google Cloud falló. ' +
             'Revisa que GCP_SERVICE_ACCOUNT contenga el JSON completo y sin recortar.';
+        }
+        // Autenticar no basta: hay que comprobar que Vertex responda de verdad.
+        // Una consulta gratuita al catálogo delata la API apagada o sin permisos.
+        if (tk) {
+          try {
+            const r = await fetch(
+              'https://us-central1-aiplatform.googleapis.com/v1beta1/publishers/google/models?pageSize=1',
+              { headers: { Authorization: 'Bearer ' + tk, 'X-Goog-User-Project': process.env.GCP_PROJECT_ID } }
+            );
+            if (r.ok) {
+              estado.vertex = true;
+            } else if (r.status === 403) {
+              const cuerpo = await r.text();
+              estado.errorVertex = /SERVICE_DISABLED|has not been used in project|is disabled/i.test(cuerpo)
+                ? 'La API de Vertex AI (aiplatform.googleapis.com) está apagada en tu proyecto. ' +
+                  'Actívala en Google Cloud: menú, APIs y servicios, Biblioteca, busca «Vertex AI API» y pulsa Habilitar. ' +
+                  'Tarda un par de minutos en surtir efecto.'
+                : 'Vertex AI rechazó la petición por permisos. Revisa que la cuenta de servicio ' +
+                  'tenga el rol de Usuario de Vertex AI o Propietario en el proyecto.';
+            } else {
+              estado.errorVertex = 'Vertex AI respondió con el código ' + r.status + '.';
+            }
+          } catch (e) {
+            estado.errorVertex = 'No se pudo contactar con Vertex AI.';
+          }
         }
       }
       return res.status(200).json(estado);

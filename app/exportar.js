@@ -229,18 +229,7 @@ export async function exportarEpisodio(ep, cfg, progreso) {
   await zip.añadir('guion-tecnico.md', enc.encode(guionTecnico(ep, hoja)));
 
   const faltan = hoja.tomas.filter((t) => t.tipo === 'video' && !t.video).length;
-  const pendientesGcs = ep.tomas.filter((t) => t.video && t.video.ok && !t.video.local);
-  if (pendientesGcs.length) {
-    await zip.añadir('CLIPS-EN-LA-NUBE.txt', enc.encode(
-      'Estos clips se generaron pero viven todavía en Google Cloud Storage porque el bucket no\n' +
-      'tiene CORS habilitado y el navegador no pudo descargarlos.\n\n' +
-      'Para traerlos:\n' +
-      '  gcloud storage cp <uri> ./clips/\n\n' +
-      pendientesGcs.map((t) => 'toma-' + pad3(t.i + 1) + '.mp4  ←  ' + t.video.gcsUri).join('\n') + '\n'
-    ));
-  }
-
-  return { blob: zip.cerrar(), hoja, faltan, enLaNube: pendientesGcs.length };
+  return { blob: zip.cerrar(), hoja, faltan };
 }
 
 /* ── Guion técnico legible ──────────────────────────────────── */

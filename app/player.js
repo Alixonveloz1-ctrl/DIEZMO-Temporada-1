@@ -78,9 +78,7 @@ export class Proyector {
     const r = {
       audio: await assets.url(clave.audio(this.ep.num, t.i)),
       imagen: await assets.url(clave.imagen(this.ep.num, t.i)),
-      video: (t.video && t.video.ok)
-        ? (t.video.local ? await assets.url(clave.video(this.ep.num, t.i)) : t.video.url)
-        : null,
+      video: (t.video && t.video.ok) ? await assets.url(clave.video(this.ep.num, t.i)) : null,
     };
     this.cache.set(k, r);
     return r;

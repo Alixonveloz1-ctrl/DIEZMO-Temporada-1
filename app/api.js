@@ -77,10 +77,23 @@ export const api = {
 
   videoConsultar: (p, o) => llamar({ mode: 'video', action: 'poll', ...p }, { intentos: 2, ...o }),
 
-  firmar: (gcsUri) => llamar({ mode: 'signurl', gcsUri }, { intentos: 2 }),
-
-  bajarGcs: (gcsUri) => llamar({ mode: 'fetchgcs', gcsUri }, { intentos: 2 }),
 };
+
+/** Descarga el clip por su referencia opaca. El navegador nunca ve el origen. */
+export async function bajarClip(clip, señal) {
+  const r = await fetch(ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: 'clip', clip }),
+    signal: señal,
+  });
+  if (!r.ok) {
+    let j = {};
+    try { j = await r.json(); } catch (e) { /* respuesta no-JSON */ }
+    throw new Error(j.error || ('No se pudo descargar el clip (' + r.status + ')'));
+  }
+  return r.blob();
+}
 
 /**
  * Lanza un clip en Veo y espera a que termine.

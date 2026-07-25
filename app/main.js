@@ -573,7 +573,7 @@ async function seleccionarToma(ep, t) {
   const v = $('detVista');
   v.innerHTML = '';
   if (t.video && t.video.ok) {
-    const u = t.video.local ? await assets.url(clave.video(ep.num, t.i)) : t.video.url;
+    const u = await assets.url(clave.video(ep.num, t.i));
     if (u) {
       const el = document.createElement('video');
       el.src = u; el.controls = true; el.playsInline = true; el.muted = true;
@@ -1273,9 +1273,7 @@ function cablear() {
       descargar(r.blob, 'DIEZMO-EP' + pad2(ep.num) + '.zip');
       estado('estadoExport',
         'Listo: ' + (r.blob.size / 1048576).toFixed(1) + ' MB · ' + r.hoja.tomas.length + ' tomas · ' +
-        fmtDur(r.hoja.duracionTotal) +
-        (r.enLaNube ? ' · ' + r.enLaNube + ' clips siguen en Google Cloud, mira CLIPS-EN-LA-NUBE.txt' : ''),
-        'ok');
+        fmtDur(r.hoja.duracionTotal), 'ok');
     } catch (e) {
       estado('estadoExport', 'La exportación falló: ' + e.message, 'err');
     }

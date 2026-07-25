@@ -196,6 +196,75 @@ function urlFirmadaV4(gsUri, segundos) {
     '?' + query + '&X-Goog-Signature=' + firma;
 }
 
+/* ── Referencia opaca a un clip ─────────────────────────────── */
+/*  El enlace firmado de Google lleva dentro el bucket y el correo de
+    la cuenta. En vez de dárselo al navegador, se cifra la ruta con la
+    propia llave privada y se entrega un identificador sin sentido.    */
+
+function claveInterna() {
+  return crypto.createHash('sha256').update(serviceAccount().private_key).digest();
+}
+
+function cifrarRuta(gsUri) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', claveInterna(), iv);
+  const dato = Buffer.concat([c.update(String(gsUri), 'utf8'), c.final()]);
+  return Buffer.concat([iv, c.getAuthTag(), dato]).toString('base64url');
+}
+
+function descifrarRuta(token) {
+  const b = Buffer.from(String(token), 'base64url');
+  const d = crypto.createDecipheriv('aes-256-gcm', claveInterna(), b.subarray(0, 12));
+  d.setAuthTag(b.subarray(12, 28));
+  return Buffer.concat([d.update(b.subarray(28)), d.final()]).toString('utf8');
+}
+
+/* ── Censura de salida ──────────────────────────────────────── */
+/*  Google incluye el identificador del proyecto en sus mensajes de
+    error, y esos mensajes acababan en el navegador. Toda respuesta
+    pasa por aquí antes de salir: ningún dato de la cuenta cruza.     */
+
+function censor() {
+  const secretos = [];
+  const meter = (v) => { if (v && String(v).length > 3) secretos.push(String(v)); };
+  meter(process.env.GCP_PROJECT_ID);
+  meter(nombreBucket());
+  try {
+    const sa = serviceAccount();
+    meter(sa.client_email);
+    meter(sa.client_id);
+    meter(sa.private_key_id);
+    if (sa.client_email) meter(String(sa.client_email).split('@')[0]);
+  } catch (e) { /* sin cuenta configurada: nada que ocultar */ }
+
+  return (texto) => {
+    let t = String(texto);
+    for (const s of secretos) t = t.split(s).join('\u00ABoculto\u00BB');
+    return t
+      .replace(/projects?[/=]\s*[^/\s"'&,}]+/gi, 'projects/\u00ABoculto\u00BB')
+      .replace(/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.iam\.gserviceaccount\.com/g, '\u00ABcuenta oculta\u00BB')
+      .replace(/gs:\/\/[^\s"',}]+/g, 'gs://\u00ABoculto\u00BB')
+      .replace(/[?&]project=[^&\s"'}]+/gi, '')
+      .replace(/\b\d{10,14}\b/g, '\u00ABoculto\u00BB');
+  };
+}
+
+// Los campos de carga útil son base64: no contienen secretos y recorrerlos
+// costaría megabytes de proceso, además de poder corromperlos.
+const SIN_CENSURA = new Set(['audio', 'image', 'video', 'data', 'clip']);
+
+function limpiarProfundo(valor, limpiar, clave) {
+  if (SIN_CENSURA.has(clave)) return valor;
+  if (typeof valor === 'string') return limpiar(valor);
+  if (Array.isArray(valor)) return valor.map((v) => limpiarProfundo(v, limpiar, clave));
+  if (valor && typeof valor === 'object') {
+    const out = {};
+    for (const k of Object.keys(valor)) out[k] = limpiarProfundo(valor[k], limpiar, k);
+    return out;
+  }
+  return valor;
+}
+
 /* ── Handler ────────────────────────────────────────────────── */
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -203,6 +272,11 @@ module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Solo POST' });
+
+  // Punto único de salida: nada sale sin pasar por la censura.
+  const limpiar = censor();
+  const jsonOriginal = res.json.bind(res);
+  res.json = (cuerpo) => jsonOriginal(limpiarProfundo(cuerpo, limpiar));
 
   try {
     const body =
@@ -537,10 +611,7 @@ module.exports = async (req, res) => {
         const gcsUri = v.gcsUri || (v.video && v.video.uri) || null;
         const salida = { done: true, mimeType: v.mimeType || 'video/mp4' };
         if (gcsUri) {
-          salida.gcsUri = gcsUri;
-          try { salida.url = urlFirmadaV4(gcsUri, body.expires || 21600); } catch (e) {
-            salida.errorFirma = (e && e.message) || String(e);
-          }
+          salida.clip = cifrarRuta(gcsUri);          // referencia opaca
         } else if (v.bytesBase64Encoded) {
           salida.video = v.bytesBase64Encoded;
         }
@@ -550,35 +621,31 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Acción de video desconocida: ' + accion });
     }
 
-    /* ════════ SIGNURL — renovar el enlace de un clip ════════ */
-    if (mode === 'signurl') {
-      if (!body.gcsUri) return res.status(400).json({ error: 'Falta "gcsUri"' });
-      return res.status(200).json({ url: urlFirmadaV4(body.gcsUri, body.expires || 21600) });
-    }
-
-    /* ════════ FETCHGCS — respaldo si el bucket no tiene CORS ════════ */
-    if (mode === 'fetchgcs') {
-      if (!body.gcsUri) return res.status(400).json({ error: 'Falta "gcsUri"' });
-      const { bucket, objeto } = rutaGs(body.gcsUri);
+    /* ════════ CLIP — entrega el video sin revelar su origen ════════ */
+    if (mode === 'clip') {
+      if (!body.clip) return res.status(400).json({ error: 'Falta la referencia del clip' });
+      let gsUri;
+      try { gsUri = descifrarRuta(body.clip); } catch (e) {
+        return res.status(400).json({ error: 'Referencia de clip inválida o caducada' });
+      }
+      const { bucket, objeto } = rutaGs(gsUri);
       const u = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
         '/o/' + encodeURIComponent(objeto) + '?alt=media';
       const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
       if (!r.ok) {
-        return res.status(r.status).json({ error: 'GCS ' + r.status, detail: (await r.text()).slice(0, 400) });
+        return res.status(r.status).json({ error: 'No se pudo leer el clip (' + r.status + ')' });
       }
-      const buf = Buffer.from(await r.arrayBuffer());
-      // Por encima de ~4 MB la respuesta de la función no pasa: mejor decirlo claro.
-      if (buf.length > 4 * 1024 * 1024) {
-        return res.status(413).json({
-          error: 'El archivo pesa ' + (buf.length / 1048576).toFixed(1) + ' MB y no cabe en el proxy. ' +
-            'Activa CORS en el bucket y usa la URL firmada.',
-        });
+      // Se transmite por partes: así no choca con el límite de respuesta
+      // y el navegador jamás ve el bucket ni el enlace firmado.
+      res.setHeader('Content-Type', r.headers.get('content-type') || 'video/mp4');
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      const lector = r.body.getReader();
+      for (;;) {
+        const { done, value } = await lector.read();
+        if (done) break;
+        res.write(Buffer.from(value));
       }
-      return res.status(200).json({
-        data: buf.toString('base64'),
-        mimeType: r.headers.get('content-type') || 'application/octet-stream',
-        bytes: buf.length,
-      });
+      return res.end();
     }
 
     /* ════════ MODELS — descubrimiento en Model Garden ════════ */

@@ -55,17 +55,11 @@ Despliega el repositorio y define tres variables de entorno:
 
 Abre la página: la primera pestaña comprueba la conexión y te dice exactamente qué falta.
 
-### 3 · CORS en el bucket (recomendado)
+### 3 · Nada más
 
-Veo escribe los clips en Cloud Storage. Sin CORS, el navegador puede reproducirlos pero
-no descargarlos al proyecto, y quedarán fuera del `.zip`. Se arregla una sola vez:
-
-```bash
-cat > cors.json <<'EOF'
-[{"origin":["*"],"method":["GET","HEAD"],"responseHeader":["Content-Type"],"maxAgeSeconds":3600}]
-EOF
-gcloud storage buckets update gs://diezmo-video --cors-file=cors.json
-```
+No hace falta configurar CORS en el bucket. Los clips que produce Veo se
+descargan a través del propio backend, que los transmite al navegador sin
+revelar dónde están guardados.
 
 ---
 
@@ -123,6 +117,12 @@ de enviar el texto — «doscientos ochenta mil yenes», «las seis y cuarenta y
 nunca.** En la pestaña de guion técnico, «Ver texto normalizado» enseña toma por toma
 cómo va a sonar. Los casos que ninguna regla resuelve bien (género gramatical, monedas con
 decimal) están en una tabla de reemplazos editable en `app/texto.js`.
+
+**Tus credenciales no salen del servidor.** El navegador nunca recibe el
+identificador del proyecto, ni el correo de la cuenta de servicio, ni el nombre
+del bucket. Toda respuesta del backend pasa por una censura antes de salir —los
+mensajes de error de Google incluyen el proyecto y se limpian—, y los clips de
+video se referencian con un identificador cifrado en lugar de un enlace firmado.
 
 **El trabajo sobrevive al cierre de la pestaña.** Todo vive en IndexedDB. Aun así, exporta
 a menudo: pulsa «Proteger del borrado automático» en la primera pestaña.

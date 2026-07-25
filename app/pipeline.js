@@ -7,7 +7,7 @@
    siguiente.
    ============================================================ */
 
-import { api, generarVideo, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64 } from './api.js';
+import { api, generarVideo, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64 } from './api.js';
 import { assets } from './db.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
 import { promptImagen, promptVideo, promptReferencia, promptLugar } from './director.js';
@@ -330,20 +330,11 @@ export class Motor {
         await assets.guardar(clave.video(ep.num, t.i), b64toBlob(r.video, r.mimeType || 'video/mp4'),
           { ep: ep.num, toma: t.i });
         t.video = { ok: true, dur, local: true };
-      } else if (r.gcsUri) {
-        // Intentamos traerlo a IndexedDB para que el proyecto sea autónomo.
-        let guardado = false;
-        try {
-          const resp = await fetch(r.url);
-          if (resp.ok) {
-            await assets.guardar(clave.video(ep.num, t.i), await resp.blob(), { ep: ep.num, toma: t.i });
-            guardado = true;
-          }
-        } catch (e) { /* el bucket no tiene CORS: seguimos con la URL firmada */ }
-        t.video = { ok: true, dur, local: guardado, gcsUri: r.gcsUri, url: guardado ? undefined : r.url };
-        if (!guardado) {
-          this._log('toma ' + (t.i + 1) + ': clip en GCS (activa CORS en el bucket para descargarlo)', 'info');
-        }
+      } else if (r.clip) {
+        // El clip viaja por el backend: el navegador nunca ve dónde está guardado.
+        const blob = await bajarClip(r.clip, this.señal);
+        await assets.guardar(clave.video(ep.num, t.i), blob, { ep: ep.num, toma: t.i });
+        t.video = { ok: true, dur, local: true };
       } else {
         throw new Error('Veo terminó sin devolver el clip');
       }

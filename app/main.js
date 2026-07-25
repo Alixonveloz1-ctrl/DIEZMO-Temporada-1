@@ -782,7 +782,8 @@ async function pintarPanel() {
     const u = await assets.url(tokio.ref);
     if (u) {
       $('hero').style.backgroundImage =
-        'linear-gradient(180deg, rgba(9,14,26,.34) 0%, rgba(9,14,26,.72) 62%, var(--fondo) 100%), url(' + u + ')';
+        'linear-gradient(180deg, rgba(5,8,15,.20) 0%, rgba(5,8,15,.55) 46%, rgba(5,8,15,.92) 82%, var(--fondo) 100%), ' +
+        'url(' + u + ')';
     }
   }
 }

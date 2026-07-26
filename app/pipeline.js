@@ -102,7 +102,7 @@ export class Motor {
             const r = await api.imagen({
               prompt,
               model: cfg.modeloImagen,
-              aspectRatio: v === 'hoja' ? '16:9' : '1:1',
+              aspectRatio: v === 'hoja' ? '2:3' : '1:1',
               imageSize: cfg.imageSize,
               guardarComo: k,
             }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(per.nombre + ': ' + m) });

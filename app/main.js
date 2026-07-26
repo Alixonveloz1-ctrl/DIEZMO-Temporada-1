@@ -11,7 +11,7 @@ import {
 } from './texto.js';
 import {
   CONFIG_DEFECTO, ELENCO_DEFECTO, LUGARES_DEFECTO, VOCES, IDIOMAS,
-  ESTILO_DEFECTO, NEGATIVO_DEFECTO, CALIDAD_DEFECTO,
+  ESTILO_DEFECTO, NEGATIVO_DEFECTO, CALIDAD_DEFECTO, BIBLIA_VERSION,
 } from './biblia.js';
 import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js';
 import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob } from './pipeline.js';
@@ -60,6 +60,40 @@ async function cargar() {
 }
 
 const epActual = () => P.episodios.find((e) => e.num === P.sel) || P.episodios[0] || null;
+
+
+/**
+ * Trae la dirección de arte y las fichas nuevas a un proyecto ya guardado.
+ * Respeta lo que hayas editado a mano y los personajes que hayas añadido tú.
+ */
+function actualizarBiblia(forzar) {
+  const guardada = P.config.bibliaVersion || 0;
+  if (!forzar && guardada >= BIBLIA_VERSION) return 0;
+
+  let cambios = 0;
+  for (const [campo, valor] of [['estilo', ESTILO_DEFECTO], ['calidad', CALIDAD_DEFECTO],
+                                ['negativo', NEGATIVO_DEFECTO]]) {
+    if (!P.config[campo + 'Editado']) { P.config[campo] = valor; cambios++; }
+  }
+
+  const refrescar = (lista, defectos) => {
+    for (const d of defectos) {
+      const v = lista.find((x) => x.id === d.id);
+      if (!v) { lista.push({ ...d, refs: [], ref: null }); cambios++; continue; }
+      if (v.editada) continue;                 // ficha tocada a mano: intocable
+      v.nombre = d.nombre;
+      v.alias = d.alias;
+      v.ficha = d.ficha;
+      if (d.principal !== undefined) v.principal = d.principal;
+      cambios++;
+    }
+  };
+  refrescar(P.elenco, ELENCO_DEFECTO);
+  refrescar(P.lugares, LUGARES_DEFECTO);
+
+  P.config.bibliaVersion = BIBLIA_VERSION;
+  return cambios;
+}
 
 /* ── El proyecto en Google Cloud ─────────────────────────────
    Se guarda sin los textos: el guion vive en el repositorio y las
@@ -1167,8 +1201,24 @@ function cablear() {
   });
 
   // Biblia
+  $('btnRestaurarArte').addEventListener('click', async () => {
+    if (!confirm('Esto devuelve el estilo, el acabado y todas las fichas a la versión del ' +
+      'repositorio. Se pierde lo que hayas escrito tú. ¿Seguir?')) return;
+    for (const c of ['estiloEditado', 'calidadEditado', 'negativoEditado']) P.config[c] = false;
+    for (const x of P.elenco.concat(P.lugares)) x.editada = false;
+    const n = actualizarBiblia(true);
+    await guardar();
+    $('cfgEstilo').value = P.config.estilo;
+    $('cfgCalidad').value = P.config.calidad;
+    $('cfgNegativo').value = P.config.negativo;
+    pintarFichas(); pintarTodo();
+    aviso(n + ' elementos restaurados. Vuelve a generar las hojas para verlo.', 'ok', 7000);
+  });
   $('btnGuardarArte').addEventListener('click', async () => {
     P.config.estilo = $('cfgEstilo').value.trim() || ESTILO_DEFECTO;
+    P.config.estiloEditado = P.config.estilo !== ESTILO_DEFECTO;
+    P.config.calidadEditado = $('cfgCalidad').value.trim() !== CALIDAD_DEFECTO;
+    P.config.negativoEditado = $('cfgNegativo').value.trim() !== NEGATIVO_DEFECTO;
     P.config.negativo = $('cfgNegativo').value.trim() || NEGATIVO_DEFECTO;
     P.config.calidad = $('cfgCalidad').value.trim() || CALIDAD_DEFECTO;
     P.config.maxReferencias = parseInt($('cfgMaxRefs').value, 10) || 3;
@@ -1202,6 +1252,7 @@ function cablear() {
     const ficha = $('fichaTexto').value.trim();
     if (obj) {
       obj.nombre = nombre; obj.alias = alias; obj.ficha = ficha;
+      obj.editada = true;                        // a partir de aquí, no se sobrescribe
       if (tipo === 'personaje') obj.principal = $('fichaPrincipal').checked;
     } else {
       const id = nombre.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -1511,6 +1562,15 @@ async function iniciar() {
   // El proyecto vive en Google Cloud: al abrir se recupera de ahí, y el
   // navegador queda solo como copia rápida.
   await recuperarDeNube();
+
+  // La dirección de arte del repositorio manda sobre la copia guardada, salvo
+  // en lo que hayas editado tú: si no, las mejoras nunca llegarían al proyecto.
+  const refrescadas = actualizarBiblia(false);
+  if (refrescadas) {
+    await guardar();
+    log('dirección de arte y fichas actualizadas a la versión ' + BIBLIA_VERSION, 'ok');
+    aviso('La biblia visual se actualizó. Vuelve a generar las hojas para ver el cambio.', 'ok', 8000);
+  }
 
   // Los guiones viven en el repositorio: no tiene sentido pedir un clic para algo
   // que siempre hay que hacer. La primera vez se cargan solos.

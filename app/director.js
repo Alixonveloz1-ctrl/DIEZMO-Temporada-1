@@ -273,21 +273,25 @@ export function promptReferencia(personaje, ctx, variante) {
   ];
 
   if (variante === 'hoja') {
+    // Un lienzo alto con UNA figura: el encuadre tiene forma de persona, así que
+    // el modelo no tiene que ensanchar ni acortar el cuerpo para llenarlo. Tres
+    // vistas apretadas en un lienzo panorámico eran la causa del aire achaparrado.
     base.push(
-      'Composición: UN SOLO personaje, el mismo, mostrado tres veces sobre un fondo gris neutro y ' +
-      'liso: de frente, de perfil y de espaldas. Las tres figuras de cuerpo entero, grandes, ' +
-      'alineadas a la misma altura y ocupando todo el alto del encuadre. Iluminación plana y ' +
-      'uniforme de estudio, sin sombras dramáticas, sin escenario, sin objetos. Expresión neutra.'
+      'Composición: UNA sola figura, de cuerpo entero y de pie, vista de frente, centrada sobre ' +
+      'un fondo gris neutro y liso. La figura ocupa casi todo el alto del encuadre, desde la ' +
+      'cabeza hasta los pies, con un margen pequeño arriba y abajo. Postura natural y relajada, ' +
+      'brazos a los costados. Iluminación de estudio suave y pareja, sin sombras dramáticas, sin ' +
+      'escenario y sin objetos alrededor. Expresión serena.'
     );
   } else if (variante === 'rostro') {
     base.push(
-      'Composición: primer plano del rostro de UN SOLO personaje sobre fondo gris neutro y liso, ' +
-      'de frente, mirando a cámara, expresión neutra. Iluminación plana y uniforme. Máximo detalle ' +
-      'facial, de mirada y de peinado.'
+      'Composición: primer plano del rostro de UNA sola figura sobre fondo gris neutro y liso, ' +
+      'de frente, mirando a cámara, expresión serena. Iluminación suave y pareja. Máximo detalle ' +
+      'en la mirada, la piel y el peinado.'
     );
   } else {
     base.push(
-      'Composición: plano medio de UN SOLO personaje sobre fondo gris neutro, en tres cuartos, en ' +
+      'Composición: plano medio de UNA sola figura sobre fondo gris neutro, en tres cuartos, en ' +
       'su postura característica. Iluminación suave de estudio.'
     );
   }
@@ -295,9 +299,10 @@ export function promptReferencia(personaje, ctx, variante) {
   // Salvaguarda anatómica: los modelos de imagen duplican miembros con facilidad,
   // y en una hoja de referencia con tres vistas el riesgo se multiplica.
   base.push(
-    'ANATOMÍA: cada figura es un cuerpo completo y correcto, con una única cabeza, un único ' +
-    'rostro, dos brazos, dos piernas y manos de cinco dedos. Constitución esbelta y adulta, de ' +
-    'piernas largas y torso proporcionado; nada de cuerpos achaparrados ni cabezas grandes.'
+    'ANATOMÍA: un cuerpo completo y correcto, con una única cabeza, un único rostro, dos brazos, ' +
+    'dos piernas y manos de cinco dedos. Figura alta y estilizada: piernas largas que ocupan algo ' +
+    'más de la mitad de la altura total, torso esbelto, cuello definido y cabeza pequeña en ' +
+    'relación con el cuerpo, como se dibuja a los adultos en el anime moderno.'
   );
 
   if (ctx.calidad) base.push(ctx.calidad);

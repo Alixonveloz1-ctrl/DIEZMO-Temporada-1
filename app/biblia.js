@@ -17,8 +17,13 @@ export const ESTILO_DEFECTO =
   'de película, sin textura de papel, sin trama de puntos, sin aspecto envejecido ni retro. ' +
   'Paleta: negros marrones cálidos, hueso, bronce y ámbar; el rojo brasa reservado a lo ' +
   'vessari; los interiores humanos en verdes desaturados y fluorescente frío. ' +
-  'Las figuras humanas se dibujan con anatomía correcta y elegante, de constitución esbelta ' +
-  'y piernas largas, tal como se estilizan los adultos en el anime moderno. ' +
+  'Las figuras se dibujan altas y esbeltas, de piernas largas y torso estilizado, con la ' +
+  'cabeza pequeña respecto al cuerpo, tal como se dibuja a los adultos en el anime moderno. ' +
+  'DISEÑO DE PERSONAJES ATRACTIVO, del que engancha al público: rostros armónicos y bien ' +
+  'proporcionados, ojos grandes y luminosos de mirada expresiva, piel limpia y sana, ' +
+  'peinados con volumen y mechones bien definidos. Los personajes resultan agradables de ' +
+  'mirar aunque la historia sea dura, y su ropa está limpia y bien confeccionada, con buena ' +
+  'caída y costuras correctas, por humilde que sea. ' +
   'Registro adulto y sobrio, sin exageración cómica.';
 
 export const NEGATIVO_DEFECTO =
@@ -28,6 +33,8 @@ export const NEGATIVO_DEFECTO =
   'sobrantes, dedos sobrantes, miembros fusionados, cuerpos fusionados, anatomía imposible, ' +
   'articulaciones torcidas, manos deformes, cabeza desproporcionada, cuerpo achaparrado, ' +
   'piernas acortadas, proporciones infantiles, enanismo, ' +
+  'aspecto andrajoso, tela basta de saco, prendas rotas o sucias, rostro demacrado, ' +
+  'ojeras exageradas, piel enferma, envejecimiento prematuro, expresión de sufrimiento físico, ' +
   'texto, letras, subtítulos, marca de agua, logotipo, firma, collage, rejilla de viñetas, ' +
   'estilo chibi, moe, kawaii, render 3D, CGI, modelado por ordenador, fotorrealismo, ' +
   'fotografía, grano de película, textura de papel, trama de puntos, aspecto retro, ' +
@@ -58,134 +65,174 @@ export const ELENCO_DEFECTO = [
   {
     id: 'sota', nombre: 'Sōta', alias: ['Sōta Amamiya', 'Amamiya Sōta', 'hermano', 'contador'],
     principal: true,
-    ficha: 'Chico japonés de diecinueve años. Delgado por trabajo, no por dieta. Pelo negro liso ' +
-      'algo largo y desordenado, flequillo que le tapa la frente. Ojos oscuros con ojeras marcadas ' +
-      'y permanentes. Cara angulosa, mandíbula tensa, expresión de cansancio contenido. ' +
-      'Ropa: chaqueta de trabajo azul marino gastada sobre camisa blanca barata, pantalón oscuro, ' +
-      'zapatillas viejas. En la segunda mitad de la temporada: mono gris de recluso con una pulsera ' +
-      'negra en la muñeca izquierda, vendada con tela blanca.',
+    ficha: 'Chico japonés de diecinueve años, guapo y de presencia serena. Rostro de óvalo ' +
+      'suave y facciones limpias: nariz recta, mandíbula definida sin dureza, cejas bien ' +
+      'dibujadas, labios finos. Ojos oscuros, grandes y de mirada franca, con pestañas ' +
+      'marcadas. Piel limpia y sana; apenas una sombra tenue bajo los ojos, porque trabaja de ' +
+      'noche. Alto y esbelto, de hombros rectos, torso estilizado y piernas largas. Pelo negro ' +
+      'liso y brillante, algo largo, con flequillo que le cae sobre la frente y mechones ' +
+      'sueltos que le dan movimiento. ' +
+      'Ropa sencilla pero cuidada y bien entallada: chaqueta de trabajo azul marino, camiseta ' +
+      'clara de cuello redondo, pantalón oscuro y zapatillas. En la segunda mitad de la ' +
+      'temporada: mono gris de una pieza con una pulsera negra en la muñeca izquierda, ' +
+      'vendada con una tira de tela blanca limpia.',
   },
   {
     id: 'hina', nombre: 'Hina', alias: ['Hina Amamiya', 'Amamiya Hina', 'hermana'],
     principal: true,
-    ficha: 'Chica japonesa de dieciséis años. Estatura media, complexión menuda pero de postura ' +
-      'firme. Pelo negro a la altura de los hombros con flequillo recto. Ojos grandes y despiertos, ' +
-      'mirada directa. Camina con paso corto y la cabeza alta. ' +
-      'Ropa: uniforme escolar japonés de invierno azul marino, o campera celeste sobre ropa de calle. ' +
-      'En la nave: conjunto deportivo blanco del Programa Puente. Lleva siempre un omamori de tela ' +
-      'roja y dorada atado a la mochila o a la cabecera de la litera.',
+    ficha: 'Chica japonesa de dieciséis años, de belleza serena y natural. Rostro dulce de ' +
+      'facciones armónicas, ojos grandes y luminosos de mirada directa y despierta, pestañas ' +
+      'largas, boca pequeña. Piel clara y limpia. Figura esbelta, de piernas largas y postura ' +
+      'firme; camina con paso corto y la cabeza alta. Pelo negro liso y brillante a la altura ' +
+      'de los hombros, con flequillo recto y mechones enmarcándole la cara. ' +
+      'Ropa: uniforme escolar japonés de invierno azul marino, impecable, o campera celeste ' +
+      'sobre ropa de calle. En la nave: conjunto deportivo blanco del Programa Puente. Lleva ' +
+      'siempre un omamori de tela roja y dorada atado a la mochila o a la litera.',
   },
   {
     id: 'rei', nombre: 'Rei', alias: ['Rei Kurosawa', 'Kurosawa Rei', 'la editora'],
     principal: true,
-    ficha: 'Mujer japonesa de veinticuatro años. Pelo negro corto y descuidado, mechones sueltos. ' +
-      'Ojeras profundas de insomnio prolongado, mirada intensa y alerta. Cazadora negra sobre ' +
-      'camiseta gris, vaqueros, mochila cruzada. Manos siempre ocupadas: portátil, cuaderno, cables.',
+    ficha: 'Mujer japonesa de veinticuatro años, atractiva y de belleza afilada. Rostro de ' +
+      'pómulos altos, mentón fino, ojos oscuros grandes e intensos con mirada alerta y ' +
+      'penetrante. Piel clara y limpia; una sombra ligera bajo los ojos delata las noches sin ' +
+      'dormir, sin llegar a afearla. Figura alta y delgada. Pelo negro corto, de corte ' +
+      'moderno y algo despeinado con intención, mechones cayéndole sobre la frente. ' +
+      'Cazadora negra de cuero sobre camiseta gris, vaqueros ajustados, botas, mochila ' +
+      'cruzada. Manos siempre ocupadas: portátil, cuaderno, cables.',
   },
   {
     id: 'kanzaki', nombre: 'Kanzaki', alias: ['Kenji Kanzaki', 'el director', 'Director Kanzaki'],
     principal: true,
-    ficha: 'Funcionario japonés de cincuenta y ocho años. Pelo gris peinado con raya impecable, ' +
-      'gafas de montura fina metálica, cara larga sin expresión. Traje gris oscuro de burócrata, ' +
-      'camisa blanca, corbata sobria. Postura recta, manos quietas. Lleva siempre una libreta ' +
-      'pequeña — salvo en el episodio final, donde ya no la lleva.',
+    ficha: 'Funcionario japonés de cincuenta y ocho años, de elegancia distinguida y ' +
+      'envejecido con dignidad. Rostro alargado de facciones nobles, nariz recta, mandíbula ' +
+      'firme, pómulos marcados; guapo de joven y todavía atractivo. Pelo gris plateado y ' +
+      'abundante, peinado con raya impecable. Gafas de montura fina metálica. Mirada oscura y ' +
+      'quieta, sin expresión legible. Alto, delgado, de porte recto. Traje gris oscuro de ' +
+      'corte perfecto, camisa blanca sin una arruga, corbata sobria. Manos quietas. Lleva ' +
+      'siempre una libreta pequeña, salvo en el episodio final.',
   },
   {
     id: 'vaal', nombre: 'Vaal', alias: ['Emisario Vaal', 'el Emisario'],
     principal: true,
-    ficha: 'Alienígena vessari. Figura alta y estilizada, de más de dos metros, de una elegancia ' +
-      'serena. Rostro casi humano y de una belleza fría: facciones finas y limpias, pómulos altos, ' +
-      'mandíbula estrecha, nariz recta y pequeña, labios delgados; la simetría es perfecta hasta ' +
-      'resultar imposible, y eso es lo único que delata que no es humano. Piel pálida de nácar, ' +
-      'lisa y luminosa, con un tenue subtono gris perla. Cabeza calva y de cráneo liso, sin cejas ' +
-      'ni pestañas. Ojos grandes y almendrados de oro uniforme, sin pupila. Cuello largo, manos de ' +
-      'dedos largos y finos. Va envuelto en capas de un tejido gris claro que cae como agua quieta. ' +
-      'Expresión serena y cortés; nunca gesticula. Bello y evidentemente no humano.',
+    ficha: 'Alienígena vessari de casta alta. Figura muy alta, de más de dos metros, esbelta y ' +
+      'de una elegancia serena, con extremidades largas y proporción estilizada. Rostro casi ' +
+      'humano y de belleza fría y perfecta: facciones finas y limpias, pómulos altos, ' +
+      'mandíbula estrecha, nariz recta y pequeña, labios delgados y bien dibujados; la ' +
+      'simetría es tan exacta que resulta imposible, y es lo único que delata que no es ' +
+      'humano. Piel pálida de nácar, lisa y luminosa, con un tenue subtono gris perla. Cabeza ' +
+      'calva de cráneo liso y hermoso, sin cejas ni pestañas. Ojos grandes y almendrados de ' +
+      'oro uniforme, sin pupila, brillantes. Cuello largo, manos de dedos largos y finos. ' +
+      'VESTUARIO, importante: túnica ceremonial de una sola pieza en tejido gris perla ' +
+      'finísimo y pesado, de caída perfecta como agua quieta, impecable, sin una arruga fuera ' +
+      'de sitio, con orillos limpios y precisos y un brillo tenue de seda. Ropa de una ' +
+      'civilización avanzadísima: sobria, cara y perfectamente confeccionada. ' +
+      'Expresión serena y cortés; nunca gesticula.',
   },
   {
     id: 'sereth', nombre: 'Sereth', alias: ['el archivista', 'el último lector'],
     principal: true,
-    ficha: 'Alienígena vessari de la casta archivista. El mismo rostro fino y bello de su especie, ' +
-      'pero desgastado por el tiempo: mejillas hundidas, piel pálida de nácar con marcas de edad, ' +
-      'expresión de cansancio inteligente. Más angosto y liviano que los demás, de hombros ' +
-      'estrechos y espalda algo encorvada de siglos inclinado sobre cosas. Ojos grandes de oro ' +
-      'uniforme, sin pupila, pero con algo rápido y despierto moviéndose detrás. Envuelto en un ' +
-      'tejido gris sin forma, con capucha que a veces lleva echada. Los dedos de la mano derecha ' +
-      'manchados de ámbar seco.',
+    ficha: 'Alienígena vessari de la casta archivista. El mismo rostro fino y bello de su ' +
+      'especie, con la dignidad de la edad: facciones nobles algo afiladas, piel pálida de ' +
+      'nácar, mirada de cansancio inteligente. Alto y muy delgado, de hombros estrechos y ' +
+      'espalda ligeramente inclinada por los siglos leyendo. Cabeza calva de cráneo liso. ' +
+      'Ojos grandes de oro uniforme, sin pupila, con algo rápido y despierto moviéndose ' +
+      'detrás. VESTUARIO: túnica larga y holgada de tejido gris topo, de buena calidad y ' +
+      'caída fluida, con capucha amplia que a veces lleva echada; sencilla y sin adornos, ' +
+      'pero limpia y bien confeccionada. Los dedos de la mano derecha manchados de ámbar seco.',
   },
   {
     id: 'goro', nombre: 'Gorō', alias: ['el yakuza'],
-    ficha: 'Hombre japonés de unos cuarenta y cinco años, corpulento, hombros anchos. Cara curtida, ' +
-      'cicatriz vieja partiéndole la ceja derecha. Pelo corto entrecano. Por el cuello del mono gris ' +
-      'asoma el borde de un tatuaje tradicional japonés. Postura relajada de quien ya vio de todo.',
+    ficha: 'Hombre japonés de unos cuarenta y cinco años, de atractivo rudo y carismático. ' +
+      'Alto y corpulento, hombros anchos, espalda recta. Rostro de facciones fuertes y ' +
+      'agradables, mandíbula cuadrada, sonrisa ladeada; una cicatriz vieja y fina le parte la ' +
+      'ceja derecha, y le sienta bien. Pelo corto entrecano, peinado hacia atrás. Mirada ' +
+      'tranquila de quien ya lo vio todo. Por el cuello del mono gris asoma el borde de un ' +
+      'tatuaje tradicional japonés de tinta azul y roja.',
   },
   {
     id: 'yuto', nombre: 'Yuto',
-    ficha: 'Chico japonés de diecisiete años, muy flaco, hombros estrechos. Pelo negro mal cortado. ' +
-      'Ojos grandes y asustados. Mono gris que le queda grande. Se abraza a sí mismo cuando escucha.',
+    ficha: 'Chico japonés de diecisiete años, de cara dulce y aniñada. Delgado y de estatura ' +
+      'media, hombros estrechos. Ojos grandes, redondos y expresivos, que delatan todo lo que ' +
+      'siente. Pelo negro suave y algo revuelto, flequillo largo. Piel clara y limpia. Mono ' +
+      'gris que le queda holgado. Se abraza a sí mismo cuando escucha.',
   },
   {
     id: 'ogata', nombre: 'Ogata', alias: ['señor Ogata', 'el cobrador'],
-    ficha: 'Hombre japonés de cincuenta años. Traje gris impecable, corbata discreta, carpeta bajo ' +
-      'el brazo. Sonríe siempre, una sonrisa de oficina que no le llega a los ojos. Pelo engominado.',
+    ficha: 'Hombre japonés de cincuenta años, de apostura impecable y desagradable. Rostro ' +
+      'anguloso y bien parecido, sonrisa constante y cordial que nunca le llega a los ojos. ' +
+      'Pelo negro engominado hacia atrás sin un mechón fuera de sitio. Alto y delgado. Traje ' +
+      'gris de corte excelente, corbata discreta, zapatos brillantes, carpeta bajo el brazo.',
   },
   {
     id: 'aoki', nombre: 'Aoki', alias: ['señorita Aoki', 'la reclutadora'],
-    ficha: 'Mujer japonesa de unos treinta años. Uniforme corporativo azul del Programa Puente con ' +
-      'placa identificativa. Pelo recogido, maquillaje impecable, sonrisa entrenada y cálida. ' +
-      'Manos abiertas al hablar, postura inclinada hacia el interlocutor.',
+    ficha: 'Mujer japonesa de unos treinta años, guapa y de trato encantador. Rostro amable de ' +
+      'facciones suaves, ojos cálidos, sonrisa entrenada y perfecta. Pelo castaño oscuro ' +
+      'recogido en un moño bajo pulcro, con mechones sueltos enmarcándole la cara. Maquillaje ' +
+      'natural impecable. Uniforme corporativo azul del Programa Puente, entallado, con placa ' +
+      'identificativa. Manos abiertas al hablar, postura inclinada hacia el interlocutor.',
   },
   {
     id: 'matsuda', nombre: 'Matsuda', alias: ['viejo Matsuda', 'señor Matsuda'],
-    ficha: 'Anciano japonés de setenta y ocho años, encorvado, delgado. Pelo blanco ralo, cara ' +
-      'llena de arrugas profundas. Chaqueta de punto marrón sobre camisa. Lleva su propia silla ' +
-      'plegable a todas partes.',
+    ficha: 'Anciano japonés de setenta y ocho años, menudo y de aire entrañable. Cara redonda ' +
+      'surcada de arrugas amables, ojos pequeños y vivos, sonrisa de pocos dientes pero ' +
+      'sincera. Pelo blanco ralo y bien peinado. Chaqueta de punto marrón cuidada sobre ' +
+      'camisa abotonada. Lleva su propia silla plegable a todas partes.',
   },
   {
     id: 'sachiko', nombre: 'Sachiko',
-    ficha: 'Chica japonesa de veintidós años, de Nagoya. Pelo castaño oscuro recogido en una coleta ' +
-      'alta. Cara redonda, sonrisa amplia y genuina, energía contagiosa. Conjunto deportivo blanco ' +
-      'del Programa Puente.',
+    ficha: 'Chica japonesa de veintidós años, de Nagoya, guapa y luminosa. Cara redonda y ' +
+      'simpática, ojos grandes y brillantes, sonrisa amplia y contagiosa que le llega a los ' +
+      'ojos. Piel clara y sana. Figura atlética y esbelta. Pelo castaño oscuro recogido en una ' +
+      'coleta alta que se le mueve al hablar, con dos mechones sueltos. Conjunto deportivo ' +
+      'blanco del Programa Puente.',
   },
   {
     id: 'tanaka', nombre: 'Tanaka',
-    ficha: 'Chico japonés de diecisiete años, flaco, mandíbula un poco salida, cicatriz de acné en ' +
-      'la mejilla izquierda. Uniforme escolar; más adelante, restos decolorados de un conjunto ' +
-      'deportivo blanco y el pelo cortado al ras por manos ajenas.',
+    ficha: 'Chico japonés de diecisiete años, delgado y de cara simpática. Facciones ' +
+      'agradables, mandíbula algo marcada, ojos oscuros de mirada tranquila; una cicatriz ' +
+      'leve de acné en la mejilla izquierda que no le afea. Pelo negro corto y ordenado. ' +
+      'Uniforme escolar impecable. Más adelante, en el astillero: conjunto deportivo blanco ' +
+      'descolorido y el pelo rapado por manos ajenas, con la mirada vacía.',
   },
   {
     id: 'mizuno', nombre: 'Mizuno', alias: ['Mizuno Kaede', 'la asistente'],
-    ficha: 'Funcionaria japonesa de veintinueve años. Traje de oficina gris, pelo negro recogido, ' +
-      'gafas discretas. Expresión seria y atenta. Lleva un llavero con un gato de la suerte.',
+    ficha: 'Funcionaria japonesa de veintinueve años, atractiva y de aire competente. Rostro ' +
+      'de facciones finas y serias, ojos oscuros atentos tras unas gafas discretas de montura ' +
+      'fina. Piel clara. Figura esbelta. Pelo negro liso recogido en una coleta baja pulcra. ' +
+      'Traje de oficina gris bien entallado. Lleva un llavero con un gato de la suerte.',
   },
   {
     id: 'kaori', nombre: 'Kaori', alias: ['la actriz', 'la de Osaka'],
-    ficha: 'Actriz japonesa de veintitrés años. Aspecto de "chica normal" cuidadosamente diseñado: ' +
-      'pelo castaño suelto, maquillaje natural, ropa de casa cómoda. Sonrisa de anuncio, sostenida ' +
-      'un segundo de más.',
+    ficha: 'Actriz japonesa de veintitrés años, muy guapa con un aspecto de "chica normal" ' +
+      'cuidadosamente diseñado. Rostro bonito y cercano, ojos grandes y cálidos, sonrisa de ' +
+      'anuncio sostenida un segundo de más. Pelo castaño claro suelto y con ondas suaves. ' +
+      'Maquillaje natural perfecto. Ropa de casa cómoda pero favorecedora.',
   },
   {
     id: 'cuidador', nombre: 'cuidador vessari', alias: ['los cuidadores', 'el cuidador'],
-    ficha: 'Vessari de casta obrera: la versión de trabajo de la misma especie. Parte del mismo ' +
-      'rostro base, pero todo en él es más ancho y más duro: mandíbula pesada y cuadrada, frente ' +
-      'baja, cuello grueso, hombros anchos. Piel gris lisa y sin poros, más apagada que la de los ' +
-      'de casta alta. Cabeza calva de cráneo alargado hacia atrás. Ojos de oro uniforme, sin ' +
-      'pupila. Traje sellado gris oscuro de una pieza, con visor espejado adherido al casco que a ' +
-      'veces se retira. Lleva una vara viva de escaneo.',
+    ficha: 'Vessari de casta obrera: la versión de trabajo de la misma especie. Comparte el ' +
+      'rostro base de su pueblo, pero todo en él es más ancho y más duro: mandíbula pesada y ' +
+      'cuadrada, frente baja, cuello grueso, hombros anchos. Sigue siendo una figura alta y ' +
+      'de buena estampa, imponente más que fea. Piel gris lisa y sin poros, más apagada que ' +
+      'la de la casta alta. Cabeza calva de cráneo alargado hacia atrás. Ojos de oro ' +
+      'uniforme, sin pupila. VESTUARIO: traje sellado de una pieza en gris oscuro, ajustado y ' +
+      'de acabado técnico impecable, con placas articuladas y un visor espejado adherido al ' +
+      'casco que a veces se retira. Lleva una vara viva de escaneo.',
   },
   {
     id: 'caminante', nombre: 'caminante de servicio', alias: ['el ser del collar', 'los caminantes'],
-    ficha: 'Criatura encorvada, más baja que un humano, piel gris verdosa, brazos largos, ojos ' +
-      'grandes y oscuros sin blanco. Alrededor del cuello, un anillo de filamentos pálidos vivos ' +
-      'que le entran por la nuca y le bajan por la columna como una raíz. Del cuello le cuelga un ' +
-      'cordón con tres cuentas de madera gastadas.',
+    ficha: 'Criatura de otra especie esclavizada, más baja que un humano y encorvada. Piel ' +
+      'gris verdosa, brazos largos y finos, manos de dedos alargados. Ojos grandes y oscuros ' +
+      'sin blanco, de mirada mansa y triste. Alrededor del cuello, un anillo de filamentos ' +
+      'pálidos vivos que le entran por la nuca y le bajan por la columna como una raíz. Del ' +
+      'cuello le cuelga un cordón viejo con tres cuentas de madera gastadas de tanto tocarlas.',
   },
   {
     id: 'instructor', nombre: 'instructor vessari', alias: ['el instructor'],
-    ficha: 'Vessari de casta alta, alto y sobrio: mismo rostro fino y bello de Vaal, misma piel ' +
-      'pálida de nácar y mismos ojos de oro sin pupila, pero de expresión más cálida y accesible. ' +
-      'Envuelto en tejido claro. Modales de docente paciente: manos siempre a la vista, gestos ' +
-      'abiertos y lentos.',
+    ficha: 'Vessari de casta alta, alto y esbelto: mismo rostro fino y bello que Vaal, misma ' +
+      'piel pálida de nácar y mismos ojos de oro sin pupila, pero de expresión más cálida y ' +
+      'accesible. VESTUARIO: túnica clara de tejido finísimo y caída perfecta, impecable. ' +
+      'Modales de docente paciente: manos siempre a la vista, gestos abiertos y lentos.',
   },
 ];
 
@@ -292,7 +339,13 @@ export const MOVIMIENTOS = [
 
 /* ── Configuración por defecto del proyecto ─────────────────── */
 
+// Sube cada vez que cambia la dirección de arte o el elenco. El estudio compara
+// este número con el del proyecto guardado y refresca lo que no hayas tocado a mano.
+export const BIBLIA_VERSION = 3;
+
 export const CONFIG_DEFECTO = {
+  bibliaVersion: BIBLIA_VERSION,
+
   // Solo para el saludo de la cabecera. Vive en este dispositivo.
   nombre: '',
 

@@ -563,17 +563,20 @@ module.exports = async (req, res) => {
               nota: textoDe(out.json).slice(0, 400) || undefined,
             });
           }
-          last = {
-            status: 502,
-            raw: motivoBloqueo(out.json) || ('Respuesta sin imagen: ' + JSON.stringify(out.json).slice(0, 600)),
-          };
+          // Un bloqueo del filtro es determinista: reintentarlo solo hace
+          // esperar al usuario para volver a fallar igual. 422 para que el
+          // cliente no lo trate como un fallo pasajero.
+          const bloqueo = motivoBloqueo(out.json);
+          last = bloqueo
+            ? { status: 422, motivo: bloqueo, raw: JSON.stringify(out.json).slice(0, 600) }
+            : { status: 502, raw: 'Vertex respondió sin imagen: ' + JSON.stringify(out.json).slice(0, 600) };
           break;
         }
         last = out;
         if (out.status !== 429 && out.status !== 503) break; // solo rotar por cuota/capacidad
       }
       return res.status((last && last.status) || 500).json({
-        error: 'Vertex imagen ' + ((last && last.status) || '?'),
+        error: (last && last.motivo) || ('Vertex rechazó la imagen (' + ((last && last.status) || '?') + ')'),
         detail: ((last && last.raw) || '').slice(0, 800),
       });
     }

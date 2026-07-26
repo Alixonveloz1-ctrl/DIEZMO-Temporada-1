@@ -25,7 +25,8 @@ const POR_CODIGO = {
   500: 'Error interno del servidor.',
   502: 'Google respondió, pero sin imagen. Casi siempre es el filtro de contenido.',
   503: 'Google no tiene capacidad en este momento. Suele resolverse reintentando.',
-  504: 'Se agotó el tiempo de espera.',
+  504: 'La generación tardó más de lo que el servidor permite esperar. Suele pasar con ' +
+       'imágenes en 4K o con el modelo Pro muy cargado; prueba a bajar la resolución.',
 };
 
 async function crudo(cuerpo, señal) {
@@ -38,9 +39,12 @@ async function crudo(cuerpo, señal) {
   let j = {};
   try { j = await r.json(); } catch (e) { /* respuesta vacía o no-JSON */ }
   if (!r.ok) {
-    const msg = j.error || (POR_CODIGO[r.status] || ('Error ' + r.status));
-    const det = j.detail ? ' — ' + String(j.detail).slice(0, 240) : '';
-    const err = new Error('[' + r.status + '] ' + msg + det);
+    // El backend pone la causa en "error" y el volcado crudo en "detail". Si no
+    // hay ninguno de los dos, el fallo es de la plataforma y solo queda el código.
+    const msg = j.error || POR_CODIGO[r.status] || ('Error ' + r.status);
+    const pista = j.error && POR_CODIGO[r.status] ? ' · ' + POR_CODIGO[r.status] : '';
+    const det = j.detail ? ' — ' + String(j.detail).slice(0, 400) : '';
+    const err = new Error('[' + r.status + '] ' + msg + pista + det);
     err.status = r.status;
     throw err;
   }

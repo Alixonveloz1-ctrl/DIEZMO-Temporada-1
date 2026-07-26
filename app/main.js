@@ -177,7 +177,48 @@ function pintarEstadoNube(estado, detalle) {
 
 /* ── Barra de trabajo ───────────────────────────────────────── */
 
+/*  Los fallos ya no se pierden. Antes solo existían como un aviso flotante de
+    unos segundos, y encima cada nuevo fallo borraba el anterior: si fallaban
+    tres hojas, se veía una. Ahora quedan escritos bajo la barra de trabajo,
+    donde estás mientras se genera, se pueden seleccionar y copiar, y no se van
+    hasta que los descartes o empieces otro trabajo.                            */
+let fallos = [];
+let trabajando = false;
+
+function pintarFallos() {
+  const caja = $('jbFallos');
+  if (!fallos.length) {
+    caja.hidden = true;
+    caja.textContent = '';
+    $('jobBar').hidden = !trabajando;
+    return;
+  }
+  caja.textContent = '';
+  const cab = document.createElement('div');
+  cab.className = 'jb-cab';
+  const t = document.createElement('span');
+  t.textContent = fallos.length + (fallos.length === 1 ? ' fallo' : ' fallos') +
+    ' · mantén pulsado para copiar el texto';
+  const x = document.createElement('button');
+  x.type = 'button';
+  x.textContent = 'Descartar';
+  x.addEventListener('click', () => { fallos = []; pintarFallos(); });
+  cab.appendChild(t); cab.appendChild(x);
+  caja.appendChild(cab);
+  for (const f of fallos.slice(-10)) {
+    const d = document.createElement('div');
+    d.className = 'jb-f';
+    d.textContent = f;
+    caja.appendChild(d);
+  }
+  caja.hidden = false;
+  $('jobBar').hidden = false;
+}
+
 function jobMostrar(fase) {
+  trabajando = true;
+  fallos = [];
+  pintarFallos();
   $('jobBar').hidden = false;
   $('jbFase').textContent = String(fase || 'trabajo').toUpperCase();
 }
@@ -185,7 +226,11 @@ function jobAvance(hecho, total, texto) {
   $('jbTxt').textContent = texto + (total ? ' · ' + hecho + '/' + total : '');
   $('jbFill').style.width = total ? ((hecho / total) * 100).toFixed(1) + '%' : '0%';
 }
-function jobOcultar() { $('jobBar').hidden = true; }
+function jobOcultar() {
+  trabajando = false;
+  // Si hubo fallos, la barra se queda: es el único sitio donde consta qué pasó.
+  if (fallos.length) pintarFallos(); else $('jobBar').hidden = true;
+}
 
 /** Mensaje flotante: lo que falla se ve donde estás, no en una consola aparte. */
 let _avisoTimer = null;
@@ -209,8 +254,11 @@ function aviso(txt, tipo, ms) {
 }
 
 function log(txt, tipo) {
-  if (tipo === 'err') aviso(txt, 'err', 9000);
-  else if (tipo === 'aviso') aviso(txt, 'aviso', 7000);
+  if (tipo === 'err') {
+    fallos.push(new Date().toTimeString().slice(0, 5) + '  ' + txt);
+    pintarFallos();
+    aviso(txt, 'err', 9000);
+  } else if (tipo === 'aviso') aviso(txt, 'aviso', 7000);
   const c = $('consola');
   const d = document.createElement('div');
   d.className = tipo || 'info';
@@ -504,6 +552,8 @@ async function pintarFichas() {
     const d = document.createElement('div');
     d.className = 'ficha';
     const vars = variantesDe(per);
+    const hechas = (per.refs || []).length;
+    const faltan = vars.length - hechas;
     d.innerHTML =
       '<div class="lienzos">' + vars.map((v) =>
         '<div class="lienzo" data-var="' + v.id + '"><span class="vacio">—</span>' +
@@ -514,7 +564,10 @@ async function pintarFichas() {
         ? ' <span class="chip">' + per.vestuarios.length + ' vestuarios</span>' : '') + '</strong>' +
       '<p>' + esc(per.ficha) + '</p></div>' +
       '<div class="acc">' +
-      '<button class="btn chico" data-acc="gen">Generar sus ' + vars.length + ' hojas</button>' +
+      '<button class="btn chico" data-acc="gen">' + (hechas
+        ? (faltan ? 'Completar las ' + faltan + ' que faltan' : 'Sus ' + vars.length + ' hojas están hechas')
+        : 'Generar sus ' + vars.length + ' hojas') + '</button>' +
+      (hechas ? '<button class="btn fantasma chico" data-acc="rehacer">Rehacer todas</button>' : '') +
       '<button class="btn fantasma chico" data-acc="editar">Editar ficha</button>' +
       '</div>';
     cont.appendChild(d);
@@ -528,7 +581,17 @@ async function pintarFichas() {
         caja.insertAdjacentHTML('afterbegin', '<img src="' + u + '" alt="' + esc(per.nombre) + '">');
       }
     }
-    d.querySelector('[data-acc=gen]').addEventListener('click', async () => {
+    const bGen = d.querySelector('[data-acc=gen]');
+    // Completar, no rehacer: la hoja que ya salió es la que fija el rostro, y las
+    // que falten se generan con ella adjunta. Rehacer todas cambia la cara.
+    if (hechas && !faltan) bGen.disabled = true;
+    bGen.addEventListener('click', async () => {
+      jobMostrar('referencias');
+      await nuevoMotor().generarReferencias([per.id], true);
+      await guardar(); pintarFichas();
+    });
+    const bReh = d.querySelector('[data-acc=rehacer]');
+    if (bReh) bReh.addEventListener('click', async () => {
       jobMostrar('referencias');
       await nuevoMotor().generarReferencias([per.id]);
       await guardar(); pintarFichas();
@@ -1250,8 +1313,14 @@ function cablear() {
     jobMostrar('referencias');
     await nuevoMotor().generarReferencias(P.elenco.filter((p) => p.principal).map((p) => p.id));
     await guardar(); pintarFichas();
-    const n = P.elenco.filter((p) => p.principal && p.refs && p.refs.length).length;
-    aviso(n + ' personajes principales ya tienen su hoja de referencia.', n ? 'ok' : 'err', 6000);
+    // Contar quién tiene TODAS sus hojas, no quién tiene alguna: antes salía
+    // un cartel verde de éxito aunque hubieran fallado tres de cada cuatro.
+    const dianas = P.elenco.filter((p) => p.principal);
+    const enteros = dianas.filter((p) => (p.refs || []).length === variantesDe(p).length).length;
+    aviso(enteros === dianas.length
+      ? 'Los ' + dianas.length + ' personajes principales tienen ya todas sus hojas.'
+      : enteros + ' de ' + dianas.length + ' quedaron completos. Lo que falló está anotado abajo.',
+      enteros === dianas.length ? 'ok' : 'err', 8000);
   });
   $('btnRefsTodos').addEventListener('click', async () => {
     jobMostrar('referencias');

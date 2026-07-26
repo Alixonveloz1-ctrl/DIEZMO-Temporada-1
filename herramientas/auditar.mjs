@@ -592,12 +592,15 @@ if (!/mode === 'montar'/.test(backM)) {
   const guion = sff(hojaF);
   const dan = new Set(dds(epF, hojaF).map((d) => d.destino));
 
-  // Lo que el script CREA por su cuenta no hace falta bajarlo.
-  const creados = /^(segmentos|musica\/lecho)\//;
+  /*  Lo que el script CREA por su cuenta no hace falta bajarlo. Se listan las
+      rutas con y sin comillas: mirando solo las entrecomilladas, media cadena
+      se quedaba fuera del examen y la comprobación pasaba por suerte.       */
+  const creados = /^(segmentos\/|musica\/lecho|voz\/(completa|pieza-))/;
   const pedidos = new Set();
-  for (const m of guion.matchAll(/-i "([^"]+)"/g)) {
-    if (!creados.test(m[1]) && !/^(lista|listamus)/.test(m[1]) && m[1].indexOf('=') === -1) {
-      pedidos.add(m[1]);
+  for (const m of guion.matchAll(/-i (?:"([^"]+)"|(\S+))/g)) {
+    const ruta = m[1] || m[2];
+    if (!creados.test(ruta) && !/^(lista|listamus|listavoz)/.test(ruta) && ruta.indexOf('=') === -1) {
+      pedidos.add(ruta);
     }
   }
   const huecos = [...pedidos].filter((p) => !dan.has(p));
@@ -617,6 +620,72 @@ if (!/mode === 'montar'/.test(backM)) {
   } else {
     ok('los ' + pedidos.size + ' archivos que pide ffmpeg —con clips y fotogramas ' +
        'reutilizados— están todos en la lista de descargas');
+  }
+}
+
+/* ── 5b-quinquies · La calidad del montaje ──────────────────── */
+titulo('CALIDAD DEL MONTAJE');
+{
+  const { hojaDeMontaje: hdm2, scriptFfmpeg: sff2 } =
+    await import(pathToFileURL(path.join(raiz, 'app', 'exportar.js')).href);
+  const t = (i, esc, corte) => ({
+    i, escena: esc, texto: 'x'.repeat(120), segEstimados: 8, segundos: 8, corteEscena: corte,
+    audio: { ok: true }, imagen: { ok: true },
+    plano: { tipo: 'fijo', movimiento: 'travelling de acercamiento lento' },
+  });
+  const epQ = { num: 1, titulo: 'T', tomas: [t(0, 1, false), t(1, 1, true), t(2, 2, false)],
+    musica: { 1: { ok: true }, 2: { ok: true } } };
+  const g = sff2(hdm2(epQ, { formato: '16:9', intensidadCamara: 1, volumenMusica: 0.3, silencioEscena: 0.7 }));
+
+  /*  EL CHASQUIDO. Codificar cada toma a AAC y luego pegarlas con «concat -c
+      copy» mete un chasquido en CADA unión: el AAC lleva muestras de precarga
+      y relleno, y por copia esos bordes se quedan dentro. Era lo que sonaba.
+      La voz no puede tocar un codificador hasta el final de todo.           */
+  const segmentoConAudio = /segmentos\/seg[\s\S]{0,300}?-c:a (?!pcm)/.test(g) ||
+    /-map "\[v\]"[^\n]*-map [^\n]*:a/.test(g);
+  const encodesAudio = (g.match(/-c:a (?!pcm)\w+/g) || []).length;
+  if (segmentoConAudio) {
+    mal('los segmentos llevan audio comprimido',
+      'al pegarlos por copia suena un chasquido en cada unión');
+  } else if (!/-map "\[v\]" -an/.test(g)) {
+    mal('los segmentos no se declaran mudos');
+  } else if (!/-f concat[^\n]*listavoz[\s\S]{0,120}pcm_s16le/.test(g)) {
+    mal('la voz no se une sin comprimir', 'unir en comprimido es lo que produce el ruido');
+  } else if (encodesAudio !== 1) {
+    mal('el audio se codifica ' + encodesAudio + ' veces', 'debe codificarse una sola vez, al final');
+  } else ok('la voz va en PCM de principio a fin y se codifica una sola vez, al final');
+
+  // El video tampoco puede recodificarse dos veces.
+  const concatVideo = /-f concat[^\n]*lista\.txt[^\n]*-c copy/.test(g);
+  const remuxFinal = /-map 0:v[^\n]*-c:v copy/.test(g);
+  if (!concatVideo || !remuxFinal) {
+    mal('el episodio se vuelve a codificar al unirlo o al mezclar',
+      'una segunda generación de x264 sobre todo el episodio');
+  } else ok('la imagen se codifica una vez por toma y el episodio se pega por copia');
+
+  /*  Y el ampliado previo al movimiento de cámara tiene que cubrir el zoom más
+      agresivo sin pasarse: pasarse cuesta tiempo de Job, y agotar el tiempo
+      significa quedarse sin montaje.                                        */
+  const mAmp = /scale=\$\{W\}\*(\d+):/.exec(g);
+  const { planoCamara: pc2 } = await import(pathToFileURL(path.join(raiz, 'app', 'camara.js')).href);
+  const { CAMARA } = await import(pathToFileURL(path.join(raiz, 'app', 'camara.js')).href);
+  let zoomMax = 1;
+  for (const nombre of Object.keys(CAMARA)) {
+    const c = pc2(nombre, 3);              // intensidad máxima que admite el mando
+    zoomMax = Math.max(zoomMax, c.z0, c.z1);
+  }
+  if (!mAmp) {
+    mal('no se amplía la imagen antes de recorrerla', 'el movimiento de cámara pixelaría');
+  } else if (Number(mAmp[1]) < zoomMax) {
+    mal('el ampliado (' + mAmp[1] + 'x) no cubre el zoom máximo (' + zoomMax.toFixed(2) + 'x)',
+      'la imagen se vería blanda en las tomas más cerradas');
+  } else if (Number(mAmp[1]) > zoomMax + 1.2) {
+    mal('el ampliado (' + mAmp[1] + 'x) se pasa del zoom máximo (' + zoomMax.toFixed(2) + 'x)',
+      'son pixeles filtrados para nada, y el Job se arriesga a agotar su tiempo');
+  } else if (!/flags=lanczos/.test(g)) {
+    mal('el ampliado usa el escalador por defecto', 'el original es de 2K: hay que estirarlo con cabeza');
+  } else {
+    ok('se amplía ' + mAmp[1] + 'x con lanczos para un zoom máximo de ' + zoomMax.toFixed(2) + 'x');
   }
 }
 

@@ -127,8 +127,8 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com \
 gcloud run jobs deploy diezmo-montaje \
   --source montaje \
   --region us-central1 \
-  --memory 4Gi \
-  --cpu 2 \
+  --memory 8Gi \
+  --cpu 8 \
   --task-timeout 3600s \
   --max-retries 1
 

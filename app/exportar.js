@@ -173,6 +173,7 @@ export function scriptFfmpeg(hoja) {
       copia, sin recodificar el episodio entero una segunda vez.               */
   const SILENCIO = Math.max(0, Number(hoja.silencioEscena) || 0);
   const lista = [];
+  const vozLista = [];
   const usable = hoja.tomas.filter((t) => t.audio && (t.video || t.imagen));
 
   usable.forEach((t, k) => {
@@ -205,9 +206,13 @@ export function scriptFfmpeg(hoja) {
       ? '[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},' +
         'tpad=stop_mode=clone:stop_duration=30,trim=duration=' + dur + ',setpts=PTS-STARTPTS' +
         vFade + '[v]'
-      // Fija: se amplía primero para que el movimiento de cámara no pixele, y
-      // después se recorre el fotograma según lo que pidió el director.
-      : '[0:v]scale=${W}*4:${H}*4,' +
+      /*  Fija: se amplía antes de recorrerla, para que el movimiento de cámara
+          no pixele. Tres veces la salida basta —el zoom más agresivo que puede
+          pedir el director es 2,8x— y cuesta la mitad que cuatro veces, que era
+          lo que había: a 7680x4320 el filtro tardaba tanto que el montaje se
+          arriesgaba a agotar el tiempo del Job y quedarse sin nada. Lanczos
+          porque el original es de 2K y hay que estirarlo con cabeza.        */
+      : '[0:v]scale=${W}*3:${H}*3:flags=lanczos,' +
         filtroZoompan(t.plano, Math.max(2, Math.round(t.duracion * fps)),
           '${W}', '${H}', '${FPS}', hoja.intensidadCamara) +
         vFade + '[v]';
@@ -216,11 +221,29 @@ export function scriptFfmpeg(hoja) {
       ? '-i "' + t.video + '"'
       : '-loop 1 -i "' + t.imagen + '"';
 
-    L.push('ffmpeg -y -loglevel error ' + entrada + ' -i "' + t.audio + '" \\');
-    L.push('  -filter_complex "' + cadenaV + (aFade ? ';[1:a]' + aFade + '[a]' : '') + '" \\');
-    L.push('  -map "[v]" -map ' + (aFade ? '"[a]"' : '1:a') +
-      ' -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \\');
-    L.push('  -c:a aac -b:a 192k -t ' + dur + ' "' + seg + '"');
+    /*  EL SEGMENTO VA MUDO, a propósito. Antes cada toma se codificaba con su
+        audio en AAC y luego se pegaban con «concat -c copy». AAC no se puede
+        pegar así: cada trozo lleva unas muestras de precarga y un relleno al
+        final, y al concatenar por copia esos bordes quedan dentro y suenan
+        como un chasquido en cada una de las 134 uniones. Y si había música, el
+        audio se recodificaba una segunda vez encima.
+        Ahora la voz no se corta ni se pega nunca en comprimido: va en PCM de
+        principio a fin y se codifica UNA sola vez, al final de todo.        */
+    L.push('ffmpeg -y -loglevel error ' + entrada + ' \\');
+    L.push('  -filter_complex "' + cadenaV + '" \\');
+    L.push('  -map "[v]" -an -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \\');
+    L.push('  -t ' + dur + ' "' + seg + '"');
+
+    /*  Los fundidos de audio se aplican DENTRO de la toma, antes de unir nada:
+        así siguen cayendo donde caían y la unión sigue siendo PCM contra PCM. */
+    const vozPieza = 'voz/pieza-' + pad3(t.n) + '.wav';
+    if (aFade) {
+      L.push('ffmpeg -y -loglevel error -i "' + t.audio + '" -af "' + aFade +
+        '" -c:a pcm_s16le "' + vozPieza + '"');
+      vozLista.push(vozPieza);
+    } else {
+      vozLista.push(t.audio);
+    }
     L.push('');
     lista.push(seg);
   });
@@ -232,12 +255,24 @@ export function scriptFfmpeg(hoja) {
 
   const salida = 'DIEZMO-EP' + String(hoja.episodio).padStart(2, '0') + '.mp4';
   const conMusica = (hoja.escenas || []).some((e) => e.musica);
-  const mudo = conMusica ? 'segmentos/episodio-sin-musica.mp4' : salida;
+  const mudo = 'segmentos/episodio-mudo.mp4';
 
-  L.push('# ── Montaje de las tomas ──');
+  L.push('# ── Montaje de la imagen ──');
+  L.push('# El video se pega por COPIA y no se vuelve a codificar: una sola');
+  L.push('# generación de x264 en todo el episodio.');
   L.push('rm -f lista.txt');
   for (const s2 of lista) L.push("echo \"file '" + s2 + "'\" >> lista.txt");
-  L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i lista.txt -c copy "' + mudo + '"');
+  L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i lista.txt -c copy -an "' + mudo + '"');
+  L.push('');
+
+  /*  La voz se une en PCM. Concatenar audio SIN COMPRIMIR no introduce nada:
+      no hay precarga de codificador, no hay relleno, no hay chasquido. Es la
+      diferencia entre pegar 134 trozos de AAC y pegar 134 trozos de onda.   */
+  L.push('# ── La voz, unida sin comprimir ──');
+  L.push('rm -f listavoz.txt');
+  for (const v of vozLista) L.push("echo \"file '" + v + "'\" >> listavoz.txt");
+  L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i listavoz.txt \\');
+  L.push('  -c:a pcm_s16le voz/completa.wav');
   L.push('');
 
   /*  La música va por ESCENA y cruza por encima de varias tomas, así que no
@@ -269,16 +304,29 @@ export function scriptFfmpeg(hoja) {
     }
     L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i listamus.txt -c copy musica/lecho.wav');
     L.push('');
-    L.push('# ── Mezcla final: la música cede paso a la narración ──');
-    L.push('ffmpeg -y -loglevel error -i "' + mudo + '" -i musica/lecho.wav \\');
-    L.push('  -filter_complex "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,' +
-      'asplit=2[voz][llave];' +
-      '[1:a]volume=' + (Number(hoja.volumenMusica) || 0.3).toFixed(2) + '[mus];' +
+  }
+
+  /*  UNA SOLA codificación de audio en todo el episodio, aquí al final. La voz
+      llega en PCM desde el principio de la cadena, la música también, se
+      mezclan y recién entonces se comprime. El video se copia tal cual.     */
+  const VOZ_PCM = '[1:a]aresample=48000:resampler=soxr,' +
+    'aformat=sample_fmts=fltp:channel_layouts=stereo';
+  L.push('# ── Mezcla final y ÚNICA codificación de audio ──');
+  if (conMusica) {
+    L.push('# La música cede paso a la narración: la voz abre el paso a la música');
+    L.push('# por compresión lateral, no por un volumen fijo.');
+    L.push('ffmpeg -y -loglevel error -i "' + mudo + '" -i voz/completa.wav -i musica/lecho.wav \\');
+    L.push('  -filter_complex "' + VOZ_PCM + ',asplit=2[voz][llave];' +
+      '[2:a]volume=' + (Number(hoja.volumenMusica) || 0.3).toFixed(2) + '[mus];' +
       '[mus][llave]sidechaincompress=threshold=0.015:ratio=14:attack=12:release=420[duck];' +
       '[voz][duck]amix=inputs=2:normalize=0:duration=first[mez]" \\');
-    L.push('  -map 0:v -map "[mez]" -c:v copy -c:a aac -b:a 192k "' + salida + '"');
-    L.push('');
+    L.push('  -map 0:v -map "[mez]" -c:v copy -c:a aac -b:a 256k -movflags +faststart "' + salida + '"');
+  } else {
+    L.push('ffmpeg -y -loglevel error -i "' + mudo + '" -i voz/completa.wav \\');
+    L.push('  -filter_complex "' + VOZ_PCM + '[mez]" \\');
+    L.push('  -map 0:v -map "[mez]" -c:v copy -c:a aac -b:a 256k -movflags +faststart "' + salida + '"');
   }
+  L.push('');
 
   L.push('echo "Listo: ' + salida + '"');
   L.push('');

@@ -461,6 +461,43 @@ if (!/if \(t\.reusa\)[\s\S]{0,600}return;/.test(pl)) mal('el motor genera igualm
 else if (!/if \(t\.reusaVideo\)[\s\S]{0,600}return;/.test(pl)) mal('el motor genera igualmente los clips que reutilizan');
 else ok('una toma marcada no gasta ni una llamada');
 
+/* ── 5h · Aguante ante cortes de conexión ──────────────────── */
+titulo('CONEXIÓN Y REINTENTOS');
+const apiJs = leer('app/api.js');
+const mainJs2 = leer('app/main.js');
+
+// Un fetch que revienta no trae código de estado: hay que distinguirlo.
+if (!/catch \(e\)[\s\S]{0,320}err\.red = true/.test(apiJs)) {
+  mal('un corte de red no se distingue de un rechazo del servidor',
+    'el usuario vería «Load failed» sin saber que es su conexión');
+} else if (!/const red = !!e\.red \|\| !e\.status/.test(apiJs)) {
+  mal('el reintento no clasifica los cortes de red');
+} else if (!/red \? intentos \+ \d+ : intentos/.test(apiJs)) {
+  mal('un corte de red se reintenta las mismas veces que un error del servidor',
+    'tres intentos en seis segundos caen todos dentro del mismo bache');
+} else ok('un corte de red se distingue, se explica y se reintenta con más margen');
+
+// No sirve de nada disparar peticiones contra una pestaña dormida.
+if (!/function esperarVisible\(/.test(apiJs)) mal('no se espera a que la pestaña vuelva a estar visible');
+else if (!/await esperarVisible\(señal\)[\s\S]{0,200}crudo\(/.test(apiJs)) {
+  mal('se llama al servidor sin comprobar que la pestaña esté delante');
+} else ok('con la app en segundo plano la cola espera en vez de fallar');
+
+// Y mejor aún: que el teléfono no se duerma mientras trabaja.
+if (!/wakeLock/.test(mainJs2)) {
+  mal('nada impide que el teléfono se bloquee a mitad de una tanda',
+    'es lo que produce los cortes en primer lugar');
+} else if (!/soltarDespierto\(\)/.test(mainJs2) || !/visibilitychange[\s\S]{0,200}mantenerDespierto/.test(mainJs2)) {
+  mal('el candado de pantalla no se suelta o no se recupera al volver');
+} else ok('mientras hay trabajo se pide que la pantalla no se apague');
+
+// Lo que falló por conexión se recupera solo, sin pedírselo al usuario.
+if (!/pasada de recuperación/.test(mainJs2)) {
+  mal('no hay pasada automática de recuperación tras una tanda con fallos');
+} else if (!/if \(ahora >= antes\)[\s\S]{0,80}break/.test(mainJs2)) {
+  mal('la recuperación podría repetirse sin avanzar', 'tiene que parar si no arregla nada');
+} else ok('tras una tanda con fallos se reintenta solo, y para si deja de avanzar');
+
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');
 const { ELENCO_DEFECTO, variantesDe, vestuarioPara } =

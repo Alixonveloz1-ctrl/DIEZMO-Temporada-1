@@ -29,13 +29,40 @@ const POR_CODIGO = {
        'imágenes en 4K o con el modelo Pro muy cargado; prueba a bajar la resolución.',
 };
 
-async function crudo(cuerpo, señal) {
-  const r = await fetch(ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(cuerpo),
-    signal: señal,
+/*  Mientras la pestaña está en segundo plano, el navegador del móvil congela
+    las peticiones en curso y rechaza las nuevas: se ve como «Load failed», que
+    no dice nada. No sirve de nada reintentar contra una pestaña dormida, así
+    que se espera a que vuelva a estar delante.                               */
+function esperarVisible(señal) {
+  if (typeof document === 'undefined' || !document.hidden) return Promise.resolve();
+  return new Promise((listo) => {
+    const mirar = () => {
+      if (document.hidden && !(señal && señal.aborted)) return;
+      document.removeEventListener('visibilitychange', mirar);
+      listo();
+    };
+    document.addEventListener('visibilitychange', mirar);
+    if (señal) señal.addEventListener('abort', mirar, { once: true });
   });
+}
+
+async function crudo(cuerpo, señal) {
+  let r;
+  try {
+    r = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal: señal,
+    });
+  } catch (e) {
+    // fetch falla antes de que exista respuesta: no hay código de estado.
+    if (e && e.name === 'AbortError') throw e;
+    const err = new Error('Se cortó la conexión con el servidor. Suele pasar cuando el ' +
+      'teléfono se bloquea o cambias de aplicación mientras genera.');
+    err.red = true;
+    throw err;
+  }
   let j = {};
   try { j = await r.json(); } catch (e) { /* respuesta vacía o no-JSON */ }
   if (!r.ok) {
@@ -62,19 +89,35 @@ export async function llamar(cuerpo, opciones) {
   const intentos = o.intentos || 3;
   const señal = o.señal;
   let ultimo = null;
+  let n = 0;
 
-  for (let n = 1; n <= intentos; n++) {
+  while (true) {
+    n++;
+    if (señal && señal.aborted) throw new Cancelado();
+    // Si la app está en segundo plano, esperar aquí en vez de fallar fuera.
+    await esperarVisible(señal);
     if (señal && señal.aborted) throw new Cancelado();
     try {
       return await crudo(cuerpo, señal);
     } catch (e) {
       if (e.name === 'AbortError') throw new Cancelado();
       ultimo = e;
-      const transitorio = !e.status || e.status === 429 || e.status === 503 ||
+      const red = !!e.red || !e.status;
+      const transitorio = red || e.status === 429 || e.status === 503 ||
         e.status === 500 || e.status === 502 || e.status === 504;
-      if (!transitorio || n === intentos) break;
-      const espera = (e.status === 429 ? 8000 : 2000) * n;
-      if (o.aviso) o.aviso('reintento ' + (n + 1) + '/' + intentos + ' en ' + Math.round(espera / 1000) + ' s');
+      /*  Un corte de red no es lo mismo que un rechazo del servidor: no hay
+          nada que corregir, solo esperar a tener conexión otra vez. Se le da
+          más margen y esperas más largas, porque tres intentos en seis
+          segundos caen todos dentro del mismo bache.                        */
+      const limite = red ? intentos + 4 : intentos;
+      if (!transitorio || n >= limite) break;
+      const espera = red
+        ? Math.min(45000, 4000 * n)
+        : (e.status === 429 ? 8000 : 2000) * n;
+      if (o.aviso) {
+        o.aviso((red ? 'sin conexión; ' : '') + 'reintento ' + (n + 1) + '/' + limite +
+          ' en ' + Math.round(espera / 1000) + ' s');
+      }
       await esperar(espera);
     }
   }

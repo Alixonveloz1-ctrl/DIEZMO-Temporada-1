@@ -218,10 +218,37 @@ function pintarFallos() {
   $('jobBar').hidden = false;
 }
 
+/*  El teléfono bloqueándose a mitad de una tanda es lo que produce los «Load
+    failed»: el navegador congela la pestaña y todas las peticiones en vuelo
+    mueren. Mientras haya trabajo, se le pide al sistema que no apague la
+    pantalla. No todos los navegadores lo permiten; si no, no pasa nada.      */
+let candado = null;
+
+async function mantenerDespierto() {
+  try {
+    if (navigator.wakeLock && !candado && !document.hidden) {
+      candado = await navigator.wakeLock.request('screen');
+      candado.addEventListener('release', () => { candado = null; });
+    }
+  } catch (e) { /* el navegador no lo concede: se sigue igual */ }
+}
+
+function soltarDespierto() {
+  if (candado) { try { candado.release(); } catch (e) { /* ya soltado */ } candado = null; }
+}
+
+// El candado se pierde al ocultar la pestaña: hay que recuperarlo al volver.
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && trabajando) mantenerDespierto();
+  });
+}
+
 function jobMostrar(fase) {
   trabajando = true;
   fallos = [];
   pintarFallos();
+  mantenerDespierto();
   $('jobBar').hidden = false;
   $('jbFase').textContent = String(fase || 'trabajo').toUpperCase();
 }
@@ -231,6 +258,7 @@ function jobAvance(hecho, total, texto) {
 }
 function jobOcultar() {
   trabajando = false;
+  soltarDespierto();
   // Si hubo fallos, la barra se queda: es el único sitio donde consta qué pasó.
   if (fallos.length) pintarFallos(); else $('jobBar').hidden = true;
 }
@@ -1528,10 +1556,30 @@ function cablear() {
     jobMostrar(etiqueta);
     await nuevoMotor().producirEpisodio(ep, fases);
     await guardar();
+
+    /*  Una tanda larga desde el móvil deja fallos de conexión por el camino.
+        Reintentar lo que falta es gratis en atención del usuario y casi
+        siempre los recupera, así que se hace solo: hasta dos pasadas más, y
+        solo mientras se siga avanzando. Si una pasada no arregla nada, parar
+        y decirlo, en vez de dar vueltas.                                     */
+    let antes = estadoEpisodio(ep).errores;
+    for (let vuelta = 0; vuelta < 2 && antes > 0; vuelta++) {
+      if (motor && motor.abort && motor.abort.signal.aborted) break;
+      log('quedan ' + antes + ' con error; pasada de recuperación ' + (vuelta + 1) + ' de 2', 'aviso');
+      jobMostrar(etiqueta + ' · recuperando');
+      await nuevoMotor().producirEpisodio(ep, fases);
+      await guardar();
+      const ahora = estadoEpisodio(ep).errores;
+      if (ahora >= antes) { antes = ahora; break; }
+      antes = ahora;
+    }
+
     const s = estadoEpisodio(ep);
     estado('estadoProd',
       'EP ' + pad2(ep.num) + ' — voz ' + s.voz + '/' + s.tomas + ' · fotogramas ' + s.imagen + '/' + s.tomas +
-      ' · movimiento ' + s.video + '/' + s.movimiento + (s.errores ? ' · ' + s.errores + ' con error' : ''),
+      ' · movimiento ' + s.video + '/' + s.movimiento +
+      (s.errores ? ' · ' + s.errores + ' sin terminar: vuelve a pulsar el mismo botón, ' +
+        'solo se genera lo que falta' : ''),
       s.errores ? 'info' : 'ok');
   };
   $('btnProdTodo').addEventListener('click', () =>

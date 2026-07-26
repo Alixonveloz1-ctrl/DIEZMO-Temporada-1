@@ -866,6 +866,7 @@ function prepararSala() {
   if (!proyector) {
     proyector = new Proyector({
       img: $('salaImg'), vid: $('salaVid'), aud: $('salaAud'), mus: $('salaMus'),
+      cfg: P.config,
       pie: $('salaSub'), barra: $('salaBarra'), info: $('salaInfo'),
     });
   }
@@ -1532,6 +1533,20 @@ function cablear() {
     for (const ep of P.episodios) recalcularTomas(ep);
     await guardar(); pintarTodo();
   });
+  $('cfgIntensidad').addEventListener('input', (e) => { $('valIntensidad').textContent = e.target.value + ' %'; });
+  $('cfgIntensidad').addEventListener('change', async (e) => {
+    P.config.intensidadCamara = Number(e.target.value) / 100;
+    await guardar();
+    aviso('Movimiento de cámara al ' + e.target.value + ' %. Se aplica al ver la Sala y al montar; ' +
+      'no hay que regenerar nada.', 'ok', 6000);
+  });
+  $('cfgVolMusica').addEventListener('input', (e) => { $('valVolMusica').textContent = e.target.value + ' %'; });
+  $('cfgVolMusica').addEventListener('change', async (e) => {
+    P.config.volumenMusica = Number(e.target.value) / 100;
+    await guardar();
+    if (proyector) proyector.cfg = P.config;
+    aviso('Música al ' + e.target.value + ' %. Se aplica al instante; no hay que regenerarla.', 'ok', 6000);
+  });
   $('cfgMovim').addEventListener('input', (e) => { $('valMovim').textContent = e.target.value + ' %'; });
   $('cfgMovim').addEventListener('change', async (e) => {
     P.config.proporcionMovimiento = Number(e.target.value) / 100;
@@ -1873,6 +1888,10 @@ async function iniciar() {
   $('cfgMaxRefs').value = String(P.config.maxReferencias);
   $('cfgSegToma').value = P.config.segundosPorToma;
   $('valSegToma').textContent = P.config.segundosPorToma + ' s';
+  $('cfgIntensidad').value = Math.round((P.config.intensidadCamara ?? 1) * 100);
+  $('valIntensidad').textContent = Math.round((P.config.intensidadCamara ?? 1) * 100) + ' %';
+  $('cfgVolMusica').value = Math.round((P.config.volumenMusica ?? 0.3) * 100);
+  $('valVolMusica').textContent = Math.round((P.config.volumenMusica ?? 0.3) * 100) + ' %';
   $('cfgMovim').value = Math.round(P.config.proporcionMovimiento * 100);
   $('valMovim').textContent = Math.round(P.config.proporcionMovimiento * 100) + ' %';
   $('pxImagen').value = P.config.precios.imagen;

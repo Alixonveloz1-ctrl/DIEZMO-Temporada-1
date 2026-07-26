@@ -440,6 +440,8 @@ export const CONFIG_DEFECTO = {
   resolucionVideo: '1080p',
   audioVeo: false,
   proporcionMovimiento: 0.35,   // fracción de tomas que se animan con Veo
+  intensidadCamara: 1,          // 1 = normal; sube o baja el recorrido de las tomas fijas
+  volumenMusica: 0.3,           // nivel de la música bajo la narración
 
   // Normalización de voz
   normalizarVoz: true,

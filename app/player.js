@@ -16,6 +16,7 @@ export class Proyector {
     this.vid = nodos.vid;
     this.aud = nodos.aud;
     this.mus = nodos.mus || null;
+    this.cfg = nodos.cfg || {};
     this.pie = nodos.pie;
     this.barra = nodos.barra;
     this.info = nodos.info;
@@ -26,10 +27,67 @@ export class Proyector {
     this.reproduciendo = false;
     this.anim = null;
     this.escenaMus = null;
+    this.ctx = null;
+    this.vigia = null;
     this.cache = new Map();
 
     this.aud.addEventListener('ended', () => this._siguiente());
     this.aud.addEventListener('timeupdate', () => this._pintarBarra());
+  }
+
+  /*  La música tiene que agacharse cuando habla el narrador, igual que en el
+      montaje final. Un volumen fijo no vale: o tapa la voz o no se oye. Se
+      mide el nivel de la locución en tiempo real y se baja la ganancia de la
+      música mientras suena; baja deprisa y sube despacio, como un compresor
+      de verdad. Si el navegador no da Web Audio, se queda en volumen fijo.  */
+  get volumenMusica() {
+    const v = Number(this.cfg.volumenMusica);
+    return isFinite(v) && v >= 0 ? v : 0.3;
+  }
+
+  _prepararMezcla() {
+    if (this.ctx || !this.mus) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { this.mus.volume = this.volumenMusica; return; }
+    try {
+      this.ctx = new AC();
+      const voz = this.ctx.createMediaElementSource(this.aud);
+      const mus = this.ctx.createMediaElementSource(this.mus);
+      this.medidor = this.ctx.createAnalyser();
+      this.medidor.fftSize = 512;
+      this.ganancia = this.ctx.createGain();
+      this.ganancia.gain.value = this.volumenMusica;
+      voz.connect(this.medidor);
+      this.medidor.connect(this.ctx.destination);
+      mus.connect(this.ganancia);
+      this.ganancia.connect(this.ctx.destination);
+      this.muestras = new Uint8Array(this.medidor.fftSize);
+      this._vigilar();
+    } catch (e) {
+      this.ctx = null;
+      this.mus.volume = this.volumenMusica;
+    }
+  }
+
+  _vigilar() {
+    if (!this.ctx) return;
+    const alto = this.volumenMusica;
+    const bajo = alto * 0.25;          // unos doce decibelios por debajo
+    const paso = () => {
+      this.medidor.getByteTimeDomainData(this.muestras);
+      let pico = 0;
+      for (let i = 0; i < this.muestras.length; i++) {
+        const v = Math.abs(this.muestras[i] - 128) / 128;
+        if (v > pico) pico = v;
+      }
+      const hablando = pico > 0.035;
+      const objetivo = hablando ? bajo : alto;
+      // Agacharse rápido, levantarse despacio: si no, sube entre sílabas.
+      this.ganancia.gain.setTargetAtTime(objetivo, this.ctx.currentTime,
+        hablando ? 0.05 : 0.5);
+      this.vigia = requestAnimationFrame(paso);
+    };
+    paso();
   }
 
   async cargar(ep, desde) {
@@ -47,6 +105,9 @@ export class Proyector {
   async reproducir() {
     if (!this.orden.length) return;
     this.reproduciendo = true;
+    this._prepararMezcla();
+    // En el móvil el contexto nace dormido: solo un gesto del usuario lo activa.
+    if (this.ctx && this.ctx.state === 'suspended') { try { await this.ctx.resume(); } catch (e) { /* sigue */ } }
     try { await this.aud.play(); } catch (e) { this.reproduciendo = false; return; }
     if (!this.vid.hidden) { try { await this.vid.play(); } catch (e) { /* sin clip */ } }
     if (this.anim) this.anim.play();
@@ -90,7 +151,8 @@ export class Proyector {
     const url = await assets.url(clave.musica(this.ep.num, t.escena));
     if (!url) { this.mus.pause(); this.mus.removeAttribute('src'); return; }
     this.mus.src = url;
-    this.mus.volume = 0.28;
+    // Con Web Audio manda la ganancia; sin él, el volumen del elemento.
+    if (!this.ctx) this.mus.volume = this.volumenMusica;
     if (this.reproduciendo) { try { await this.mus.play(); } catch (e) { /* sin música */ } }
   }
 
@@ -131,8 +193,9 @@ export class Proyector {
         // números que usará el montaje, así que lo que ves aquí es lo que saldrá.
         const dur = t.segundos || t.segEstimados || 8;
         if (this.anim) { this.anim.cancel(); this.anim = null; }
-        const cam = planoCamara(t.plano);
-        const pasos = fotogramasCss(t.plano);
+        const k = (this.cfg && this.cfg.intensidadCamara) || 1;
+        const cam = planoCamara(t.plano, k);
+        const pasos = fotogramasCss(t.plano, k);
         this.img.style.transform = pasos[0].transform;
         if (cam.nombre !== 'cámara fija') {
           this.anim = this.img.animate(pasos,
@@ -170,6 +233,7 @@ export class Proyector {
 
   liberar() {
     this.pausar();
+    if (this.vigia) { cancelAnimationFrame(this.vigia); this.vigia = null; }
     if (this.mus) { this.mus.removeAttribute('src'); this.escenaMus = null; }
     if (this.anim) { this.anim.cancel(); this.anim = null; }
     this.cache.clear();

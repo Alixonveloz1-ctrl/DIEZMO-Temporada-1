@@ -253,20 +253,40 @@ else ok('los ' + MOVIMIENTOS.length + ' movimientos del director tienen traducci
 
 // La escala interpola durante la toma: si el desplazamiento se pasa del sobrante
 // en cualquier instante, el movimiento se clava contra el borde a mitad de plano.
+// Y tiene que aguantar a cualquier intensidad, que ahora es un mando del usuario.
 let fuera = [];
-for (const n of Object.keys(CAMARA)) {
-  const c = CAMARA[n];
-  for (let i = 0; i <= 100; i++) {
-    const q = i / 100;
-    const z = c.z0 + (c.z1 - c.z0) * q;
-    const m = (1 - 1 / z) / 2;
-    const dx = Math.abs(c.x0 + (c.x1 - c.x0) * q);
-    const dy = Math.abs(c.y0 + (c.y1 - c.y0) * q);
-    if (Math.max(dx, dy) > m + 1e-9) { fuera.push(n + ' (al ' + i + ' %)'); break; }
+for (const k of [0, 0.5, 1, 1.5, 2, 3]) {
+  for (const n of Object.keys(CAMARA)) {
+    const c = planoCamara(n, k);
+    for (let i = 0; i <= 100; i++) {
+      const q = i / 100;
+      const z = c.z0 + (c.z1 - c.z0) * q;
+      const m = (1 - 1 / z) / 2;
+      const dx = Math.abs(c.x0 + (c.x1 - c.x0) * q);
+      const dy = Math.abs(c.y0 + (c.y1 - c.y0) * q);
+      if (Math.max(dx, dy) > m + 1e-9) { fuera.push(n + ' a intensidad ' + k + ' (al ' + i + ' %)'); break; }
+    }
   }
 }
-if (fuera.length) mal('movimientos que se salen del fotograma', fuera.join(' · '));
-else ok('ningún movimiento se sale del fotograma en ningún instante de la toma');
+if (fuera.length) mal('movimientos que se salen del fotograma', fuera.slice(0, 4).join(' · '));
+else ok('a intensidad 0, 0,5, 1, 1,5, 2 y 3 ningún movimiento se sale del fotograma');
+
+// Y el recorrido tiene que NOTARSE: el nueve por ciento anterior no se veía.
+const recorrido = (n) => {
+  const c = planoCamara(n, 1);
+  return Math.max(Math.abs(c.z1 / c.z0 - 1), Math.abs(c.x1 - c.x0), Math.abs(c.y1 - c.y0));
+};
+const flojos = Object.keys(CAMARA)
+  .filter((n) => n !== 'cámara fija' && !/en mano/.test(n))
+  .filter((n) => recorrido(n) < 0.1);
+if (flojos.length) {
+  mal('movimientos que no se van a percibir', flojos.join(' · ') + ' — recorren menos del 10 %');
+} else ok('a intensidad normal todo movimiento recorre al menos el 10 % del encuadre');
+
+// A intensidad cero la imagen se queda de verdad quieta.
+const c0 = planoCamara('travelling de acercamiento lento', 0);
+if (c0.z0 !== c0.z1 || c0.x0 !== c0.x1) mal('a intensidad cero la cámara sigue moviéndose');
+else ok('a intensidad cero la imagen se queda realmente quieta')
 
 // Sala y montaje tienen que partir de los mismos números, o lo aprobado no es lo que sale.
 const usaCamara = (f, q) => new RegExp(q).test(leer(f));

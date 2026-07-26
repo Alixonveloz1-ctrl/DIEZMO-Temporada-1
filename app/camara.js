@@ -13,40 +13,39 @@
    apruebas mirando sea exactamente lo que sale montado.
    ============================================================ */
 
-/*  Cada movimiento se describe con seis números normalizados:
-      z0,z1  escala al principio y al final
-      x0,x1  desplazamiento horizontal de la cámara, en fracción del cuadro
-      y0,y1  desplazamiento vertical
-    Signo: +x mira más a la derecha, así que el contenido se va hacia la
-    izquierda. +y mira más abajo. Es la convención de una cámara real.
+/*  Cada movimiento se describe por lo que RECORRE, no por la escala:
+      pan   fracción del cuadro que se desplaza de principio a fin
+      zoom  cuánto abre o cierra a lo largo de la toma
+    La escala necesaria para que quepa ese recorrido se calcula después. Así,
+    subir la intensidad no puede sacar la cámara del fotograma: el margen se
+    agranda solo.
 
-    Las panorámicas necesitan una escala mayor que uno aunque no acerquen:
-    sin ese margen no hay imagen fuera del cuadro por la que desplazarse. */
-
+    Las cifras son las de un Ken Burns que se nota. La versión anterior movía
+    un nueve por ciento en siete segundos y no se percibía.                   */
 export const CAMARA = {
-  'cámara fija': { z0: 1.00, z1: 1.00, x0: 0, x1: 0, y0: 0, y1: 0 },
+  'cámara fija': {},
 
-  'travelling de acercamiento lento': { z0: 1.00, z1: 1.09, x0: 0, x1: 0, y0: 0, y1: 0 },
-  'travelling de alejamiento lento': { z0: 1.09, z1: 1.00, x0: 0, x1: 0, y0: 0, y1: 0 },
+  'travelling de acercamiento lento': { zoom: 0.18 },
+  'travelling de alejamiento lento': { zoom: -0.18 },
 
-  'panorámica lenta a la izquierda': { z0: 1.09, z1: 1.09, x0: 0.030, x1: -0.030, y0: 0, y1: 0 },
-  'panorámica lenta a la derecha': { z0: 1.09, z1: 1.09, x0: -0.030, x1: 0.030, y0: 0, y1: 0 },
+  'panorámica lenta a la izquierda': { panX: -0.13 },
+  'panorámica lenta a la derecha': { panX: 0.13 },
 
-  'inclinación hacia arriba': { z0: 1.09, z1: 1.09, x0: 0, x1: 0, y0: 0.030, y1: -0.030 },
-  'inclinación hacia abajo': { z0: 1.09, z1: 1.09, x0: 0, x1: 0, y0: -0.030, y1: 0.030 },
+  'inclinación hacia arriba': { panY: -0.13 },
+  'inclinación hacia abajo': { panY: 0.13 },
 
-  // Baja mientras se abre: el gesto de una grúa que desciende y descubre el
-  // plano. No puede cerrar por debajo de 1,06 o se queda sin recorrido vertical.
-  'grúa descendente': { z0: 1.13, z1: 1.06, x0: 0, x1: 0, y0: -0.026, y1: 0.026 },
+  // Baja mientras se abre: el gesto de una grúa que desciende y descubre el plano.
+  'grúa descendente': { panY: 0.11, zoom: -0.09 },
 
-  // Acompaña a un sujeto: lateral sostenido, algo más largo que una panorámica.
-  'seguimiento lateral': { z0: 1.11, z1: 1.11, x0: -0.042, x1: 0.042, y0: 0, y1: 0 },
+  // Acompaña a un sujeto: lateral sostenido, más recorrido que una panorámica.
+  'seguimiento lateral': { panX: 0.17 },
 
   // Ni quieta ni con rumbo: deriva mínima y desigual entre los dos ejes.
-  'cámara en mano sutil': { z0: 1.05, z1: 1.07, x0: -0.008, x1: 0.010, y0: 0.006, y1: -0.007 },
+  'cámara en mano sutil': { panX: 0.028, panY: -0.022, zoom: 0.04 },
 };
 
 export const CAMARA_POR_DEFECTO = 'travelling de acercamiento lento';
+export const INTENSIDAD_POR_DEFECTO = 1;
 
 /** El texto del director, reducido a una de las claves de arriba. */
 export function normalizarMovimiento(texto) {
@@ -66,33 +65,49 @@ export function normalizarMovimiento(texto) {
   return CAMARA_POR_DEFECTO;
 }
 
-/*  Con una escala z solo se puede desplazar la cámara por el sobrante:
-    el cuadro visible mide 1/z, así que sobra (1 - 1/z) repartido entre
-    los dos lados. Pasarse de ahí haría que ffmpeg tropezara con el borde
-    y el movimiento se quedaría clavado a mitad de toma.                  */
-function margen(z) { return Math.max(0, (1 - 1 / z) / 2); }
+/*  Con una escala z el cuadro visible mide 1/z, así que sobra (1 - 1/z)
+    repartido entre los dos lados. Para recorrer una fracción `r` del cuadro
+    hace falta al menos esa holgura, y se pide un dieciocho por ciento de más
+    para no rozar nunca el borde.                                             */
+function escalaPara(recorrido) {
+  if (recorrido <= 0) return 1;
+  return 1 / (1 - Math.min(0.55, recorrido * 1.18));
+}
 
 /**
- * El movimiento de una toma, ya recortado a lo que la escala permite.
- * @param {object|string} plano  el plano del director, o el texto del movimiento
- * @returns {{nombre:string, z0:number, z1:number, x0:number, x1:number, y0:number, y1:number}}
+ * El movimiento de una toma, ya resuelto a escalas y desplazamientos.
+ * @param {object|string} plano       el plano del director, o el texto del movimiento
+ * @param {number} intensidad         1 = normal; 0,5 la mitad; 2 el doble
  */
-export function planoCamara(plano) {
+export function planoCamara(plano, intensidad) {
   const nombre = normalizarMovimiento(
     plano && typeof plano === 'object' ? plano.movimiento : plano);
-  const c = CAMARA[nombre];
-  const lim = (v, z) => Math.max(-margen(z), Math.min(margen(z), v));
+  const base = CAMARA[nombre];
+  // Cero es una elección válida —imagen realmente quieta—, así que solo se
+  // recurre al valor por defecto cuando no viene número.
+  const n = Number(intensidad);
+  const k = Math.max(0, Math.min(3, isFinite(n) && n >= 0 ? n : INTENSIDAD_POR_DEFECTO));
+
+  const panX = (base.panX || 0) * k;
+  const panY = (base.panY || 0) * k;
+  const dz = (base.zoom || 0) * k;
+  const recorrido = Math.max(Math.abs(panX), Math.abs(panY));
+  const zBase = escalaPara(recorrido);
+
+  // El extremo con menos escala es el que tiene que caber: se apoya ahí.
+  let z0, z1;
+  if (dz >= 0) { z0 = zBase; z1 = zBase + dz; } else { z1 = zBase; z0 = zBase - dz; }
+
   return {
-    nombre,
-    z0: c.z0, z1: c.z1,
-    x0: lim(c.x0, c.z0), x1: lim(c.x1, c.z1),
-    y0: lim(c.y0, c.z0), y1: lim(c.y1, c.z1),
+    nombre, z0, z1,
+    x0: -panX / 2, x1: panX / 2,
+    y0: -panY / 2, y1: panY / 2,
   };
 }
 
 /** ¿Esta toma se queda de verdad quieta? */
-export function esQuieta(mov) {
-  const c = planoCamara(mov);
+export function esQuieta(mov, intensidad) {
+  const c = planoCamara(mov, intensidad);
   return c.z0 === c.z1 && c.x0 === c.x1 && c.y0 === c.y1;
 }
 
@@ -103,8 +118,8 @@ export function esQuieta(mov) {
  * El contenido va al revés que la cámara: si la cámara mira a la derecha,
  * la imagen se desplaza hacia la izquierda.
  */
-export function fotogramasCss(mov) {
-  const c = planoCamara(mov);
+export function fotogramasCss(mov, intensidad) {
+  const c = planoCamara(mov, intensidad);
   const paso = (z, x, y) =>
     ({ transform: 'scale(' + z.toFixed(4) + ') translate(' +
       (-x * 100 / z).toFixed(4) + '%, ' + (-y * 100 / z).toFixed(4) + '%)' });
@@ -118,8 +133,8 @@ export function fotogramasCss(mov) {
  * `on` es el número de fotograma que va sacando el filtro; se convierte en
  * un avance de cero a uno para interpolar la escala y el desplazamiento.
  */
-export function filtroZoompan(mov, frames, ancho, alto, fps) {
-  const c = planoCamara(mov);
+export function filtroZoompan(mov, frames, ancho, alto, fps, intensidad) {
+  const c = planoCamara(mov, intensidad);
   const n = Math.max(2, Math.round(frames));
   const p = 'on/' + (n - 1);
   const num = (v) => v.toFixed(6);

@@ -208,7 +208,8 @@ export function scriptFfmpeg(hoja) {
       // Fija: se amplía primero para que el movimiento de cámara no pixele, y
       // después se recorre el fotograma según lo que pidió el director.
       : '[0:v]scale=${W}*4:${H}*4,' +
-        filtroZoompan(t.plano, Math.max(2, Math.round(t.duracion * fps)), '${W}', '${H}', '${FPS}') +
+        filtroZoompan(t.plano, Math.max(2, Math.round(t.duracion * fps)),
+          '${W}', '${H}', '${FPS}', hoja.intensidadCamara) +
         vFade + '[v]';
 
     const entrada = t.tipo === 'video' && t.video
@@ -272,8 +273,8 @@ export function scriptFfmpeg(hoja) {
     L.push('ffmpeg -y -loglevel error -i "' + mudo + '" -i musica/lecho.wav \\');
     L.push('  -filter_complex "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,' +
       'asplit=2[voz][llave];' +
-      '[1:a]volume=0.55[mus];' +
-      '[mus][llave]sidechaincompress=threshold=0.02:ratio=8:attack=15:release=380[duck];' +
+      '[1:a]volume=' + (Number(hoja.volumenMusica) || 0.3).toFixed(2) + '[mus];' +
+      '[mus][llave]sidechaincompress=threshold=0.015:ratio=14:attack=12:release=420[duck];' +
       '[voz][duck]amix=inputs=2:normalize=0:duration=first[mez]" \\');
     L.push('  -map 0:v -map "[mez]" -c:v copy -c:a aac -b:a 192k "' + salida + '"');
     L.push('');

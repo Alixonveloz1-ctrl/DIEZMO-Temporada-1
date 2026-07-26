@@ -714,6 +714,14 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         <div class="rango"><input type="range" id="cfgMovim" min="0" max="100" step="5"><span class="val" id="valMovim">35 %</span></div>
       </div>
       <p class="pista" id="cuentaMovim" style="color:var(--oro)">—</p>
+      <div class="campo">
+        <label for="cfgIntensidad">Cuánto se mueve la cámara en las tomas fijas</label>
+        <div class="rango"><input type="range" id="cfgIntensidad" min="0" max="200" step="10"><span class="val" id="valIntensidad">100 %</span></div>
+      </div>
+      <p class="pg-txt" style="margin:6px 0 11px">Una toma fija no es una imagen quieta: la cámara
+        se acerca, se aleja o recorre el fotograma según lo que pidió el director. Al cien por cien
+        el recorrido es de un dieciocho por ciento del encuadre, que se nota sin marear. A cero, la
+        imagen se queda realmente quieta.</p>
       <p class="pg-txt" style="margin:8px 0 11px">Al mover esto se reparte otra vez el movimiento en
         todos los episodios ya dirigidos, intercalado a lo largo de cada uno. Las tomas que el
         director marcó como imprescindibles se animan siempre, esté donde esté el porcentaje.</p>
@@ -732,6 +740,13 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         <select id="selModMusProd"></select>
         <p class="pista" id="pistaModMus">—</p>
       </div>
+      <div class="campo">
+        <label for="cfgVolMusica">Volumen de la música bajo la narración</label>
+        <div class="rango"><input type="range" id="cfgVolMusica" min="0" max="80" step="5"><span class="val" id="valVolMusica">30 %</span></div>
+      </div>
+      <p class="pg-txt" style="margin:6px 0 11px">La música se agacha sola mientras habla el
+        narrador, unos doce decibelios por debajo, y vuelve a subir en los silencios. Este mando
+        fija el nivel del que parte, en la Sala y en el montaje final.</p>
       <div class="fila-btn"><button class="btn primario" id="btnProdMus">Generar la música</button><button class="btn fantasma" id="btnRehacerMus">Rehacer toda la música</button></div>
     </div>
 

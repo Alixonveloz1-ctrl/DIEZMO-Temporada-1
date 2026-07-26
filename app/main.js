@@ -448,6 +448,7 @@ const MODELOS = {
     ['gemini-2.5-flash', 'Gemini 2.5 Flash — rápido y barato'],
   ],
   voz: [
+    ['gemini-3.1-flash-tts-preview', 'Gemini 3.1 Flash TTS — el más nuevo, más contexto'],
     ['gemini-2.5-flash-preview-tts', 'Gemini 2.5 Flash TTS'],
     ['gemini-2.5-pro-preview-tts', 'Gemini 2.5 Pro TTS'],
   ],
@@ -470,6 +471,8 @@ const NOTA_MODELO = {
   'veo-2.0-generate-001': 'Generación anterior. Más barata, sin audio y con menos control de cámara.',
   'lyria-3-pro-preview': 'Pieza completa de hasta tres minutos, suficiente para una escena entera. Cobra por pieza, no por segundo: 0,08 $ cada una dure lo que dure.',
   'lyria-3-clip-preview': 'Clips de treinta segundos a 0,04 $. Para una escena hay que repetirlo, así que sale peor que el Pro salvo para probar.',
+  'gemini-3.1-flash-tts-preview': 'El más reciente: contexto de 32 mil tokens frente a 8 mil, y el audio gasta 25 tokens por segundo en vez de 32, así que caben escenas más largas. En vista previa: si da error de modelo no encontrado, tu proyecto aún no tiene acceso.',
+  'gemini-2.5-flash-preview-tts': 'El estable. Ocho mil tokens de entrada y hasta unos ocho minutos de audio por llamada, de sobra para una escena.',
 };
 
 function llenarSelect(sel, pares, valor) {

@@ -463,6 +463,78 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
 
+/* ── 5c-quater · La voz se pide por escena ─────────────────── */
+titulo('VOZ POR ESCENA');
+const pipeVoz = leer('app/pipeline.js');
+const genVoz = pipeVoz.slice(pipeVoz.indexOf('async generarVoz('),
+  pipeVoz.indexOf('/* ── Fotogramas'));
+
+if (!/porEscena/.test(genVoz) || !/api\.tts\(/.test(genVoz)) {
+  mal('no se encuentra la generación de voz');
+} else if ((genVoz.match(/api\.tts\(/g) || []).length !== 1) {
+  mal('hay más de una llamada de voz por escena');
+} else if (!/cortarEscena\(/.test(genVoz)) {
+  mal('el audio de la escena no se reparte entre sus tomas',
+    'la imagen no sabría cuándo cambiar');
+} else if (!/if \(indices\) return tomas\.some/.test(genVoz)) {
+  mal('regenerar una toma suelta no rehace su escena',
+    'esa toma volvería a salir con otro tono y se notaría más');
+} else ok('una sola llamada por escena, repartida después entre sus tomas');
+
+// El reparto por silencios: se comprueba de verdad, no por su forma.
+const { cortarEscena } = await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
+const R = 24000;
+function escenaFalsa(duraciones, pausa) {
+  let sem = 7; const rnd = () => ((sem = (sem * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const trozos = [], limites = []; let t = 0;
+  duraciones.forEach((d, k) => {
+    const n = Math.round(d * R), v = new Int16Array(n);
+    for (let i = 0; i < n; i++) {
+      v[i] = ((Math.sin(2 * Math.PI * 118 * i / R) * (0.5 + 0.5 * Math.sin(2 * Math.PI * 4.5 * i / R)) * 9000) + (rnd() - 0.5) * 90) | 0;
+    }
+    trozos.push(v); t += n;
+    if (k < duraciones.length - 1) {
+      const p = new Int16Array(Math.round(pausa * R));
+      for (let i = 0; i < p.length; i++) p[i] = ((rnd() - 0.5) * 90) | 0;
+      limites.push(t + Math.round(p.length / 2));
+      trozos.push(p); t += p.length;
+    }
+  });
+  const pcm = new Int16Array(t); let o = 0;
+  for (const x of trozos) { pcm.set(x, o); o += x.length; }
+  return { pcm, limites };
+}
+const duraciones = [6, 11, 4, 9, 7, 5];
+const { pcm: pcmF, limites } = escenaFalsa(duraciones, 0.4);
+const tramos = cortarEscena(pcmF, R, duraciones.map((d) => d * 100));
+const errores = limites.map((real, k) => Math.abs(tramos[k].hasta - real) / R);
+const suma = tramos.reduce((a, t) => a + (t.hasta - t.desde), 0);
+const monotono = tramos.every((t, k) => t.hasta > t.desde && (k === 0 || t.desde === tramos[k - 1].hasta));
+if (suma !== pcmF.length) mal('el reparto pierde o duplica audio', suma + ' de ' + pcmF.length + ' muestras');
+else if (!monotono) mal('los tramos se solapan o van hacia atrás');
+else if (Math.max(...errores) > 0.3) {
+  mal('el reparto por silencios se desvía demasiado', 'peor error ' + Math.max(...errores).toFixed(2) + ' s');
+} else ok('reparte una escena de 6 tomas con ' + (Math.max(...errores) * 1000).toFixed(0) + ' ms de error, sin perder audio');
+
+// Ninguna escena puede pasarse del presupuesto de audio del modelo.
+const { limpiarTexto: lt2, segmentar: sg2 } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
+let peorEscena = 0;
+for (let k = 1; k <= 12; k++) {
+  const ts = sg2(lt2(leer('episodios/ep' + String(k).padStart(2, '0') + '.md')), { segundosPorToma: 8, cps: 16 });
+  const porEsc = new Map();
+  for (const t of ts) porEsc.set(t.escena, (porEsc.get(t.escena) || 0) + t.segEstimados);
+  peorEscena = Math.max(peorEscena, ...porEsc.values());
+}
+const TOPE = 16000 / 32;      // tokens de salida / tokens por segundo de audio
+if (peorEscena > TOPE) {
+  mal('hay escenas más largas de lo que el modelo puede narrar de una vez',
+    (peorEscena / 60).toFixed(1) + ' min frente a un tope de ' + (TOPE / 60).toFixed(1) + ' min');
+} else {
+  ok('la escena más larga son ' + (peorEscena / 60).toFixed(1) + ' min · caben ' +
+     (TOPE / 60).toFixed(1) + ' min por llamada');
+}
+
 /* ── 5c-ter · El audio no puede llegar cortado ─────────────── */
 titulo('AUDIO COMPLETO');
 const back4 = leer('api/ep-gemini.js');

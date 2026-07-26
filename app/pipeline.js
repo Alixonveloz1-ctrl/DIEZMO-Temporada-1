@@ -15,6 +15,7 @@ import { promptImagen, promptVideo, promptReferencia, promptLugar } from './dire
 import { variantesDe, vestuarioPara } from './biblia.js';
 import { duracionVeo } from './veo.js';
 import { encargarMusica, promptMusica } from './musica.js';
+import { cortarEscena } from './voz.js';
 
 export const clave = {
   audio: (ep, i) => 'ep' + pad(ep) + '/t' + pad3(i) + '/audio',
@@ -35,6 +36,16 @@ export function claveImagenDe(numEp, t) {
 }
 export function claveVideoDe(numEp, t) {
   return (t && t.reusaVideo) || clave.video(numEp, t.i);
+}
+
+/*  El PCM viaja como bytes; el reparto por silencios necesita muestras de 16
+    bits. Se copia en vez de reinterpretar el búfer porque el desplazamiento
+    puede ser impar y Int16Array exige alineación par.                        */
+function aInt16(bytes) {
+  const n = bytes.length >> 1;
+  const out = new Int16Array(n);
+  for (let i = 0; i < n; i++) out[i] = (bytes[i * 2] | (bytes[i * 2 + 1] << 8)) << 16 >> 16;
+  return out;
 }
 
 function pad(n) { return String(n).padStart(2, '0'); }
@@ -220,64 +231,91 @@ export class Motor {
 
   async generarVoz(ep, soloFaltantes, indices) {
     const cfg = this.p.config;
-    const pendientes = ep.tomas.filter((t) => {
-      if (indices && indices.indexOf(t.i) === -1) return false;
-      return !soloFaltantes || !t.audio || !t.audio.ok;
-    });
+
+    /*  UNA LLAMADA POR ESCENA, no por toma. Pedir la voz toma a toma daba 134
+        llamadas por episodio, y cada una es un narrador que no sabe qué se
+        acaba de decir: cambia el tono, y a veces hasta el timbre. Con la
+        escena entera de una vez el modelo tiene contexto real, y las costuras
+        caen en los cortes de escena, que es donde un cambio de tono no
+        molesta —donde incluso se agradece.
+
+        Después el audio se reparte entre las tomas por sus silencios, para que
+        la imagen siga cambiando en el sitio exacto.                          */
+    const porEscena = new Map();
+    for (const t of ep.tomas) {
+      if (!porEscena.has(t.escena)) porEscena.set(t.escena, []);
+      porEscena.get(t.escena).push(t);
+    }
+    const escenas = [...porEscena.entries()]
+      .map(([n, tomas]) => ({ escena: n, tomas }))
+      .filter(({ tomas }) => {
+        // Regenerar una toma suelta rehace su escena: si no, esa toma volvería
+        // a salir con otro tono y se notaría más que antes.
+        if (indices) return tomas.some((t) => indices.indexOf(t.i) !== -1);
+        return !soloFaltantes || tomas.some((t) => !t.audio || !t.audio.ok);
+      });
 
     return this._correr(async () => {
       let hecho = 0;
-      for (const t of pendientes) {
+      for (const esc of escenas) {
         if (this.señal.aborted) return;
-        this._prog(hecho, pendientes.length, 'voz · toma ' + (t.i + 1) + '/' + ep.tomas.length);
+        this._prog(hecho, escenas.length, 'voz · escena ' + esc.escena + ' de ' + porEscena.size);
 
-        let texto = t.texto;
-        if (cfg.anunciarTitulo && t.i === 0) {
-          texto = 'DIEZMO. Episodio ' + ep.num + ': ' + ep.titulo + '.\n\n' + texto;
-        }
-        if (cfg.normalizarVoz) {
-          texto = normalizarParaVoz(texto, cfg.reemplazos || REEMPLAZOS_BASE);
-        }
-        if (!texto.trim()) { hecho++; continue; }
+        const piezas = esc.tomas.map((t) => {
+          let texto = t.texto;
+          if (cfg.anunciarTitulo && t.i === 0) {
+            texto = 'DIEZMO. Episodio ' + ep.num + ': ' + ep.titulo + '.\n\n' + texto;
+          }
+          if (cfg.normalizarVoz) texto = normalizarParaVoz(texto, cfg.reemplazos || REEMPLAZOS_BASE);
+          return texto.trim();
+        });
+        if (!piezas.some((p) => p)) { hecho++; continue; }
 
         try {
           const r = await api.tts({
-            text: texto,
+            text: piezas.filter(Boolean).join('\n\n'),
             voice: cfg.voz,
             model: cfg.modeloTts,
             styleInstruction: cfg.instruccionVoz,
             temperature: cfg.temperaturaVoz,
             languageCode: cfg.idioma || undefined,
             seed: cfg.semillaVoz === '' ? undefined : Number(cfg.semillaVoz),
-          }, { intentos: 3, señal: this.señal, aviso: (m) => this._log('toma ' + (t.i + 1) + ': ' + m) });
+          }, { intentos: 4, señal: this.señal, aviso: (m) => this._log('escena ' + esc.escena + ': ' + m) });
 
           const ex = extraerPCM(b64aBytes(r.audio), r.sampleRate || 24000);
-          const partes = [ex.pcm];
-          if (t.corteEscena && cfg.silencioEscena > 0) {
-            partes.push(new Uint8Array(Math.round(ex.rate * cfg.silencioEscena) * 2));
-          }
-          const blob = crearWav(partes, ex.rate);
-          const dur = partes.reduce((a, p) => a + p.length, 0) / 2 / ex.rate;
+          const muestras = aInt16(ex.pcm);
+          // El peso de cada toma es su texto: es lo que predice cuánto dura.
+          const pesos = piezas.map((p) => Math.max(1, p.length));
+          const tramos = cortarEscena(muestras, ex.rate, pesos);
 
-          const kAudio = clave.audio(ep.num, t.i);
-          await assets.guardar(kAudio, blob, { ep: ep.num, toma: t.i, dur });
-          /*  La voz se termina de montar aquí —se le añade el silencio del corte
-              de escena—, así que el archivo bueno solo existe en el navegador.
-              Si no se sube, el trabajo vive en una sola máquina y se pierde en
-              cuanto el proyecto se recupere en otro sitio.                     */
-          if (nube.disponible) {
-            try { await nube.subir(kAudio, await blobAb64(blob), 'audio/wav'); }
-            catch (e) { this._log('la voz de la toma ' + (t.i + 1) + ' no se pudo subir al bucket', 'aviso'); }
+          for (let k = 0; k < esc.tomas.length; k++) {
+            const t = esc.tomas[k];
+            const trozo = ex.pcm.subarray(tramos[k].desde * 2, tramos[k].hasta * 2);
+            const partes = [trozo];
+            if (t.corteEscena && cfg.silencioEscena > 0) {
+              partes.push(new Uint8Array(Math.round(ex.rate * cfg.silencioEscena) * 2));
+            }
+            const blob = crearWav(partes, ex.rate);
+            const dur = partes.reduce((a, x) => a + x.length, 0) / 2 / ex.rate;
+
+            const kAudio = clave.audio(ep.num, t.i);
+            await assets.guardar(kAudio, blob, { ep: ep.num, toma: t.i, dur });
+            if (nube.disponible) {
+              try { await nube.subir(kAudio, await blobAb64(blob), 'audio/wav'); }
+              catch (e) { this._log('la voz de la toma ' + (t.i + 1) + ' no se pudo subir al bucket', 'aviso'); }
+            }
+            t.audio = { ok: true, dur: +dur.toFixed(2), rate: ex.rate };
+            t.segundos = +dur.toFixed(2);
           }
-          t.audio = { ok: true, dur: +dur.toFixed(2), rate: ex.rate };
-          t.segundos = +dur.toFixed(2);
+          this._log('voz lista: escena ' + esc.escena + ' · ' + esc.tomas.length + ' tomas · ' +
+            (muestras.length / ex.rate).toFixed(1) + ' s en una sola locución', 'ok');
         } catch (e) {
           if (e && e.cancelado) return;
-          t.audio = { ok: false, error: e.message };
-          this._log('voz toma ' + (t.i + 1) + ': ' + e.message, 'err');
+          for (const t of esc.tomas) t.audio = { ok: false, error: e.message };
+          this._log('voz escena ' + esc.escena + ': ' + e.message, 'err');
         }
         hecho++;
-        this._prog(hecho, pendientes.length, 'voz');
+        this._prog(hecho, escenas.length, 'voz');
         if (this.avisos.cambio) this.avisos.cambio();
       }
     });

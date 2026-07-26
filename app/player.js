@@ -15,6 +15,7 @@ export class Proyector {
     this.img = nodos.img;
     this.vid = nodos.vid;
     this.aud = nodos.aud;
+    this.mus = nodos.mus || null;
     this.pie = nodos.pie;
     this.barra = nodos.barra;
     this.info = nodos.info;
@@ -24,6 +25,7 @@ export class Proyector {
     this.pos = 0;
     this.reproduciendo = false;
     this.anim = null;
+    this.escenaMus = null;
     this.cache = new Map();
 
     this.aud.addEventListener('ended', () => this._siguiente());
@@ -48,12 +50,14 @@ export class Proyector {
     try { await this.aud.play(); } catch (e) { this.reproduciendo = false; return; }
     if (!this.vid.hidden) { try { await this.vid.play(); } catch (e) { /* sin clip */ } }
     if (this.anim) this.anim.play();
+    if (this.mus && this.mus.src) { try { await this.mus.play(); } catch (e) { /* sin música */ } }
   }
 
   pausar() {
     this.reproduciendo = false;
     this.aud.pause();
     this.vid.pause();
+    if (this.mus) this.mus.pause();
     if (this.anim) this.anim.pause();
   }
 
@@ -76,6 +80,20 @@ export class Proyector {
     if (this.reproduciendo) this.reproducir();
   }
 
+  /*  La música va por escena, así que solo se cambia de pieza al cambiar de
+      escena: reiniciarla en cada toma la cortaría cada ocho segundos. Suena
+      por debajo de la voz, que es quien manda.                               */
+  async _musicaDe(t) {
+    if (!this.mus) return;
+    if (this.escenaMus === t.escena) return;
+    this.escenaMus = t.escena;
+    const url = await assets.url(clave.musica(this.ep.num, t.escena));
+    if (!url) { this.mus.pause(); this.mus.removeAttribute('src'); return; }
+    this.mus.src = url;
+    this.mus.volume = 0.28;
+    if (this.reproduciendo) { try { await this.mus.play(); } catch (e) { /* sin música */ } }
+  }
+
   async _urls(t) {
     const k = 'k' + t.i;
     if (this.cache.has(k)) return this.cache.get(k);
@@ -93,6 +111,7 @@ export class Proyector {
     const u = await this._urls(t);
 
     this.aud.src = u.audio || '';
+    await this._musicaDe(t);
 
     if (u.video) {
       this.vid.hidden = false;
@@ -151,6 +170,7 @@ export class Proyector {
 
   liberar() {
     this.pausar();
+    if (this.mus) { this.mus.removeAttribute('src'); this.escenaMus = null; }
     if (this.anim) { this.anim.cancel(); this.anim = null; }
     this.cache.clear();
   }

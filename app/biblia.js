@@ -414,6 +414,7 @@ export const CONFIG_DEFECTO = {
   modeloTexto: 'gemini-3.1-pro-preview',
   modeloImagen: 'gemini-3-pro-image',
   modeloVideo: 'veo-3.1-lite-generate-001',
+  modeloMusica: 'lyria-3-pro-preview',
   modeloTts: 'gemini-2.5-flash-preview-tts',
 
   // Voz

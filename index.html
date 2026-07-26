@@ -396,6 +396,23 @@ code{background:var(--carta-3);padding:2px 6px;border-radius:5px;font-size:12.5p
 .sala .pista i{display:block;height:100%;background:var(--azul-2);width:0;transition:width 200ms linear}
 .sala-info{font-size:12px;color:var(--tinta-3s);margin:12px 0 0;text-align:center}
 
+/* ── Pasos de producción ──────────────────────────────────── */
+.paso-gen{
+  border:1px solid var(--linea);border-radius:var(--r-m);padding:14px;margin:12px 0;
+  background:var(--fondo-2);
+}
+.pg-cab{display:flex;align-items:center;gap:10px;font-size:14.5px;font-weight:700;margin-bottom:7px}
+.pg-n{
+  width:24px;height:24px;flex:none;border-radius:50%;background:var(--azul);color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;
+}
+.pg-est{margin-left:auto;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--tinta-3s);text-align:right}
+.pg-est.hecho{color:var(--verde)}
+.pg-est.parcial{color:var(--oro)}
+.pg-txt{font-size:12.5px;color:var(--tinta-2);margin:0 0 11px;line-height:1.5}
+.paso-gen.listo .pg-n{background:var(--verde)}
+.paso-gen.espera{opacity:.5}
+
 /* ── Barra de trabajo ─────────────────────────────────────── */
 #jobBar{
   position:fixed;left:0;right:0;bottom:calc(72px + env(safe-area-inset-bottom));z-index:50;
@@ -563,96 +580,128 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
 <!-- ══════════ EPISODIOS ══════════ -->
 <section class="fase" id="fase-episodios">
   <div class="panel">
-    <h2>Los doce guiones</h2>
-    <ul id="listaEps"></ul>
-    <div class="fila-btn" style="margin-top:14px">
-      <button class="btn fantasma chico" id="btnCargarSerie">Recargar los guiones</button>
-      <label class="btn fantasma chico" for="fileInput">Añadir .md
-        <input type="file" id="fileInput" multiple accept=".md,.txt" hidden>
-      </label>
-      <button class="btn fantasma chico" id="btnRecalcular">Recalcular tomas</button>
-    </div>
-  </div>
-
-  <div class="panel">
-    <h2>Guion técnico</h2>
+    <h2>Episodio</h2>
     <div class="campo"><select id="selEpGuion"></select></div>
-    <div class="selector-modelo">
-      <div class="cab">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
-        Modelo de texto · el director
-      </div>
-      <select id="cfgModeloTexto"></select>
-      <p class="pista">Este modelo no dibuja nada. Lee el guion y decide, toma por toma, qué
-        se ve: en qué lugar ocurre, quién sale en cuadro, el encuadre, la luz y el movimiento
-        de cámara. Esas decisiones son las que luego recibe el modelo de imagen.</p>
-    </div>
-    <div class="fila-btn">
-      <button class="btn primario" id="btnDirigir">Dirigir este episodio</button>
-      <button class="btn" id="btnDirigirTodo">Dirigir los doce</button>
-      <button class="btn fantasma" id="btnRepartir">Recalcular qué se anima</button>
-      <button class="btn fantasma" id="btnVerTexto">Ver texto narrado</button>
-    </div>
-    <div class="rejilla3" style="margin-top:16px">
-      <div class="campo">
-        <label for="cfgSegToma">Segundos por toma</label>
-        <div class="rango"><input type="range" id="cfgSegToma" min="4" max="20" step="1"><span class="val" id="valSegToma">8 s</span></div>
-      </div>
-      <div class="campo">
-        <label for="cfgMovim">Tomas con movimiento real</label>
-        <div class="rango"><input type="range" id="cfgMovim" min="0" max="100" step="5"><span class="val" id="valMovim">35 %</span></div>
-      </div>
-      <div class="campo">
-        <label for="cfgFormato">Formato</label>
-        <select id="cfgFormato">
-          <option value="16:9">16:9 — panorámico</option>
-          <option value="9:16">9:16 — vertical</option>
-          <option value="1:1">1:1 — cuadrado</option>
-        </select>
-      </div>
-    </div>
-    <div class="estado" id="estadoGuion"></div>
     <p class="nota chica" id="resumenGuion">—</p>
+    <div class="estado" id="estadoGuion"></div>
+    <details style="margin-top:14px">
+      <summary>Los doce guiones y sus ajustes</summary>
+      <ul id="listaEps" style="margin-top:12px"></ul>
+      <div class="rejilla3" style="margin-top:16px">
+        <div class="campo">
+          <label for="cfgSegToma">Segundos por toma</label>
+          <div class="rango"><input type="range" id="cfgSegToma" min="4" max="20" step="1"><span class="val" id="valSegToma">8 s</span></div>
+        </div>
+        <div class="campo">
+          <label for="cfgMovim">Tomas con movimiento real</label>
+          <div class="rango"><input type="range" id="cfgMovim" min="0" max="100" step="5"><span class="val" id="valMovim">35 %</span></div>
+        </div>
+        <div class="campo">
+          <label for="cfgFormato">Formato</label>
+          <select id="cfgFormato">
+            <option value="16:9">16:9 — panorámico</option>
+            <option value="9:16">9:16 — vertical</option>
+            <option value="1:1">1:1 — cuadrado</option>
+          </select>
+        </div>
+      </div>
+      <div class="fila-btn">
+        <button class="btn fantasma chico" id="btnCargarSerie">Recargar los guiones</button>
+        <label class="btn fantasma chico" for="fileInput">Añadir .md
+          <input type="file" id="fileInput" multiple accept=".md,.txt" hidden>
+        </label>
+        <button class="btn fantasma chico" id="btnRecalcular">Recalcular tomas</button>
+        <button class="btn fantasma chico" id="btnVerTexto">Ver texto narrado</button>
+      </div>
+    </details>
   </div>
 
   <div class="panel">
-    <h2>Escaleta <span class="cuenta" id="cuentaGuion"></span></h2>
-    <div class="tomas" id="rejillaGuion"></div>
-  </div>
+    <h2>Producción</h2>
+    <p class="nota chica" style="margin:0 0 4px">Cinco pasos, en este orden. Cada uno necesita el
+      anterior: la voz va antes que la imagen porque su duración real decide cuántos segundos de
+      video pedir y cuánto dura cada pieza de música.</p>
 
-  <div class="panel">
-    <h2>Producir</h2>
-    <div class="campo"><select id="selEpProd"></select></div>
-
-    <div class="selector-modelo">
-      <div class="cab">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M3 17l5-4 4 3 3-2 6 5"/></svg>
-        Modelo de imagen
+    <div class="paso-gen">
+      <div class="pg-cab"><span class="pg-n">1</span> Dirigir<span class="pg-est" id="estPaso1">—</span></div>
+      <p class="pg-txt">El modelo de texto lee el guion y decide, toma por toma, qué se ve: lugar,
+        quién sale en cuadro, encuadre, luz y movimiento de cámara. No dibuja nada.</p>
+      <div class="selector-modelo">
+        <div class="cab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+          Modelo de texto · el director
+        </div>
+        <select id="cfgModeloTexto"></select>
       </div>
-      <select id="selModImgProd"></select>
-      <label style="display:block;font-size:11px;color:var(--tinta-2);margin:10px 0 6px;font-weight:600">Resolución de cada fotograma</label>
-      <select id="selResImgProd"></select>
-      <p class="pista" id="pistaModImg">—</p>
+      <div class="fila-btn">
+        <button class="btn primario" id="btnDirigir">Dirigir este episodio</button>
+        <button class="btn" id="btnDirigirTodo">Dirigir los doce</button>
+        <button class="btn fantasma" id="btnRepartir">Recalcular qué se anima</button>
+      </div>
     </div>
 
-    <div class="selector-modelo">
-      <div class="cab">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>
-        Modelo de video
-      </div>
-      <select id="selModVidProd"></select>
-      <p class="pista" id="pistaModVid">—</p>
-      <p class="pista" id="tarifaVid" style="color:var(--oro)">—</p>
+    <div class="paso-gen">
+      <div class="pg-cab"><span class="pg-n">2</span> Voz<span class="pg-est" id="estPaso2">—</span></div>
+      <p class="pg-txt">La narración de cada toma. Va antes que todo lo demás porque manda el tiempo.</p>
+      <div class="fila-btn"><button class="btn primario" id="btnProdVoz">Generar la voz</button></div>
     </div>
 
-    <div class="fila-btn">
-      <button class="btn primario" id="btnProdTodo">Producir episodio completo</button>
-      <button class="btn" id="btnProdVoz">Solo voz</button>
-      <button class="btn" id="btnProdImg">Solo fotogramas</button>
-      <button class="btn" id="btnProdVid">Solo movimiento</button>
+    <div class="paso-gen">
+      <div class="pg-cab"><span class="pg-n">3</span> Fotogramas<span class="pg-est" id="estPaso3">—</span></div>
+      <p class="pg-txt">Una imagen por toma, con las hojas de los personajes que salen en ella adjuntas
+        como referencia.</p>
+      <div class="selector-modelo">
+        <div class="cab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M3 17l5-4 4 3 3-2 6 5"/></svg>
+          Modelo de imagen
+        </div>
+        <select id="selModImgProd"></select>
+        <label style="display:block;font-size:11px;color:var(--tinta-2);margin:10px 0 6px;font-weight:600">Resolución de cada fotograma</label>
+        <select id="selResImgProd"></select>
+        <p class="pista" id="pistaModImg">—</p>
+      </div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdImg">Generar los fotogramas</button></div>
+    </div>
+
+    <div class="paso-gen">
+      <div class="pg-cab"><span class="pg-n">4</span> Movimiento<span class="pg-est" id="estPaso4">—</span></div>
+      <p class="pg-txt">Solo las tomas que el director marcó como movimiento se animan con Veo. Las
+        demás se quedan como fotograma con la cámara moviéndose por encima.</p>
+      <div class="selector-modelo">
+        <div class="cab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-3v10l-6-3z"/></svg>
+          Modelo de video
+        </div>
+        <select id="selModVidProd"></select>
+        <p class="pista" id="pistaModVid">—</p>
+        <p class="pista" id="tarifaVid" style="color:var(--oro)">—</p>
+      </div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdVid">Generar el movimiento</button></div>
+    </div>
+
+    <div class="paso-gen">
+      <div class="pg-cab"><span class="pg-n">5</span> Música<span class="pg-est" id="estPaso5">—</span></div>
+      <p class="pg-txt">Una pieza instrumental por escena, no por toma. Se cobra por pieza y no por
+        segundo, así que una de tres minutos cuesta lo mismo que una de treinta.</p>
+      <div class="selector-modelo">
+        <div class="cab">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          Modelo de música
+        </div>
+        <select id="selModMusProd"></select>
+        <p class="pista" id="pistaModMus">—</p>
+      </div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdMus">Generar la música</button></div>
+    </div>
+
+    <div class="fila-btn" style="margin-top:18px">
+      <button class="btn primario grande" id="btnProdTodo">Hacer los cinco pasos, en orden</button>
+    </div>
+    <div class="fila-btn" style="margin-top:9px">
       <button class="btn brasa" id="btnDetenerProd">Detener</button>
     </div>
-    <p class="nota">Se genera únicamente lo que falta. Puedes detener cuando quieras y reanudar: lo terminado queda guardado.</p>
+    <p class="nota">Se genera únicamente lo que falta. Puedes detener cuando quieras y reanudar: lo
+      terminado queda guardado en Google Cloud.</p>
     <div class="estado" id="estadoProd"></div>
     <div id="consola" style="margin-top:13px"></div>
   </div>
@@ -793,6 +842,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <div class="pista"><i id="salaBarra"></i></div>
     </div>
     <audio id="salaAud" hidden></audio>
+    <audio id="salaMus" hidden loop></audio>
     <p class="sala-info" id="salaInfo">—</p>
     <div class="fila-btn" style="margin-top:12px;justify-content:center">
       <button class="btn" id="btnSalaAtras">‹ Anterior</button>

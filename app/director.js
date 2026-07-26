@@ -200,15 +200,47 @@ export async function dirigirEpisodio(ctx, opciones) {
 export function repartirMovimiento(planos, proporcion) {
   const n = planos.length;
   const cupo = Math.round(n * Math.min(Math.max(proporcion, 0), 1));
-  const orden = planos
-    .map((p, i) => ({ i, prio: p ? p.prioridad : 1 }))
-    .sort((a, b) => b.prio - a.prio || a.i - b.i);
-
+  const prioDe = (i) => (planos[i] ? planos[i].prioridad : 1);
   const animadas = new Set();
-  for (const { i, prio } of orden) {
-    if (prio === 5) { animadas.add(i); continue; }
-    if (animadas.size < cupo) animadas.add(i);
+
+  // Prioridad 5 es movimiento imprescindible: se anima esté donde esté, aunque
+  // se coma el cupo. Una nave que llega no puede quedarse en fotografía.
+  for (let i = 0; i < n; i++) if (prioDe(i) === 5) animadas.add(i);
+
+  /*  El resto se reparte POR TRAMOS. Antes se ordenaba por prioridad y se
+      desempataba por índice, y como el director casi siempre devuelve 2 o 3,
+      casi todo empataba: el cupo se llenaba de principio a fin y el último
+      tercio del episodio se quedaba sin una sola toma animada. Ahora el
+      episodio se divide en tantos tramos como clips falten y en cada tramo
+      gana la toma de más prioridad, así el movimiento queda intercalado.     */
+  const faltan = cupo - animadas.size;
+  if (faltan > 0) {
+    const paso = n / faltan;
+    for (let k = 0; k < faltan; k++) {
+      const desde = Math.floor(k * paso);
+      const hasta = Math.max(desde + 1, Math.min(n, Math.floor((k + 1) * paso)));
+      let mejor = -1, mejorPrio = -1;
+      for (let i = desde; i < hasta; i++) {
+        if (animadas.has(i)) continue;
+        if (prioDe(i) > mejorPrio) { mejorPrio = prioDe(i); mejor = i; }
+      }
+      if (mejor >= 0) animadas.add(mejor);
+    }
   }
+
+  // Si algún tramo venía ya lleno de prioridades 5, el cupo se completa con lo
+  // mejor que quede suelto, para no quedarse corto de movimiento.
+  if (animadas.size < cupo) {
+    const resto = planos
+      .map((p, i) => ({ i, prio: prioDe(i) }))
+      .filter((x) => !animadas.has(x.i))
+      .sort((a, b) => b.prio - a.prio || a.i - b.i);
+    for (const x of resto) {
+      if (animadas.size >= cupo) break;
+      animadas.add(x.i);
+    }
+  }
+
   return planos.map((p, i) => ({ ...p, tipo: animadas.has(i) ? 'movimiento' : 'fijo' }));
 }
 

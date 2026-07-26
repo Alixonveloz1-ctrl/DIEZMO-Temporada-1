@@ -52,7 +52,10 @@ const todoJs = ['app/main.js', 'app/player.js'].map(leer).join('\n');
 // Algunos se construyen sobre la marcha: $('fase-' + nombre). Cuentan igual.
 const dinamico = (i) => {
   const corte = i.indexOf('-');
-  return corte > 0 && todoJs.includes("'" + i.slice(0, corte + 1) + "' +");
+  if (corte > 0 && todoJs.includes("'" + i.slice(0, corte + 1) + "' +")) return true;
+  // También los que terminan en número: $('estPaso' + n).
+  const raiz2 = i.replace(/\d+$/, '');
+  return raiz2 !== i && todoJs.includes("'" + raiz2 + "' +");
 };
 const sinUso = [...ids].filter((i) =>
   !usados.has(i) && !todoJs.includes(i) && !dinamico(i) &&
@@ -301,6 +304,69 @@ if (sinTabla.length) mal('modelos de video ofrecidos sin duración o sin tarifa'
 else if (precioSegundo('veo-3.1-lite-generate-001', '1080p', false) !== 0.05) {
   mal('la tarifa de Veo 3.1 Lite no coincide con la oficial');
 } else ok('los ' + new Set(ofrecidos).size + ' modelos ofrecidos tienen duración y tarifa oficial');
+
+/* ── 5e · Todo lo que se genera tiene su botón, y en orden ─── */
+titulo('PASOS DE PRODUCCIÓN');
+const FASES = [
+  { n: 1, nombre: 'dirigir',     boton: 'btnDirigir',  motor: 'dirigirEpisodio' },
+  { n: 2, nombre: 'voz',         boton: 'btnProdVoz',  motor: 'generarVoz' },
+  { n: 3, nombre: 'fotogramas',  boton: 'btnProdImg',  motor: 'generarImagenes' },
+  { n: 4, nombre: 'movimiento',  boton: 'btnProdVid',  motor: 'generarVideos' },
+  { n: 5, nombre: 'música',      boton: 'btnProdMus',  motor: 'generarMusica' },
+];
+const fuenteMotor = leer('app/pipeline.js') + leer('app/main.js');
+const sinBoton = FASES.filter((f) => !ids.has(f.boton));
+const sinMotor = FASES.filter((f) => !fuenteMotor.includes(f.motor));
+if (sinBoton.length) mal('fases sin botón en la página', sinBoton.map((f) => f.nombre).join(' · '));
+else if (sinMotor.length) mal('botones sin nada detrás', sinMotor.map((f) => f.nombre).join(' · '));
+else ok('las ' + FASES.length + ' fases tienen botón propio y motor detrás');
+
+// El orden en la página tiene que ser el orden real de producción.
+const posiciones = FASES.map((f) => ({ n: f.n, pos: html.indexOf('id="' + f.boton + '"') }));
+const desordenadas = posiciones.filter((x, i) => i > 0 && x.pos < posiciones[i - 1].pos);
+if (desordenadas.length) mal('los botones no aparecen en el orden de producción');
+else ok('aparecen en pantalla en el mismo orden en que hay que ejecutarlos');
+
+// Y cada paso tiene que decir cómo va, o quedan cosas a oscuras.
+const sinEstado = FASES.filter((f) => !ids.has('estPaso' + f.n));
+if (sinEstado.length) mal('pasos que no informan de su estado', sinEstado.map((f) => f.nombre).join(' · '));
+else if (!/function pintarPasos\(/.test(leer('app/main.js'))) mal('nada pinta el estado de los pasos');
+else ok('cada paso muestra cuánto lleva hecho');
+
+// Nada duplicado: un solo selector de episodio y una sola rejilla de tomas.
+const seccion = html.slice(html.indexOf('id="fase-episodios"'), html.indexOf('id="fase-biblia"'));
+const selectores = (seccion.match(/<select id="selEp[^"]*"/g) || []).length;
+const rejillas = (seccion.match(/class="tomas" id="[^"]+"/g) || []).length;
+if (selectores > 1) mal('hay ' + selectores + ' selectores de episodio en la misma pestaña');
+else if (rejillas > 1) mal('la lista de tomas aparece ' + rejillas + ' veces en la misma pestaña');
+else ok('un solo selector de episodio y una sola lista de tomas');
+
+/* ── 5f · Música ───────────────────────────────────────────── */
+titulo('MÚSICA');
+const { MODELOS_MUSICA, precioPieza, escenasDe, promptMusica, duracionMaxima } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'musica.js')).href);
+
+if (precioPieza('lyria-3-pro-preview') !== 0.08) mal('la tarifa de Lyria 3 Pro no es la oficial');
+else if (duracionMaxima('lyria-3-pro-preview') !== 184) mal('la duración máxima de Lyria 3 Pro no es la documentada');
+else ok('Lyria 3 Pro: pieza de hasta 184 s por 0,08 $, cobrada por pieza y no por segundo');
+
+// La música lleva narración encima: una voz cantada competiría con ella.
+const pm = promptMusica({ escena: 1, segundos: 120, encargo: 'prueba' }, { modeloMusica: 'lyria-3-pro-preview' });
+if (!/INSTRUMENTAL/i.test(pm) || !/sin voces/i.test(pm)) {
+  mal('el encargo de música no exige que sea instrumental', 'una voz cantada pisaría al narrador');
+} else ok('todo encargo de música exige instrumental y deja sitio a la narración');
+
+// Una pieza por escena, no por toma.
+const epFalso = { num: 1, tomas: [
+  { i: 0, escena: 1, segEstimados: 8, texto: 'a' }, { i: 1, escena: 1, segEstimados: 8, texto: 'b' },
+  { i: 2, escena: 2, segEstimados: 8, texto: 'c' }] };
+const es = escenasDe(epFalso);
+if (es.length !== 2 || es[0].segundos !== 16) mal('las escenas no se agrupan bien para la música');
+else if (!/\[maestra\]|musica\/lecho/.test(leer('app/exportar.js'))) {
+  mal('el montaje no mezcla la música');
+} else if (!/sidechaincompress/.test(leer('app/exportar.js'))) {
+  mal('la música no cede paso a la narración en la mezcla');
+} else ok('una pieza por escena, mezclada en el montaje y agachándose bajo la voz');
 
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');

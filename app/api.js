@@ -94,6 +94,8 @@ export const api = {
 
   imagen: (p, o) => llamar({ mode: 'image', ...p }, o),
 
+  musica: (p, o) => llamar({ mode: 'musica', ...p }, o),
+
   videoIniciar: (p, o) => llamar({ mode: 'video', action: 'start', ...p }, o),
 
   videoConsultar: (p, o) => llamar({ mode: 'video', action: 'poll', ...p }, { intentos: 2, ...o }),

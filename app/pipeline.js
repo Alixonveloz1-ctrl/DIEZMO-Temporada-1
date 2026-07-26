@@ -14,6 +14,7 @@ import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
 import { promptImagen, promptVideo, promptReferencia, promptLugar } from './director.js';
 import { variantesDe, vestuarioPara } from './biblia.js';
 import { duracionVeo } from './veo.js';
+import { encargarMusica, promptMusica } from './musica.js';
 
 export const clave = {
   audio: (ep, i) => 'ep' + pad(ep) + '/t' + pad3(i) + '/audio',
@@ -21,6 +22,7 @@ export const clave = {
   video: (ep, i) => 'ep' + pad(ep) + '/t' + pad3(i) + '/vid',
   refPersonaje: (id, n) => 'ref/personaje/' + id + '/' + n,
   refLugar: (id) => 'ref/lugar/' + id,
+  musica: (ep, esc) => 'ep' + pad(ep) + '/mus/' + pad3(esc),
   episodio: (ep) => 'ep' + pad(ep) + '/completo',
 };
 
@@ -417,13 +419,70 @@ export class Motor {
     }
   }
 
+  /* ── Música ───────────────────────────────────────────────── */
+  /*  Una pieza por escena, no por toma. Lyria cobra por pieza y no por
+      segundo, así que una de tres minutos cuesta lo mismo que una de treinta.  */
+
+  async generarMusica(ep, soloFaltantes) {
+    const cfg = this.p.config;
+    return this._correr(async () => {
+      this._prog(0, 1, 'encargando la música del episodio');
+      let escenas;
+      try {
+        escenas = await encargarMusica(ep, cfg, {
+          señal: this.señal, aviso: (m) => this._log('música: ' + m),
+        });
+      } catch (e) {
+        if (e && e.cancelado) return;
+        this._log('no se pudo preparar la música: ' + e.message, 'err');
+        return;
+      }
+
+      ep.musica = ep.musica || {};
+      let hecho = 0;
+      for (const esc of escenas) {
+        if (this.señal.aborted) return;
+        const k = clave.musica(ep.num, esc.escena);
+        const ya = ep.musica[esc.escena];
+        if (soloFaltantes && ya && ya.ok) { hecho++; this._prog(hecho, escenas.length, 'música'); continue; }
+
+        this._prog(hecho, escenas.length, 'música · escena ' + esc.escena);
+        try {
+          const r = await api.musica({
+            prompt: promptMusica(esc, cfg),
+            model: cfg.modeloMusica,
+            guardarComo: k,
+          }, { intentos: 3, señal: this.señal, aviso: (m) => this._log('escena ' + esc.escena + ': ' + m) });
+
+          await assets.guardar(k, b64toBlob(r.audio, r.mimeType || 'audio/mpeg'),
+            { ep: ep.num, escena: esc.escena });
+          ep.musica[esc.escena] = {
+            ok: true, encargo: esc.encargo, segundos: Math.round(esc.segundos),
+            desde: esc.desde, hasta: esc.hasta,
+          };
+          this._log('música lista: escena ' + esc.escena, 'ok');
+        } catch (e) {
+          if (e && e.cancelado) return;
+          ep.musica[esc.escena] = { ok: false, error: e.message };
+          this._log('música escena ' + esc.escena + ': ' + e.message, 'err');
+        }
+        hecho++;
+        this._prog(hecho, escenas.length, 'música');
+        if (this.avisos.cambio) this.avisos.cambio();
+      }
+    });
+  }
+
   /* ── Episodio completo, de principio a fin ────────────────── */
 
   async producirEpisodio(ep, fases) {
-    const f = fases || { voz: true, imagen: true, video: true };
+    const f = fases || { voz: true, imagen: true, video: true, musica: true };
+    // El orden importa: la voz fija la duración real de cada toma, y de ahí
+    // salen los segundos de vídeo y la longitud de cada pieza de música.
     if (f.voz) { await this.generarVoz(ep, true); }
     if (f.imagen) { await this.generarImagenes(ep, true); }
     if (f.video) { await this.generarVideos(ep, true); }
+    if (f.musica) { await this.generarMusica(ep, true); }
   }
 }
 
@@ -456,6 +515,8 @@ export async function audioCompleto(ep) {
 export function estadoEpisodio(ep) {
   const n = ep.tomas ? ep.tomas.length : 0;
   const cuenta = (f) => (ep.tomas || []).filter(f).length;
+  const escenas = new Set((ep.tomas || []).map((t) => t.escena)).size;
+  const musica = Object.values(ep.musica || {}).filter((m) => m && m.ok).length;
   const segundos = (ep.tomas || []).reduce((a, t) => a + (t.segundos || t.segEstimados || 0), 0);
   return {
     tomas: n,
@@ -466,6 +527,8 @@ export function estadoEpisodio(ep) {
     video: cuenta((t) => t.video && t.video.ok),
     errores: cuenta((t) => (t.audio && t.audio.ok === false) || (t.imagen && t.imagen.ok === false) ||
       (t.video && t.video.ok === false)),
+    escenas,
+    musica,
     segundos,
   };
 }

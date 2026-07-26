@@ -111,12 +111,28 @@ export function hojaDeMontaje(ep, cfg) {
     return fila;
   });
 
+  // La música va por escena y cruza por encima de varias tomas, así que las
+  // escenas viajan aparte con su duración real.
+  const escenas = [];
+  for (const t of ep.tomas) {
+    const ult = escenas[escenas.length - 1];
+    const dur = t.segundos || t.segEstimados || 0;
+    if (ult && ult.escena === t.escena) { ult.duracion = +(ult.duracion + dur).toFixed(2); continue; }
+    escenas.push({
+      escena: t.escena,
+      duracion: +dur.toFixed(2),
+      musica: (ep.musica && ep.musica[t.escena] && ep.musica[t.escena].ok)
+        ? 'musica/escena-' + pad3(t.escena) + '.mp3' : null,
+    });
+  }
+
   return {
     serie: 'DIEZMO',
     temporada: 1,
     episodio: ep.num,
     titulo: ep.titulo,
     formato: cfg.formato,
+    escenas,
     silencioEscena: cfg.silencioEscena || 0,
     duracionTotal: +t0.toFixed(2),
     tomas,
@@ -213,12 +229,57 @@ export function scriptFfmpeg(hoja) {
     else if (!t.video && !t.imagen) L.push('echo "toma ' + t.n + ': sin imagen ni clip, se omite"');
   }
 
-  L.push('# ── Concatenado final ──');
+  const salida = 'DIEZMO-EP' + String(hoja.episodio).padStart(2, '0') + '.mp4';
+  const conMusica = (hoja.escenas || []).some((e) => e.musica);
+  const mudo = conMusica ? 'segmentos/episodio-sin-musica.mp4' : salida;
+
+  L.push('# ── Montaje de las tomas ──');
   L.push('rm -f lista.txt');
   for (const s2 of lista) L.push("echo \"file '" + s2 + "'\" >> lista.txt");
-  L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i lista.txt -c copy ' +
-    '"DIEZMO-EP' + String(hoja.episodio).padStart(2, '0') + '.mp4"');
-  L.push('echo "Listo: DIEZMO-EP' + String(hoja.episodio).padStart(2, '0') + '.mp4"');
+  L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i lista.txt -c copy "' + mudo + '"');
+  L.push('');
+
+  /*  La música va por ESCENA y cruza por encima de varias tomas, así que no
+      puede mezclarse segmento a segmento: se arma un lecho continuo del largo
+      del episodio y se mezcla de una vez al final. El vídeo se copia tal cual
+      —no se recodifica una segunda vez—, solo se rehace el audio.            */
+  if (conMusica) {
+    L.push('# ── Lecho musical, escena por escena ──');
+    L.push('mkdir -p musica/lecho');
+    L.push('rm -f listamus.txt');
+    for (const e of hoja.escenas) {
+      const d = Math.max(0.1, Number(e.duracion) || 0).toFixed(3);
+      const trozo = 'musica/lecho/esc-' + pad3(e.escena) + '.wav';
+      const fade = Math.min(1.8, Math.max(0.3, (Number(e.duracion) || 2) / 6)).toFixed(2);
+      if (e.musica) {
+        // Si la pieza es más corta que la escena, se repite; el fundido de
+        // entrada y salida tapa la costura y separa una escena de la siguiente.
+        L.push('ffmpeg -y -loglevel error -stream_loop -1 -i "' + e.musica + '" -t ' + d + ' \\');
+        L.push('  -af "afade=t=in:st=0:d=' + fade + ',afade=t=out:st=' +
+          Math.max(0, (Number(e.duracion) || 0) - Number(fade)).toFixed(2) + ':d=' + fade +
+          ',aformat=sample_rates=48000:channel_layouts=stereo" \\');
+        L.push('  -c:a pcm_s16le "' + trozo + '"');
+      } else {
+        L.push('# escena ' + e.escena + ': sin música, silencio');
+        L.push('ffmpeg -y -loglevel error -f lavfi -i anullsrc=r=48000:cl=stereo -t ' + d +
+          ' -c:a pcm_s16le "' + trozo + '"');
+      }
+      L.push("echo \"file '" + trozo + "'\" >> listamus.txt");
+    }
+    L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i listamus.txt -c copy musica/lecho.wav');
+    L.push('');
+    L.push('# ── Mezcla final: la música cede paso a la narración ──');
+    L.push('ffmpeg -y -loglevel error -i "' + mudo + '" -i musica/lecho.wav \\');
+    L.push('  -filter_complex "[0:a]aformat=sample_rates=48000:channel_layouts=stereo,' +
+      'asplit=2[voz][llave];' +
+      '[1:a]volume=0.55[mus];' +
+      '[mus][llave]sidechaincompress=threshold=0.02:ratio=8:attack=15:release=380[duck];' +
+      '[voz][duck]amix=inputs=2:normalize=0:duration=first[mez]" \\');
+    L.push('  -map 0:v -map "[mez]" -c:v copy -c:a aac -b:a 192k "' + salida + '"');
+    L.push('');
+  }
+
+  L.push('echo "Listo: ' + salida + '"');
   L.push('');
 
   return L.join('\n');
@@ -231,6 +292,11 @@ export async function exportarEpisodio(ep, cfg, progreso) {
   const hoja = hojaDeMontaje(ep, cfg);
   const total = ep.tomas.length;
   let n = 0;
+
+  for (const esc of Object.keys(ep.musica || {})) {
+    const m = await assets.blob(clave.musica(ep.num, Number(esc)));
+    if (m) await zip.añadir('musica/escena-' + pad3(Number(esc)) + '.mp3', m);
+  }
 
   for (const t of ep.tomas) {
     n++;

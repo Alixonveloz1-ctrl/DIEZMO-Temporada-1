@@ -604,6 +604,60 @@ module.exports = async (req, res) => {
       });
     }
 
+    /* ════════ MUSICA — Lyria 3 ════════ */
+    /*  Se llama igual que un modelo de imagen: generateContent con las dos
+        modalidades. Devuelve el audio en una parte inlineData (MP3 a 44,1 kHz)
+        y, aparte, texto describiendo la estructura de la pieza.               */
+    if (mode === 'musica') {
+      if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });
+
+      const model = body.model || 'lyria-3-pro-preview';
+      if (!/^lyria-/.test(model)) {
+        return res.status(400).json({
+          error: 'Modelo de música no admitido: ' + model,
+          detail: 'Usa lyria-3-pro-preview (pieza de hasta tres minutos) o ' +
+            'lyria-3-clip-preview (treinta segundos).',
+        });
+      }
+
+      const partes = [{ text: String(body.prompt) }];
+      // Admite una imagen como inspiración: el fotograma de la escena.
+      if (body.image && body.image.data) {
+        partes.push({ inlineData: { mimeType: body.image.mimeType || 'image/png', data: body.image.data } });
+      }
+
+      const vBody = {
+        contents: [{ role: 'user', parts: partes }],
+        generationConfig: { responseModalities: ['AUDIO', 'TEXT'] },
+        safetySettings: SEGURIDAD,
+      };
+
+      // Lyria 3 vive en el endpoint global, como los Gemini 3.
+      const out = await callVertex(vertexUrl('global', project, model), token, vBody, project);
+      if (!out.ok) {
+        return res.status(out.status).json({
+          error: 'Vertex música ' + out.status,
+          detail: (out.raw || '').slice(0, 800),
+        });
+      }
+      const inline = pickInlinePart(out.json);
+      if (!inline) {
+        const bloqueo = motivoBloqueo(out.json);
+        return res.status(bloqueo ? 422 : 502).json({
+          error: bloqueo || 'Lyria respondió sin audio',
+          detail: JSON.stringify(out.json).slice(0, 600),
+        });
+      }
+      const guardado = await archivar(token, body.guardarComo, inline.data,
+        inline.mimeType || 'audio/mpeg');
+      return res.status(200).json({
+        audio: inline.data,
+        mimeType: inline.mimeType || 'audio/mpeg',
+        guardado,
+        nota: textoDe(out.json).slice(0, 600) || undefined,
+      });
+    }
+
     /* ════════ VIDEO — Veo (operación de larga duración) ════════ */
     if (mode === 'video') {
       const model = body.model || 'veo-3.1-fast-generate-001';

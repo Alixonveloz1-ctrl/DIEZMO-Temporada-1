@@ -18,6 +18,7 @@ import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js
 import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob } from './pipeline.js';
 import { Proyector } from './player.js';
 import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
+import { MODELOS_MUSICA, precioPieza, escenasDe } from './musica.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
 
 const $ = (id) => document.getElementById(id);
@@ -360,6 +361,7 @@ const MODELOS = {
     ['gemini-2.5-flash-preview-tts', 'Gemini 2.5 Flash TTS'],
     ['gemini-2.5-pro-preview-tts', 'Gemini 2.5 Pro TTS'],
   ],
+  musica: MODELOS_MUSICA,
 };
 
 const RESOLUCIONES = {
@@ -376,6 +378,8 @@ const NOTA_MODELO = {
   'veo-3.1-fast-generate-001': 'Equilibrio entre precio y calidad. Recomendado para la mayoría de las tomas.',
   'veo-3.1-generate-001': 'Máxima calidad de animación. Resérvalo para los planos que llevan el peso del episodio.',
   'veo-2.0-generate-001': 'Generación anterior. Más barata, sin audio y con menos control de cámara.',
+  'lyria-3-pro-preview': 'Pieza completa de hasta tres minutos, suficiente para una escena entera. Cobra por pieza, no por segundo: 0,08 $ cada una dure lo que dure.',
+  'lyria-3-clip-preview': 'Clips de treinta segundos a 0,04 $. Para una escena hay que repetirlo, así que sale peor que el Pro salvo para probar.',
 };
 
 function llenarSelect(sel, pares, valor) {
@@ -405,6 +409,7 @@ function poblarModelos() {
   for (const id of ['cfgModeloVideo', 'selModVidProd']) {
     llenarSelect($(id), MODELOS.video, P.config.modeloVideo);
   }
+  llenarSelect($('selModMusProd'), MODELOS.musica, P.config.modeloMusica);
   const res = RESOLUCIONES[P.config.modeloImagen] || RESOLUCIONES['gemini-2.5-flash-image'];
   for (const id of ['selResImgProd', 'selResImgBiblia']) llenarSelect($(id), res, P.config.imageSize);
   P.config.imageSize = $('selResImgProd').value;
@@ -416,6 +421,7 @@ function pintarNotasModelo() {
   n('pistaModImg', P.config.modeloImagen);
   n('pistaModImgBiblia', P.config.modeloImagen);
   n('pistaModVid', P.config.modeloVideo);
+  n('pistaModMus', P.config.modeloMusica);
   if ($('tarifaVid')) {
     $('tarifaVid').textContent = 'Tarifa aplicada: ' +
       tarifaLegible(P.config.modeloVideo, P.config.resolucionVideo, P.config.audioVeo);
@@ -427,6 +433,7 @@ function fijarModelo(tipo, valor) {
   if (tipo === 'imagen') P.config.modeloImagen = valor;
   else if (tipo === 'video') P.config.modeloVideo = valor;
   else if (tipo === 'texto') P.config.modeloTexto = valor;
+  else if (tipo === 'musica') P.config.modeloMusica = valor;
   poblarModelos();
   guardar();
   pintarCoste();
@@ -535,7 +542,7 @@ function pintarListaEps() {
 }
 
 function pintarSelectores() {
-  for (const id of ['selEpGuion', 'selEpProd', 'selEpSala', 'selEpExport']) {
+  for (const id of ['selEpGuion', 'selEpSala', 'selEpExport']) {
     const s = $(id);
     s.innerHTML = '';
     for (const ep of P.episodios) {
@@ -722,19 +729,11 @@ function tarjetaToma(ep, t, conAcciones) {
   return d;
 }
 
-function pintarRejillaGuion() {
-  const ep = epActual();
-  const c = $('rejillaGuion');
-  c.innerHTML = '';
-  $('resumenGuion').textContent = resumenGuion(ep);
-  if (!ep) return;
-  for (const t of ep.tomas) c.appendChild(tarjetaToma(ep, t));
-}
-
 function pintarRejillaProd() {
   const ep = epActual();
   const c = $('rejillaProd');
   c.innerHTML = '';
+  $('resumenGuion').textContent = resumenGuion(ep);
   if (!ep) return;
   const lista = ep.tomas.filter((t) => {
     if (filtro === 'faltan') {
@@ -805,7 +804,7 @@ async function seleccionarToma(ep, t) {
 function prepararSala() {
   if (!proyector) {
     proyector = new Proyector({
-      img: $('salaImg'), vid: $('salaVid'), aud: $('salaAud'),
+      img: $('salaImg'), vid: $('salaVid'), aud: $('salaAud'), mus: $('salaMus'),
       pie: $('salaSub'), barra: $('salaBarra'), info: $('salaInfo'),
     });
   }
@@ -1077,15 +1076,48 @@ function costeEpisodio(ep) {
     .filter((t) => t.plano && t.plano.tipo === 'movimiento')
     .reduce((a, t) => a + duracionVeo(P.config.modeloVideo, t.segundos || t.segEstimados || 8), 0);
   const porSegundo = precioSegundo(P.config.modeloVideo, P.config.resolucionVideo, P.config.audioVeo);
+  const escenas = escenasDe(ep).length;
   return {
     imagen: s.tomas * pr.imagen,
     video: segundosVideo * porSegundo,
     voz: (caracteres / 1000) * pr.vozMil,
     director: pr.episodio,
-    get total() { return this.imagen + this.video + this.voz + this.director; },
+    // Lyria cobra por pieza generada, no por segundo: una por escena.
+    musica: escenas * precioPieza(P.config.modeloMusica),
+    get total() { return this.imagen + this.video + this.voz + this.director + this.musica; },
     tomas: s.tomas,
     segundosVideo,
+    escenas,
   };
+}
+
+function pintarPasos() {
+  const ep = epActual();
+  const marca = (n, txt, clase) => {
+    const e = $('estPaso' + n);
+    if (!e) return;
+    e.textContent = txt;
+    e.className = 'pg-est' + (clase ? ' ' + clase : '');
+    const caja = e.closest('.paso-gen');
+    if (caja) caja.classList.toggle('listo', clase === 'hecho');
+  };
+  if (!ep) { for (let n = 1; n <= 5; n++) marca(n, 'sin episodio', ''); return; }
+
+  const s = estadoEpisodio(ep);
+  const linea = (hechas, total, palabra) => {
+    if (!total) return ['—', ''];
+    if (hechas >= total) return [total + ' ' + palabra + ' · completo', 'hecho'];
+    if (hechas === 0) return ['0 de ' + total + ' ' + palabra, ''];
+    return [hechas + ' de ' + total + ' ' + palabra, 'parcial'];
+  };
+  marca(1, ...linea(s.dirigido, s.tomas, 'tomas'));
+  marca(2, ...linea(s.voz, s.tomas, 'voces'));
+  marca(3, ...linea(s.imagen, s.tomas, 'fotogramas'));
+  // El movimiento solo aplica a las tomas que el director marcó como tal.
+  marca(4, ...(s.movimiento
+    ? linea(s.video, s.movimiento, 'clips')
+    : ['ninguna toma marcada con movimiento', '']));
+  marca(5, ...linea(s.musica, s.escenas, 'escenas'));
 }
 
 function pintarCoste() {
@@ -1095,10 +1127,10 @@ function pintarCoste() {
   const ep = epActual();
   const usd = (n) => '$' + n.toFixed(2);
 
-  let temporada = 0, tomas = 0, segVid = 0;
+  let temporada = 0, tomas = 0, segVid = 0, escenas = 0;
   for (const e of P.episodios) {
     const k = costeEpisodio(e);
-    temporada += k.total; tomas += k.tomas; segVid += k.segundosVideo;
+    temporada += k.total; tomas += k.tomas; segVid += k.segundosVideo; escenas += k.escenas;
   }
   const k = ep ? costeEpisodio(ep) : null;
 
@@ -1107,9 +1139,11 @@ function pintarCoste() {
     (k ? '<tr><td>EP ' + pad2(ep.num) + ' — ' + k.tomas + ' fotogramas</td><td>' + usd(k.imagen) + '</td></tr>' +
       '<tr><td>EP ' + pad2(ep.num) + ' — ' + k.segundosVideo + ' s de video</td><td>' + usd(k.video) + '</td></tr>' +
       '<tr><td>EP ' + pad2(ep.num) + ' — voz</td><td>' + usd(k.voz) + '</td></tr>' +
+      '<tr><td>EP ' + pad2(ep.num) + ' — ' + k.escenas + ' piezas de música</td><td>' + usd(k.musica) + '</td></tr>' +
       '<tr><td>EP ' + pad2(ep.num) + ' — dirección</td><td>' + usd(k.director) + '</td></tr>' +
       '<tr><td><strong>Este episodio</strong></td><td><strong>' + usd(k.total) + '</strong></td></tr>' : '') +
-    '<tr><td><strong>Temporada completa</strong> — ' + tomas + ' fotogramas, ' + segVid + ' s de video</td>' +
+    '<tr><td><strong>Temporada completa</strong> — ' + tomas + ' fotogramas, ' + segVid +
+    ' s de video, ' + escenas + ' piezas de música</td>' +
     '<td><strong>' + usd(temporada) + '</strong></td></tr>' +
     '</table>' +
     '<p class="nota chica">Solo se cobra lo que se genera: si detienes a mitad, pagas la mitad. Bajar la ' +
@@ -1129,14 +1163,13 @@ async function pintarAlmacen() {
 function pintarTodo() {
   pintarListaEps();
   pintarSelectores();
-  pintarRejillaGuion();
   pintarRejillaProd();
+  pintarPasos();
   pintarCoste();
   pintarResumenTemporada();
   pintarAlmacen();
   pintarPanel();
   const ep = epActual();
-  $('cuentaGuion').textContent = ep ? ep.tomas.length + ' tomas' : '';
   $('cuentaProd').textContent = ep ? ep.tomas.length + ' tomas' : '';
   $('cuentaElenco').textContent = P.elenco.length;
   $('cuentaLugares').textContent = P.lugares.length;
@@ -1406,12 +1439,11 @@ function cablear() {
   });
 
   // Producción
-  $('selEpProd').addEventListener('change', (e) => { P.sel = Number(e.target.value); guardar(); pintarTodo(); });
   const producir = async (fases, etiqueta) => {
     const ep = epActual();
     if (!ep) return;
     if (!ep.tomas.some((t) => t.plano) && (fases.imagen || fases.video)) {
-      estado('estadoProd', 'Este episodio no está dirigido: ve a «Guion técnico» y pulsa «Dirigir este episodio».', 'err');
+      estado('estadoProd', 'Este episodio no está dirigido: pulsa antes el paso 1, «Dirigir este episodio».', 'err');
       return;
     }
     estado('estadoProd', '');
@@ -1424,10 +1456,13 @@ function cablear() {
       ' · movimiento ' + s.video + '/' + s.movimiento + (s.errores ? ' · ' + s.errores + ' con error' : ''),
       s.errores ? 'info' : 'ok');
   };
-  $('btnProdTodo').addEventListener('click', () => producir({ voz: true, imagen: true, video: true }, 'producción'));
+  $('btnProdTodo').addEventListener('click', () =>
+    producir({ voz: true, imagen: true, video: true, musica: true }, 'producción'));
   $('btnProdVoz').addEventListener('click', () => producir({ voz: true }, 'voz'));
   $('btnProdImg').addEventListener('click', () => producir({ imagen: true }, 'fotogramas'));
   $('btnProdVid').addEventListener('click', () => producir({ video: true }, 'movimiento'));
+  $('btnProdMus').addEventListener('click', () => producir({ musica: true }, 'música'));
+  $('selModMusProd').addEventListener('change', (e) => fijarModelo('musica', e.target.value));
   const detener = () => { if (motor) motor.detener(); log('detención solicitada', 'err'); };
   $('btnDetenerProd').addEventListener('click', detener);
   $('btnDetenerGlobal').addEventListener('click', detener);

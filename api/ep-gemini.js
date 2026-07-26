@@ -335,6 +335,29 @@ function limpiarProfundo(valor, limpiar, clave) {
   return valor;
 }
 
+/* ── Duraciones que admite cada Veo ─────────────────────────── */
+/*  Debe coincidir con DURACIONES en app/veo.js; la auditoría lo comprueba.
+    Vertex rechaza la petición si el valor no está en la lista, así que aquí
+    se ajusta al más cercano en vez de dejar pasar un 5 o un 7 a un modelo 3.x. */
+const DURACIONES_VEO = {
+  'veo-3.1-generate-001': [4, 6, 8],
+  'veo-3.1-fast-generate-001': [4, 6, 8],
+  'veo-3.1-lite-generate-001': [4, 6, 8],
+  'veo-2.0-generate-001': [5, 6, 7, 8],
+};
+
+function duracionValida(model, pedida) {
+  const lista = DURACIONES_VEO[model] || [4, 6, 8];
+  const d = Number(pedida);
+  if (!isFinite(d) || d <= 0) return lista[lista.length - 1];
+  let mejor = lista[0];
+  for (const v of lista) {
+    const dif = Math.abs(v - d), difMejor = Math.abs(mejor - d);
+    if (dif < difMejor || (dif === difMejor && v > mejor)) mejor = v;
+  }
+  return mejor;
+}
+
 /* ── Handler ────────────────────────────────────────────────── */
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -606,7 +629,7 @@ module.exports = async (req, res) => {
 
         const parameters = {
           aspectRatio: body.aspectRatio || '16:9',
-          durationSeconds: Math.min(Math.max(parseInt(body.durationSeconds, 10) || 8, 4), 8),
+          durationSeconds: duracionValida(model, body.durationSeconds),
           sampleCount: 1,
           generateAudio: body.generateAudio === true,
           personGeneration: body.personGeneration || 'allow_adult',

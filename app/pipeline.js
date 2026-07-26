@@ -13,6 +13,7 @@ import { nube } from './nube.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
 import { promptImagen, promptVideo, promptReferencia, promptLugar } from './director.js';
 import { variantesDe, vestuarioPara } from './biblia.js';
+import { duracionVeo } from './veo.js';
 
 export const clave = {
   audio: (ep, i) => 'ep' + pad(ep) + '/t' + pad3(i) + '/audio',
@@ -378,7 +379,9 @@ export class Motor {
     const img = await assets.blob(clave.imagen(ep.num, t.i));
     if (!img) { t.video = { ok: false, error: 'falta el fotograma' }; return; }
 
-    const dur = Math.min(8, Math.max(4, Math.round(t.segundos || t.segEstimados || 8)));
+    // Veo solo admite ciertos enteros y los rechaza si no coinciden: 4, 6 u 8 en
+    // la familia 3.x, de 5 a 8 en Veo 2. Se pide el más cercano a lo que dura la voz.
+    const dur = duracionVeo(cfg.modeloVideo, t.segundos || t.segEstimados || 8);
     const ctx = { estilo: cfg.estilo };
 
     try {

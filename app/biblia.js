@@ -446,7 +446,9 @@ export const CONFIG_DEFECTO = {
 
   // Precios orientativos en dólares, editables desde la interfaz.
   // Vertex cambia sus tarifas: aquí solo sirven para dimensionar el trabajo.
-  precios: { imagen: 0.15, videoSegundo: 0.15, vozMil: 0.012, episodio: 0.25 },
+  // El segundo de video no está aquí: su precio depende del modelo, la resolución
+  // y el audio, y sale de la tarifa oficial en app/veo.js.
+  precios: { imagen: 0.15, vozMil: 0.012, episodio: 0.25 },
 };
 
 export const VOCES = [

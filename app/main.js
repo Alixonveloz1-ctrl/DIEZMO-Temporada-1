@@ -17,6 +17,7 @@ import {
 import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js';
 import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob } from './pipeline.js';
 import { Proyector } from './player.js';
+import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
 
 const $ = (id) => document.getElementById(id);
@@ -415,6 +416,10 @@ function pintarNotasModelo() {
   n('pistaModImg', P.config.modeloImagen);
   n('pistaModImgBiblia', P.config.modeloImagen);
   n('pistaModVid', P.config.modeloVideo);
+  if ($('tarifaVid')) {
+    $('tarifaVid').textContent = 'Tarifa aplicada: ' +
+      tarifaLegible(P.config.modeloVideo, P.config.resolucionVideo, P.config.audioVeo);
+  }
 }
 
 /** Un cambio en cualquier selector de modelo se refleja en todos. */
@@ -1067,12 +1072,14 @@ function costeEpisodio(ep) {
   const pr = P.config.precios;
   const s = estadoEpisodio(ep);
   const caracteres = (ep.tomas || []).reduce((a, t) => a + t.chars, 0);
+  // Los mismos segundos que se le van a pedir a Veo, no una estimación aparte.
   const segundosVideo = (ep.tomas || [])
     .filter((t) => t.plano && t.plano.tipo === 'movimiento')
-    .reduce((a, t) => a + Math.min(8, Math.max(4, Math.round(t.segundos || t.segEstimados || 8))), 0);
+    .reduce((a, t) => a + duracionVeo(P.config.modeloVideo, t.segundos || t.segEstimados || 8), 0);
+  const porSegundo = precioSegundo(P.config.modeloVideo, P.config.resolucionVideo, P.config.audioVeo);
   return {
     imagen: s.tomas * pr.imagen,
-    video: segundosVideo * pr.videoSegundo,
+    video: segundosVideo * porSegundo,
     voz: (caracteres / 1000) * pr.vozMil,
     director: pr.episodio,
     get total() { return this.imagen + this.video + this.voz + this.director; },
@@ -1433,7 +1440,6 @@ function cablear() {
   $('btnGuardarPrecios').addEventListener('click', async () => {
     P.config.precios = {
       imagen: parseFloat($('pxImagen').value) || 0,
-      videoSegundo: parseFloat($('pxVideo').value) || 0,
       vozMil: parseFloat($('pxVoz').value) || 0,
       episodio: parseFloat($('pxTexto').value) || 0,
     };
@@ -1641,7 +1647,6 @@ async function iniciar() {
   $('cfgMovim').value = Math.round(P.config.proporcionMovimiento * 100);
   $('valMovim').textContent = Math.round(P.config.proporcionMovimiento * 100) + ' %';
   $('pxImagen').value = P.config.precios.imagen;
-  $('pxVideo').value = P.config.precios.videoSegundo;
   $('pxVoz').value = P.config.precios.vozMil;
   $('pxTexto').value = P.config.precios.episodio;
 

@@ -642,6 +642,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       </div>
       <select id="selModVidProd"></select>
       <p class="pista" id="pistaModVid">—</p>
+      <p class="pista" id="tarifaVid" style="color:var(--oro)">—</p>
     </div>
 
     <div class="fila-btn">
@@ -663,12 +664,13 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <summary>Ajustar precios unitarios</summary>
       <div class="rejilla2" style="margin-top:12px">
         <div class="campo"><label for="pxImagen">Dólares por fotograma</label><input type="number" id="pxImagen" step="0.01" min="0"></div>
-        <div class="campo"><label for="pxVideo">Dólares por segundo de video</label><input type="number" id="pxVideo" step="0.01" min="0"></div>
         <div class="campo"><label for="pxVoz">Dólares por mil caracteres de voz</label><input type="number" id="pxVoz" step="0.001" min="0"></div>
         <div class="campo"><label for="pxTexto">Dólares por episodio dirigido</label><input type="number" id="pxTexto" step="0.01" min="0"></div>
       </div>
       <button class="btn chico" id="btnGuardarPrecios">Guardar precios</button>
-      <p class="nota chica">Valores orientativos. Consulta la tarifa vigente de Vertex AI y ajústalos: el cálculo se rehace solo.</p>
+      <p class="nota chica">El segundo de video no se ajusta aquí: su precio depende del modelo, de la
+        resolución y de si lleva audio, y se toma de la tarifa oficial de Vertex AI. Se muestra en el
+        recuadro del modelo de video.</p>
     </details>
   </div>
 
@@ -913,7 +915,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
   </div>
   <div class="campo check"><input type="checkbox" id="cfgNormalizar"><label for="cfgNormalizar">Convertir cifras y símbolos a letras antes de narrar</label></div>
   <div class="campo check"><input type="checkbox" id="cfgAnunciar"><label for="cfgAnunciar">Anunciar el título al empezar cada episodio</label></div>
-  <div class="campo check"><input type="checkbox" id="cfgAudioVeo"><label for="cfgAudioVeo">Dejar que Veo genere ambiente sonoro</label></div>
+  <div class="campo check"><input type="checkbox" id="cfgAudioVeo"><label for="cfgAudioVeo">Dejar que Veo genere ambiente sonoro <span style="color:var(--oro)">(encarece el segundo de video y puede pisar la narración)</span></label></div>
   <div class="campo"><label for="cfgSilencio">Silencio en los cortes de escena (segundos)</label><input type="number" id="cfgSilencio" min="0" max="3" step="0.1"></div>
   <div class="dlg-pie">
     <button class="btn fantasma" id="btnProbarVoz">Probar la voz</button>

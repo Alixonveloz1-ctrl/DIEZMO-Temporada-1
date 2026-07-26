@@ -248,6 +248,60 @@ if (!/^zoompan=z=/.test(f) || !/:x='/.test(f) || !/:y='/.test(f) || !/:d=192:/.t
   mal('la Sala no recibe los dos extremos de la animación');
 } else ok('el filtro de montaje y la animación de la Sala salen bien formados');
 
+/* ── 5d · Duraciones y tarifa de Veo ───────────────────────── */
+titulo('DURACIÓN Y COSTE DEL VIDEO');
+const { DURACIONES, duracionVeo, precioSegundo, TARIFA } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'veo.js')).href);
+
+// El backend valida por su cuenta: si las dos tablas se separan, Vertex rechaza.
+const backend = leer('api/ep-gemini.js');
+const tablaBack = {};
+const bloqueBack = (backend.match(/const DURACIONES_VEO = \{([\s\S]*?)\};/) || ['', ''])[1];
+for (const m of bloqueBack.matchAll(/'([^']+)':\s*\[([0-9,\s]+)\]/g)) {
+  tablaBack[m[1]] = m[2].split(',').map((x) => parseInt(x, 10));
+}
+const desajuste = Object.keys(DURACIONES).filter((k) =>
+  !tablaBack[k] || tablaBack[k].join(',') !== DURACIONES[k].join(','));
+if (!Object.keys(tablaBack).length) mal('el backend no valida la duración contra el modelo');
+else if (desajuste.length) mal('las duraciones del backend y del cliente no coinciden', desajuste.join(' · '));
+else ok('cliente y backend admiten las mismas duraciones para los ' + Object.keys(DURACIONES).length + ' modelos');
+
+// Ya no puede quedar el recorte viejo, que mandaba 5 y 7 a un modelo que no los acepta.
+if (/Math\.min\(8,\s*Math\.max\(4,/.test(leer('app/pipeline.js')) ||
+    /Math\.min\(Math\.max\(parseInt\(body\.durationSeconds/.test(backend)) {
+  mal('sigue el recorte 4-8 en algún sitio', 'puede pedir 5 o 7 segundos, que Veo 3.x rechaza');
+} else ok('nadie recorta ya la duración a mano');
+
+// Ninguna duración de toma puede producir un valor que el modelo no admita.
+let invalido = [];
+for (const modelo of Object.keys(DURACIONES)) {
+  for (let d = 0.1; d <= 20; d = +(d + 0.1).toFixed(1)) {
+    const v = duracionVeo(modelo, d);
+    if (DURACIONES[modelo].indexOf(v) === -1) { invalido.push(modelo + ' con ' + d + ' s → ' + v); break; }
+  }
+  for (const raro of [0, -3, NaN, null, undefined, 'ocho']) {
+    const v = duracionVeo(modelo, raro);
+    if (DURACIONES[modelo].indexOf(v) === -1) invalido.push(modelo + ' con «' + raro + '» → ' + v);
+  }
+}
+if (invalido.length) mal('el cálculo de duración puede devolver un valor que Veo rechaza', invalido.slice(0, 4).join(' · '));
+else ok('cualquier duración de toma cae en un valor que el modelo admite');
+
+// En empate manda la mayor: vale más sobrar clip que congelar imagen.
+const empates = [[5, 6], [7, 8]].filter(([d, esperado]) => duracionVeo('veo-3.1-lite-generate-001', d) !== esperado);
+if (empates.length) mal('en un empate no se elige la duración mayor', JSON.stringify(empates));
+else if (duracionVeo('veo-3.1-lite-generate-001', 3.8) !== 4 || duracionVeo('veo-3.1-lite-generate-001', 6.2) !== 6) {
+  mal('no se elige la duración válida más cercana');
+} else ok('se pide la más cercana, y en empate la mayor (cinco segundos pide seis)');
+
+// Todo modelo que la interfaz ofrece tiene que tener duración y tarifa.
+const ofrecidos = [...leer('app/main.js').matchAll(/\['(veo-[^']+)'/g)].map((m) => m[1]);
+const sinTabla = [...new Set(ofrecidos)].filter((m) => !DURACIONES[m] || !TARIFA[m]);
+if (sinTabla.length) mal('modelos de video ofrecidos sin duración o sin tarifa', sinTabla.join(' · '));
+else if (precioSegundo('veo-3.1-lite-generate-001', '1080p', false) !== 0.05) {
+  mal('la tarifa de Veo 3.1 Lite no coincide con la oficial');
+} else ok('los ' + new Set(ofrecidos).size + ' modelos ofrecidos tienen duración y tarifa oficial');
+
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');
 const { ELENCO_DEFECTO, variantesDe, vestuarioPara } =

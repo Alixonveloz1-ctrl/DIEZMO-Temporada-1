@@ -597,6 +597,8 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         Modelo de imagen
       </div>
       <select id="selModImgProd"></select>
+      <label style="display:block;font-size:11px;color:var(--tinta-2);margin:10px 0 6px;font-weight:600">Resolución de cada fotograma</label>
+      <select id="selResImgProd"></select>
       <p class="pista" id="pistaModImg">—</p>
     </div>
 
@@ -687,27 +689,22 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <textarea id="cfgEstilo" class="alto"></textarea>
     </div>
     <div class="campo">
+      <label for="cfgCalidad">Acabado — cuánto detalle se le exige a cada imagen</label>
+      <textarea id="cfgCalidad" class="alto"></textarea>
+    </div>
+    <div class="campo">
       <label for="cfgNegativo">Qué evitar siempre</label>
       <textarea id="cfgNegativo"></textarea>
     </div>
-    <div class="rejilla2">
-      <div class="campo">
-        <label for="cfgTamano">Resolución de imagen</label>
-        <select id="cfgTamano">
-          <option value="1K">1K — rápida y barata</option>
-          <option value="2K">2K — recomendada</option>
-          <option value="4K">4K — solo en Nano Banana Pro</option>
-        </select>
-      </div>
-      <div class="campo">
-        <label for="cfgMaxRefs">Referencias por fotograma</label>
-        <select id="cfgMaxRefs">
-          <option value="1">1 personaje</option>
-          <option value="2">2 personajes</option>
-          <option value="3">3 personajes (máximo útil)</option>
-        </select>
-      </div>
+    <div class="campo">
+      <label for="cfgMaxRefs">Referencias por fotograma</label>
+      <select id="cfgMaxRefs">
+        <option value="1">1 personaje</option>
+        <option value="2">2 personajes</option>
+        <option value="3">3 personajes (máximo útil)</option>
+      </select>
     </div>
+    <p class="nota chica" style="margin-top:0">La resolución se elige junto al modelo de imagen, en el recuadro azul de esta misma pestaña y de Producción.</p>
     <button class="btn" id="btnGuardarArte">Guardar dirección de arte</button>
   </div>
 
@@ -721,6 +718,8 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         Modelo para personajes y lugares
       </div>
       <select id="selModImgBiblia"></select>
+      <label style="display:block;font-size:11px;color:var(--tinta-2);margin:10px 0 6px;font-weight:600">Resolución de cada imagen</label>
+      <select id="selResImgBiblia"></select>
       <p class="pista" id="pistaModImgBiblia">—</p>
     </div>
 
@@ -860,7 +859,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     <div class="campo"><label for="cfgVoz">Voz del narrador</label><select id="cfgVoz"></select></div>
     <div class="campo"><label for="cfgIdioma">Idioma / acento</label><select id="cfgIdioma"></select></div>
     <div class="campo"><label for="cfgModeloTts">Modelo de voz</label><select id="cfgModeloTts"></select></div>
-    <div class="campo"><label for="cfgResVideo">Resolución del video</label>
+    <div class="campo"><label for="cfgResVideo">Resolución de los clips de video</label>
       <select id="cfgResVideo"><option value="720p">720p</option><option value="1080p">1080p</option></select>
     </div>
     <div class="campo"><label for="cfgModeloImagen">Modelo de imagen por defecto</label><select id="cfgModeloImagen"></select></div>

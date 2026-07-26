@@ -33,6 +33,16 @@ export const NEGATIVO_DEFECTO =
   'fotografía, grano de película, textura de papel, trama de puntos, aspecto retro, ' +
   'colores lavados, dibujo de los años ochenta, sonrisas publicitarias, poses de videojuego';
 
+export const CALIDAD_DEFECTO =
+  'ACABADO: producción de largometraje, con densidad de detalle alta y pareja en todo el ' +
+  'encuadre. Cada material se reconoce por su textura: el algodón gastado de la ropa, el metal ' +
+  'rayado, el reflejo del vidrio, el nácar de la piel vessari, la carne tibia y nervada del ' +
+  'casco de las naves. Foco nítido y limpio sobre el sujeto principal, con profundidad de campo ' +
+  'cinematográfica y un desenfoque suave y ordenado en el fondo. Bordes definidos y línea ' +
+  'firme, sin emborronado ni artefactos. La luz está construida, no es plana: una fuente ' +
+  'principal identificable, relleno suave en las sombras y una luz de contorno que separa a las ' +
+  'figuras del fondo.';
+
 export const INSTRUCCION_VOZ_DEFECTO =
   'Narra en español latino neutro, con voz grave y profunda, a un ritmo medio, con pausas ' +
   'naturales y energía dramática contenida, estilo narrador de recaps de anime. Este fragmento ' +
@@ -292,7 +302,7 @@ export const CONFIG_DEFECTO = {
 
   // Modelos
   modeloTexto: 'gemini-3.1-pro-preview',
-  modeloImagen: 'gemini-2.5-flash-image',
+  modeloImagen: 'gemini-3-pro-image',
   modeloVideo: 'veo-3.1-lite-generate-001',
   modeloTts: 'gemini-2.5-flash-preview-tts',
 
@@ -311,6 +321,7 @@ export const CONFIG_DEFECTO = {
 
   // Arte
   estilo: ESTILO_DEFECTO,
+  calidad: CALIDAD_DEFECTO,
   negativo: NEGATIVO_DEFECTO,
   maxReferencias: 3,
 

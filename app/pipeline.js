@@ -256,7 +256,7 @@ export class Motor {
     }
 
     const ctx = {
-      estilo: cfg.estilo, negativo: cfg.negativo, formato: cfg.formato,
+      estilo: cfg.estilo, calidad: cfg.calidad, negativo: cfg.negativo, formato: cfg.formato,
       elenco: this.p.elenco, lugares: this.p.lugares,
     };
     const prompt = t.promptImagen || promptImagen(plano, ctx);

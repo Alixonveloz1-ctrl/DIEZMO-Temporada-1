@@ -532,10 +532,9 @@ module.exports = async (req, res) => {
       }
 
       const imageConfig = { aspectRatio: body.aspectRatio || '16:9' };
-      // Solo Nano Banana Pro admite elegir la resolución.
-      if (body.imageSize && model === 'gemini-3-pro-image') {
-        imageConfig.imageSize = String(body.imageSize);
-      }
+      // Nano Banana Pro y Nano Banana 2 generan en 1K, 2K y 4K. El 2.5 no
+      // acepta el parámetro y siempre entrega en torno a 1K.
+      if (body.imageSize && esG3) imageConfig.imageSize = String(body.imageSize);
 
       const vBody = {
         contents: [{ role: 'user', parts }],

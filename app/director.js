@@ -246,6 +246,7 @@ export function promptImagen(plano, ctx) {
   partes.push('ILUMINACIÓN: ' + plano.luz + '.');
   partes.push('ATMÓSFERA: ' + plano.emocion + '.');
   partes.push('Composición pensada para ' + (ctx.formato || '16:9') + '.');
+  if (ctx.calidad) partes.push(ctx.calidad);
   partes.push('EVITAR: ' + negativo);
 
   return partes.join('\n');
@@ -299,7 +300,8 @@ export function promptReferencia(personaje, ctx, variante) {
     'piernas largas y torso proporcionado; nada de cuerpos achaparrados ni cabezas grandes.'
   );
 
-  base.push('EVITAR: ' + ctx.negativo + ', múltiples personajes distintos, fondo con escenario.');
+  if (ctx.calidad) base.push(ctx.calidad);
+  base.push('EVITAR: ' + ctx.negativo + ', varios personajes distintos, escenario de fondo.');
   return base.join('\n');
 }
 
@@ -312,6 +314,7 @@ export function promptLugar(lugar, ctx) {
     'Composición: plano general amplio y establecedor del espacio vacío, sin personajes. ' +
     'Máximo detalle arquitectónico y de materiales. Este fondo servirá de referencia para todas ' +
     'las tomas que ocurran aquí.',
+    ctx.calidad || '',
     'EVITAR: ' + ctx.negativo + ', personas, figuras humanas.',
   ].join('\n');
 }

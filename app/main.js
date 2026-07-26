@@ -11,7 +11,7 @@ import {
 } from './texto.js';
 import {
   CONFIG_DEFECTO, ELENCO_DEFECTO, LUGARES_DEFECTO, VOCES, IDIOMAS,
-  ESTILO_DEFECTO, NEGATIVO_DEFECTO,
+  ESTILO_DEFECTO, NEGATIVO_DEFECTO, CALIDAD_DEFECTO,
 } from './biblia.js';
 import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js';
 import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob } from './pipeline.js';
@@ -273,10 +273,16 @@ const MODELOS = {
   ],
 };
 
+const RESOLUCIONES = {
+  'gemini-3-pro-image': [['1K', '1K — rápida'], ['2K', '2K — recomendada'], ['4K', '4K — máxima']],
+  'gemini-3.1-flash-image': [['1K', '1K — rápida'], ['2K', '2K — recomendada'], ['4K', '4K — máxima']],
+  'gemini-2.5-flash-image': [['1K', '1K — es la única que entrega este modelo']],
+};
+
 const NOTA_MODELO = {
-  'gemini-2.5-flash-image': 'Región us-central1. El más rápido y barato; buena consistencia de personaje.',
-  'gemini-3.1-flash-image': 'Endpoint global. Más nuevo que el 2.5 y casi igual de rápido.',
-  'gemini-3-pro-image': 'Endpoint global. La mejor calidad y el único que admite 2K y 4K. Más caro y más lento.',
+  'gemini-2.5-flash-image': 'El más rápido y barato, pero entrega siempre en torno a 1K: para máxima calidad no es este.',
+  'gemini-3.1-flash-image': 'Rápido y admite 2K y 4K. Buen término medio entre precio y detalle.',
+  'gemini-3-pro-image': 'La mejor calidad y el mejor detalle. Admite 2K y 4K. Más caro y más lento; es el que conviene para las hojas de referencia y los fotogramas que importan.',
   'veo-3.1-lite-generate-001': 'El más barato. Suficiente para planos de movimiento contenido.',
   'veo-3.1-fast-generate-001': 'Equilibrio entre precio y calidad. Recomendado para la mayoría de las tomas.',
   'veo-3.1-generate-001': 'Máxima calidad de animación. Resérvalo para los planos que llevan el peso del episodio.',
@@ -310,6 +316,9 @@ function poblarModelos() {
   for (const id of ['cfgModeloVideo', 'selModVidProd']) {
     llenarSelect($(id), MODELOS.video, P.config.modeloVideo);
   }
+  const res = RESOLUCIONES[P.config.modeloImagen] || RESOLUCIONES['gemini-2.5-flash-image'];
+  for (const id of ['selResImgProd', 'selResImgBiblia']) llenarSelect($(id), res, P.config.imageSize);
+  P.config.imageSize = $('selResImgProd').value;
   pintarNotasModelo();
 }
 
@@ -633,8 +642,8 @@ async function seleccionarToma(ep, t) {
 
   const p = t.plano || {};
   const ctx = {
-    estilo: P.config.estilo, negativo: P.config.negativo, formato: P.config.formato,
-    elenco: P.elenco, lugares: P.lugares,
+    estilo: P.config.estilo, calidad: P.config.calidad, negativo: P.config.negativo,
+    formato: P.config.formato, elenco: P.elenco, lugares: P.lugares,
   };
   $('detPrompt').value = t.promptImagen || (t.plano ? promptImagen(p, ctx) : '');
   $('detAccion').value = p.accionVideo || '';
@@ -1115,6 +1124,12 @@ function cablear() {
     $(id).addEventListener('change', (e) => fijarModelo('video', e.target.value));
   }
   $('cfgModeloTexto').addEventListener('change', (e) => fijarModelo('texto', e.target.value));
+  for (const id of ['selResImgProd', 'selResImgBiblia']) {
+    $(id).addEventListener('change', (e) => {
+      P.config.imageSize = e.target.value;
+      poblarModelos(); guardar(); pintarCoste();
+    });
+  }
 
   // Proyecto
   $('btnPing').addEventListener('click', comprobarConexion);
@@ -1155,8 +1170,7 @@ function cablear() {
   $('btnGuardarArte').addEventListener('click', async () => {
     P.config.estilo = $('cfgEstilo').value.trim() || ESTILO_DEFECTO;
     P.config.negativo = $('cfgNegativo').value.trim() || NEGATIVO_DEFECTO;
-    P.config.formato = $('cfgFormato').value;
-    P.config.imageSize = $('cfgTamano').value;
+    P.config.calidad = $('cfgCalidad').value.trim() || CALIDAD_DEFECTO;
     P.config.maxReferencias = parseInt($('cfgMaxRefs').value, 10) || 3;
     await guardar(); pintarTodo();
   });
@@ -1474,9 +1488,9 @@ async function iniciar() {
   modelos = await store.leer('modelos');
 
   $('cfgEstilo').value = P.config.estilo;
+  $('cfgCalidad').value = P.config.calidad;
   $('cfgNegativo').value = P.config.negativo;
   $('cfgFormato').value = P.config.formato;
-  $('cfgTamano').value = P.config.imageSize;
   $('cfgMaxRefs').value = String(P.config.maxReferencias);
   $('cfgSegToma').value = P.config.segundosPorToma;
   $('valSegToma').textContent = P.config.segundosPorToma + ' s';

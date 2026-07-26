@@ -714,11 +714,26 @@ if (peorBloque > TOPE_MODELO) {
 }
 
 // Y si aun así el servidor no llega, hay que partir en vez de rendirse.
-if (!/e\.status === 413 \|\| e\.status === 504/.test(genVoz) || !/cola\.unshift\(/.test(genVoz)) {
+if (!/e\.status === 413 \|\| e\.status === 504/.test(genVoz) || !/plan\.splice\(hecho, 1,/.test(genVoz)) {
   mal('un bloque que no cabe no se parte en dos', 'la escena entera se quedaría sin voz');
 } else if (!/finales: \[504\]/.test(genVoz)) {
   mal('un 504 de voz se reintenta igual', 'son otros sesenta segundos perdidos por intento');
 } else ok('lo que no cabe se parte en dos y se reintenta solo, sin repetir la espera');
+
+/*  Y la barra tiene que contar LLAMADAS. Contando tomas rellenadas, el
+    episodio 1 marcaba «/134» y eso se lee como 134 generaciones, que es justo
+    lo que se acababa de dejar de hacer: son 24.                             */
+if (!/this\._prog\(hecho, plan\.length,/.test(genVoz) ||
+    /this\._prog\([^)]*tomasTotal/.test(genVoz)) {
+  mal('la barra de voz no cuenta llamadas', 'contar tomas hace parecer que se pide toma a toma');
+} else {
+  const ep1 = sg2(lt2(leer('episodios/ep01.md')), { segundosPorToma: 8, cps: 16 });
+  const esc1 = new Map();
+  for (const t of ep1) { if (!esc1.has(t.escena)) esc1.set(t.escena, []); esc1.get(t.escena).push(t); }
+  let n1 = 0;
+  for (const ts of esc1.values()) n1 += repartirEnBloques(ts, SEGUNDOS_POR_LLAMADA).length;
+  ok('la barra cuenta llamadas: el episodio 1 marca ' + n1 + ', no ' + ep1.length);
+}
 
 // El servidor tiene que decir que no cabe, en vez de dejar que corte la plataforma.
 const guardaTts = leer('api/ep-gemini.js');

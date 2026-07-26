@@ -262,47 +262,72 @@ export class Motor {
       });
 
     return this._correr(async () => {
-      const total = escenas.reduce((a, e) => a + e.tomas.length, 0);
-      let hecho = 0;
       /*  Si un bloque no cabe, los siguientes tampoco van a caber: el techo se
           baja para toda la tanda en cuanto el servidor lo dice una vez.      */
       let techo = SEGUNDOS_POR_LLAMADA;
 
+      /*  El plan se arma ENTERO antes de empezar, para poder decir cuántas
+          llamadas son. La barra contaba tomas rellenadas y eso se leía como
+          134 generaciones cuando en realidad son 24: aquí lo que se paga y lo
+          que se espera es la llamada, así que es lo que hay que contar.      */
+      const plan = [];
       for (const esc of escenas) {
-        if (this.señal.aborted) return;
-        const cola = repartirEnBloques(esc.tomas, techo);
-        let n = 0;
-
-        while (cola.length) {
-          if (this.señal.aborted) return;
-          const bloque = cola.shift();
-          n++;
-          const dónde = 'escena ' + esc.escena + (cola.length || n > 1 ? ' · parte ' + n : '');
-          this._prog(hecho, total, 'voz · ' + dónde);
-
-          try {
-            await this._unBloqueDeVoz(ep, bloque, dónde);
-          } catch (e) {
-            if (e && e.cancelado) return;
-            /*  Demasiado audio para una sola respuesta (413) o más tiempo del
-                que el servidor espera (504): no es un fallo de Google, es que
-                se pidió de más. Se parte en dos y se reintenta solo.         */
-            if (bloque.length > 1 && (e.status === 413 || e.status === 504)) {
-              techo = Math.max(10, Math.round(techo / 2));
-              const mitad = Math.ceil(bloque.length / 2);
-              cola.unshift(bloque.slice(0, mitad), bloque.slice(mitad));
-              this._log(dónde + ': era demasiado para una llamada; se parte en dos', 'aviso');
-              n--;
-              continue;
-            }
-            for (const t of bloque) t.audio = { ok: false, error: e.message };
-            this._log('voz ' + dónde + ': ' + e.message, 'err');
-          }
-
-          hecho += bloque.length;
-          this._prog(hecho, total, 'voz');
-          if (this.avisos.cambio) this.avisos.cambio();
+        for (const tomas of repartirEnBloques(esc.tomas, techo)) {
+          plan.push({ escena: esc.escena, tomas, parte: 1, partes: 1 });
         }
+      }
+      // Cuántas partes tiene cada escena y qué número es cada una. Se recalcula
+      // después de cada corte, para que la etiqueta nunca mienta.
+      const renumerar = () => {
+        const cuantas = new Map();
+        for (const b of plan) cuantas.set(b.escena, (cuantas.get(b.escena) || 0) + 1);
+        const vistas = new Map();
+        for (const b of plan) {
+          const n = (vistas.get(b.escena) || 0) + 1;
+          vistas.set(b.escena, n);
+          b.parte = n;
+          b.partes = cuantas.get(b.escena);
+        }
+      };
+      renumerar();
+
+      const tomasTotal = escenas.reduce((a, e) => a + e.tomas.length, 0);
+      this._log('voz: ' + plan.length + ' llamadas para ' + tomasTotal + ' tomas de ' +
+        escenas.length + ' escenas', 'info');
+
+      let hecho = 0;
+      while (hecho < plan.length) {
+        if (this.señal.aborted) return;
+        const b = plan[hecho];
+        const dónde = 'escena ' + b.escena +
+          (b.partes > 1 ? ' · parte ' + b.parte + ' de ' + b.partes : '');
+        this._prog(hecho, plan.length, 'voz · ' + dónde);
+
+        try {
+          await this._unBloqueDeVoz(ep, b.tomas, dónde);
+        } catch (e) {
+          if (e && e.cancelado) return;
+          /*  Demasiado audio para una sola respuesta (413) o más tiempo del
+              que el servidor espera (504): no es un fallo de Google, es que se
+              pidió de más. Este bloque se sustituye por sus dos mitades —una
+              llamada más en el plan— y se reintenta solo.                    */
+          if (b.tomas.length > 1 && (e.status === 413 || e.status === 504)) {
+            techo = Math.max(10, Math.round(techo / 2));
+            const mitad = Math.ceil(b.tomas.length / 2);
+            plan.splice(hecho, 1,
+              { escena: b.escena, tomas: b.tomas.slice(0, mitad), parte: 1, partes: 1 },
+              { escena: b.escena, tomas: b.tomas.slice(mitad), parte: 1, partes: 1 });
+            renumerar();
+            this._log(dónde + ': era demasiado para una llamada; se parte en dos', 'aviso');
+            continue;
+          }
+          for (const t of b.tomas) t.audio = { ok: false, error: e.message };
+          this._log('voz ' + dónde + ': ' + e.message, 'err');
+        }
+
+        hecho++;
+        this._prog(hecho, plan.length, 'voz');
+        if (this.avisos.cambio) this.avisos.cambio();
       }
     });
   }

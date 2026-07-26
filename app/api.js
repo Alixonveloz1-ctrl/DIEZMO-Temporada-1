@@ -151,7 +151,43 @@ export const api = {
 
   vozLargaConsultar: (p, o) => llamar({ mode: 'vozlarga', action: 'poll', ...p }, { intentos: 2, ...o }),
 
+  montarIniciar: (p, o) => llamar({ mode: 'montar', action: 'start', ...p }, o),
+
+  montarConsultar: (p, o) => llamar({ mode: 'montar', action: 'poll', ...p }, { intentos: 2, ...o }),
+
 };
+
+/**
+ * Manda montar el episodio en la nube y espera al MP4.
+ * Dieciséis minutos de 1080p tardan lo suyo: se consulta cada 15 s.
+ *
+ * @returns {string} referencia opaca del MP4, para descargarlo con bajarClip
+ */
+export async function montarEpisodio(params, opciones) {
+  const o = opciones || {};
+  const inicio = await api.montarIniciar(params, o);
+  if (o.aviso) o.aviso('encargo enviado al montador…');
+
+  const limite = Date.now() + (o.tiempoMaximo || 90 * 60 * 1000);
+  let vuelta = 0;
+
+  while (Date.now() < limite) {
+    if (o.señal && o.señal.aborted) throw new Cancelado();
+    await esperar(vuelta === 0 ? 20000 : 15000);
+    vuelta++;
+    const est = await api.montarConsultar(
+      { operationName: inicio.operationName },
+      { señal: o.señal }
+    );
+    if (est.done) {
+      if (est.error) throw new Error(est.error);
+      return inicio.salida;
+    }
+    if (o.aviso) o.aviso('montando… ' + Math.round(vuelta * 15 / 60) + ' min');
+  }
+  throw new Error('El montaje tardó más de lo previsto. Mira las ejecuciones del ' +
+    'montador en Cloud Run: si terminó, el MP4 ya está en el bucket.');
+}
 
 /**
  * Narra un episodio entero de una vez y espera a que Cloud TTS lo escriba en

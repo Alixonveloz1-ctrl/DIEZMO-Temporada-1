@@ -649,6 +649,107 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Acción de voz larga desconocida: ' + accion });
     }
 
+    /* ════════ MONTAR — el episodio terminado, en el bucket ════════ */
+    /*  Juntar 134 fotogramas con su movimiento de cámara, los clips, la voz y
+        la música es trabajo de ffmpeg, y ffmpeg no cabe aquí: la función dura
+        un minuto y no lleva binario. Tampoco cabe en el navegador —dieciséis
+        minutos de 1080p tumban la pestaña del teléfono.
+
+        Lo hace un Cloud Run Job en el proyecto del usuario. Este modo escribe
+        el encargo en el bucket, lanza el Job y consulta la operación, igual
+        que con Veo. El contenedor no sabe nada de la cuenta: recibe las rutas
+        ya compuestas aquí, que es el único sitio donde viven los datos.      */
+    if (mode === 'montar') {
+      const accion = body.action || 'start';
+      const bucket = nombreBucket();
+      const job = process.env.MONTAJE_JOB || 'diezmo-montaje';
+      const region = process.env.MONTAJE_REGION || 'us-central1';
+
+      if (!bucket) {
+        return res.status(400).json({ error: 'El montaje trabaja sobre el bucket, y no hay bucket configurado.' });
+      }
+
+      if (accion === 'start') {
+        const ep = parseInt(body.episodio, 10);
+        if (!ep) return res.status(400).json({ error: 'Falta "episodio"' });
+        if (!body.hoja || !body.script || !Array.isArray(body.descargas)) {
+          return res.status(400).json({ error: 'Falta el encargo de montaje' });
+        }
+
+        const pad2 = String(ep).padStart(2, '0');
+        const carpeta = RAIZ + 'montaje/ep' + pad2;
+        const material = RAIZ + 'material/ep' + pad2;
+        const salida = RAIZ + 'material/ep' + pad2 + '/completo.mp4';
+
+        /*  La lista va como texto separado por tabuladores en vez de JSON: el
+            contenedor la lee con un bucle de shell y no necesita intérprete. */
+        const lista = body.descargas
+          .map((d) => 'gs://' + bucket + '/' + RAIZ + 'material/' + d.clave + '\t' + d.destino)
+          .join('\n');
+
+        await gcsSubir(token, bucket, carpeta + '/hoja.json',
+          Buffer.from(JSON.stringify(body.hoja)), 'application/json');
+        await gcsSubir(token, bucket, carpeta + '/montar.sh',
+          Buffer.from(String(body.script)), 'text/x-shellscript');
+        await gcsSubir(token, bucket, carpeta + '/descargas.txt',
+          Buffer.from(lista), 'text/plain');
+
+        const url = 'https://run.googleapis.com/v2/projects/' + project +
+          '/locations/' + region + '/jobs/' + job + ':run';
+        const out = await callVertex(url, token, {
+          overrides: {
+            containerOverrides: [{
+              env: [
+                { name: 'TRABAJO', value: 'gs://' + bucket + '/' + carpeta },
+                { name: 'PREFIJO', value: 'gs://' + bucket + '/' + material },
+                { name: 'SALIDA', value: 'gs://' + bucket + '/' + salida },
+              ],
+            }],
+          },
+        }, project);
+
+        if (!out.ok) {
+          const pista = out.status === 404
+            ? ' No se encuentra el montador: falta desplegarlo (ver montaje/DESPLIEGUE.md).'
+            : out.status === 403
+              ? ' La cuenta de servicio no tiene permiso para lanzar el montador.'
+              : '';
+          return res.status(out.status).json({
+            error: 'Montaje: inicio ' + out.status + '.' + pista,
+            detail: (out.raw || '').slice(0, 800),
+          });
+        }
+        return res.status(200).json({
+          operationName: (out.json && out.json.name) || '',
+          salida: cifrarRuta('gs://' + bucket + '/' + salida),
+        });
+      }
+
+      if (accion === 'poll') {
+        if (!body.operationName) return res.status(400).json({ error: 'Falta "operationName"' });
+        const url = 'https://run.googleapis.com/v2/' + String(body.operationName);
+        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        const raw = await r.text();
+        let j = null;
+        try { j = JSON.parse(raw); } catch (e) { /* respuesta no-JSON */ }
+        if (!r.ok) {
+          return res.status(r.status).json({ error: 'Montaje: consulta ' + r.status, detail: raw.slice(0, 800) });
+        }
+        j = j || {};
+        if (!j.done) return res.status(200).json({ done: false });
+        if (j.error) {
+          return res.status(200).json({
+            done: true,
+            error: (j.error.message || JSON.stringify(j.error)).slice(0, 500) +
+              ' — el registro completo está en Cloud Run, en las ejecuciones del montador.',
+          });
+        }
+        return res.status(200).json({ done: true });
+      }
+
+      return res.status(400).json({ error: 'Acción de montaje desconocida: ' + accion });
+    }
+
     /* ════════ TEXT — director de IA / JSON estructurado ════════ */
     if (mode === 'text') {
       if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });

@@ -4,7 +4,7 @@
 
 import { proyecto as store, assets, cuota, pedirPersistencia } from './db.js';
 import { nube, guardarPronto, vaciarCola, alGuardar } from './nube.js';
-import { api, crearWav, extraerPCM, b64aBytes } from './api.js';
+import { api, crearWav, extraerPCM, b64aBytes, bajarClip, montarEpisodio } from './api.js';
 import {
   limpiarTexto, tituloDe, segmentar, verificarCobertura,
   normalizarParaVoz, REEMPLAZOS_BASE,
@@ -24,7 +24,7 @@ import {
   VOCES_CHIRP, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO, nombreVozChirp, narraEpisodioEntero,
 } from './voz.js';
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
-import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
+import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargasDe, descargar, Zip } from './exportar.js';
 
 const $ = (id) => document.getElementById(id);
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -1965,6 +1965,57 @@ function cablear() {
 
   // Entrega
   $('selEpExport').addEventListener('change', (e) => { P.sel = Number(e.target.value); guardar(); pintarTodo(); });
+  /*  El entregable es el capítulo montado, no una bolsa de piezas: las piezas
+      sueltas ya están en el bucket y solo hacen falta si algo sale mal.     */
+  $('btnMontarEp').addEventListener('click', async () => {
+    const ep = epActual();
+    if (!ep) return;
+    const hoja = hojaDeMontaje(ep, P.config);
+    const sinVoz = hoja.tomas.filter((t) => !t.audio).length;
+    const sinImagen = hoja.tomas.filter((t) => !t.video && !t.imagen).length;
+    if (sinVoz || sinImagen) {
+      const seguir = confirm('Faltan piezas: ' + sinVoz + ' tomas sin voz y ' + sinImagen +
+        ' sin imagen ni clip. Esas tomas se omiten del montaje.\n\n¿Monto igualmente?');
+      if (!seguir) return;
+    }
+    jobMostrar('montaje');
+    estado('estadoExport', 'Enviando el encargo al montador…', 'info');
+    try {
+      const ref = await montarEpisodio({
+        episodio: ep.num,
+        hoja,
+        script: scriptFfmpeg(hoja),
+        descargas: descargasDe(ep, hoja),
+      }, {
+        aviso: (m) => { jobAvance(0, 0, m); estado('estadoExport', m, 'info'); },
+      });
+      P.episodios.find((x) => x.num === ep.num).montaje = { ok: true, ref, ts: Date.now() };
+      await guardar();
+      estado('estadoExport', 'Episodio montado. Pulsa «Descargar el último montaje».', 'ok');
+      aviso('El episodio ' + ep.num + ' está montado y guardado en el bucket.', 'ok', 9000);
+    } catch (e) {
+      estado('estadoExport', 'El montaje falló: ' + e.message, 'err');
+    }
+    jobOcultar();
+    pintarTodo();
+  });
+
+  $('btnBajarEp').addEventListener('click', async () => {
+    const ep = epActual();
+    if (!ep || !ep.montaje || !ep.montaje.ok) {
+      estado('estadoExport', 'Este episodio todavía no está montado.', 'err');
+      return;
+    }
+    estado('estadoExport', 'Trayendo el episodio del bucket…', 'info');
+    try {
+      const blob = await bajarClip(ep.montaje.ref);
+      descargar(blob, 'DIEZMO-EP' + pad2(ep.num) + '.mp4');
+      estado('estadoExport', 'Descargado: ' + (blob.size / 1048576).toFixed(0) + ' MB', 'ok');
+    } catch (e) {
+      estado('estadoExport', 'No se pudo descargar: ' + e.message, 'err');
+    }
+  });
+
   $('btnExportEp').addEventListener('click', async () => {
     const ep = epActual();
     if (!ep) return;

@@ -517,14 +517,115 @@ if (!/await rehidratar\(remoto\);[\s\S]{0,320}pintarConfig\(\)/.test(mainM)) {
     'abrir Ajustes y guardar subiría al bucket los valores locales viejos sin tocar nada');
 } else ok('recuperar de la nube repinta los mandos antes de que nadie pueda guardarlos');
 
+/* ── 5b-quater · El episodio se entrega montado ─────────────── */
+titulo('MONTAJE EN LA NUBE');
+const { limpiarTexto: lt2, segmentar: sg2 } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
+const backM = leer('api/ep-gemini.js');
+const contenedor = leer('montaje/montar.sh');
+
+/*  El contenedor se despliega copiándolo a mano en la consola del usuario, que
+    tiene varias cuentas. Si llevara escrito un bucket o un proyecto, acabaría
+    apuntando a la cuenta equivocada. No debe llevar NINGUNO: todo llega en las
+    tres rutas que compone el backend, que es donde viven los datos.         */
+if (!/gs:\/\//.test(contenedor) === false && /gs:\/\/[a-z0-9]/i.test(contenedor)) {
+  mal('el montador lleva una ruta de bucket escrita', 'apuntaría a la cuenta equivocada');
+} else if (/TRABAJO|SALIDA/.test(contenedor) === false) {
+  mal('el montador no recibe las rutas por variables de entorno');
+} else ok('el montador no lleva escrito ningún dato de la cuenta: todo llega en tres rutas');
+
+if (!/mode === 'montar'/.test(backM)) {
+  mal('no existe el modo de montaje');
+} else if (!/jobs\/' \+ job \+ ':run'/.test(backM)) {
+  mal('el montaje no lanza el Cloud Run Job');
+} else if (!/MONTAJE_JOB|MONTAJE_REGION/.test(backM)) {
+  mal('el nombre y la región del montador están escritos a fuego, no en variables');
+} else ok('el backend escribe el encargo en el bucket y lanza el Job, y consulta como con Veo');
+
+/*  El montador se despliega copiando a mano el texto de DESPLIEGUE.md. Si ese
+    texto se queda atrás respecto al archivo real, lo desplegado NO es lo
+    auditado y nadie se entera hasta que el montaje falla en la nube.        */
+{
+  const doc = leer('montaje/DESPLIEGUE.md');
+  const desnudo = (t) => t.split('\n')
+    .filter((l) => !l.trim().startsWith('#') || l.startsWith('#!'))
+    .map((l) => l.trimEnd()).join('\n').replace(/\n{2,}/g, '\n').trim();
+  const citado = (marca) => {
+    const i = doc.indexOf(marca);
+    if (i < 0) return null;
+    const j = doc.indexOf('> ```', i + marca.length);
+    if (j < 0) return null;
+    return desnudo(doc.slice(doc.indexOf('\n', i) + 1, j).split('\n')
+      .map((l) => (l.startsWith('> ') ? l.slice(2) : (l.trim() === '>' ? '' : l))).join('\n'));
+  };
+  const pares = [
+    ['montaje/montar.sh', citado('```bash\n> #!/bin/bash')],
+    ['montaje/Dockerfile', citado('```dockerfile')],
+  ];
+  const desfasados = pares.filter(([f, c]) => c === null || c !== desnudo(leer(f)));
+  if (desfasados.length) {
+    mal('el texto que se pega en la consola ya no coincide con ' +
+      desfasados.map(([f]) => f).join(' y '),
+      'se desplegaría un montador distinto del que se ha comprobado aquí');
+  } else ok('lo que se pega en la consola es exactamente el montador auditado');
+}
+
+/*  LA INVARIANTE QUE IMPORTA: cada archivo que el script de ffmpeg abre tiene
+    que estar en la lista de descargas. Si falta uno, el fallo aparece en la
+    nube después de minutos de trabajo, y el mensaje de ffmpeg no dice cuál. */
+{
+  const { hojaDeMontaje: hdm, scriptFfmpeg: sff, descargasDe: dds } =
+    await import(pathToFileURL(path.join(raiz, 'app', 'exportar.js')).href);
+  const tomasEp = sg2(lt2(leer('episodios/ep01.md')), { segundosPorToma: 8, cps: 16 })
+    .map((t, k) => ({
+      ...t,
+      audio: { ok: true },
+      imagen: { ok: true },
+      // Una de cada cinco con clip, y una reutilizando el fotograma de otra:
+      // los dos casos que rompen una lista escrita aparte.
+      video: k % 5 === 0 ? { ok: true, dur: 8 } : null,
+      reusa: k === 7 ? 'ep01/t003/img' : undefined,
+      plano: { tipo: k % 5 === 0 ? 'movimiento' : 'fijo', movimiento: 'travelling de acercamiento lento' },
+    }));
+  const epF = { num: 1, titulo: 'Prueba', tomas: tomasEp, musica: { 1: { ok: true }, 2: { ok: true } } };
+  const hojaF = hdm(epF, { formato: '16:9', intensidadCamara: 1, volumenMusica: 0.3 });
+  const guion = sff(hojaF);
+  const dan = new Set(dds(epF, hojaF).map((d) => d.destino));
+
+  // Lo que el script CREA por su cuenta no hace falta bajarlo.
+  const creados = /^(segmentos|musica\/lecho)\//;
+  const pedidos = new Set();
+  for (const m of guion.matchAll(/-i "([^"]+)"/g)) {
+    if (!creados.test(m[1]) && !/^(lista|listamus)/.test(m[1]) && m[1].indexOf('=') === -1) {
+      pedidos.add(m[1]);
+    }
+  }
+  const huecos = [...pedidos].filter((p) => !dan.has(p));
+  /*  Y un fotograma reutilizado tiene que pedirse desde SU maestro. Si se pide
+      desde la clave de la propia toma, la lista sale completa y el montaje
+      falla en la nube por un archivo que no existe.                         */
+  const lista = dds(epF, hojaF);
+  const reusada = lista.find((d) => d.destino === 'fotogramas/toma-008.png');
+  if (!pedidos.size) {
+    mal('no se ha podido leer qué archivos pide el script de montaje');
+  } else if (!reusada || reusada.clave !== 'ep01/t003/img') {
+    mal('un fotograma reutilizado no se pide desde el suyo',
+      'se pediría ' + (reusada ? reusada.clave : 'nada') + ', que no existe en el bucket');
+  } else if (huecos.length) {
+    mal(huecos.length + ' archivos que pide ffmpeg no están en la lista de descargas',
+      huecos.slice(0, 4).join(' · '));
+  } else {
+    ok('los ' + pedidos.size + ' archivos que pide ffmpeg —con clips y fotogramas ' +
+       'reutilizados— están todos en la lista de descargas');
+  }
+}
+
 /* ── 5b-ter · Una locución por episodio ─────────────────────── */
 titulo('VOZ DE EPISODIO ENTERO');
 const pipeVL = leer('app/pipeline.js');
 const backVL = leer('api/ep-gemini.js');
 const { VOCES_CHIRP, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO, cortarEscena } =
   await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
-const { limpiarTexto: lt2, segmentar: sg2 } =
-  await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
 
 /*  El motor por bloques nunca podrá dar el mismo narrador quince minutos
     seguidos: cada llamada es una actuación nueva. El de episodio entero sí,
@@ -1198,9 +1299,20 @@ const recorrer = (dir) => {
     if (!/\.(js|mjs|html|json|md)$/.test(e.name)) continue;
     if (rel.endsWith('auditar.mjs')) continue;          // este archivo define los patrones
     const txt = fs.readFileSync(path.join(raiz, rel), 'utf8');
-    for (const p of patrones) {
-      if (p.test(txt) && !/censor|redact|oculto|nombreBucket|gs:\/\/mi-|gs:\/\/diezmo-video|gs:\/\/«/.test(txt.split('\n').find((l) => p.test(l)) || '')) {
-        sucio.push(rel + ' → ' + (txt.split('\n').find((l) => p.test(l)) || '').trim().slice(0, 70));
+    /*  Se examina CADA línea que coincide, no solo la primera. Mirando solo la
+        primera, una línea eximida —una plantilla, un ejemplo— tapaba todas las
+        demás del archivo: se coló una cuenta de servicio real detrás de un
+        ejemplo y la auditoría dio limpio.                                    */
+    for (const linea of txt.split('\n')) {
+      for (const p of patrones) {
+        if (!p.test(linea)) continue;
+        /*  Una dirección cuyo usuario sale de una variable de shell no es una
+            dirección: es una plantilla que se rellena en la máquina del
+            usuario. Se exime esa forma concreta, no el patrón: un correo de
+            verdad nunca empieza por «$».                                     */
+        if (/\$\{?\w+\}?[^@\s"']*@/.test(linea)) continue;
+        if (/censor|redact|oculto|nombreBucket|gs:\/\/mi-|gs:\/\/diezmo-video|gs:\/\/«/.test(linea)) continue;
+        sucio.push(rel + ' → ' + linea.trim().slice(0, 70));
       }
     }
   }

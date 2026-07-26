@@ -934,9 +934,11 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     <h2>Exportar</h2>
     <div class="campo"><select id="selEpExport"></select></div>
     <div class="fila-btn">
-      <button class="btn primario" id="btnExportEp">Exportar episodio (.zip)</button>
+      <button class="btn primario" id="btnMontarEp">Montar el episodio (.mp4)</button>
+      <button class="btn" id="btnBajarEp">Descargar el último montaje</button>
       <button class="btn" id="btnExportAudio">Solo la voz (.wav)</button>
       <button class="btn" id="btnExportGuion">Solo el guion técnico</button>
+      <button class="btn fantasma" id="btnExportEp">Descargar las piezas sueltas (.zip)</button>
     </div>
     <div class="estado" id="estadoExport"></div>
     <p class="nota">El .zip trae los fotogramas, los clips, las voces, la hoja de montaje, el guion técnico y un <code>montar.sh</code> que arma el episodio con ffmpeg en un comando.</p>

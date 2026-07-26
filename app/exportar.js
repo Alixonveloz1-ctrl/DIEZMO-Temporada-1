@@ -286,6 +286,34 @@ export function scriptFfmpeg(hoja) {
   return L.join('\n');
 }
 
+/* ── Encargo de montaje para el montador de la nube ─────────── */
+
+/**
+ * Qué archivo del bucket va a qué sitio del montaje.
+ *
+ * Sale de la MISMA hoja que usa el script de ffmpeg, así que los nombres no
+ * pueden discrepar: si la hoja dice «fotogramas/toma-007.png», aquí se dice
+ * de dónde sale ese archivo, y no hay una segunda lista que mantener.
+ */
+export function descargasDe(ep, hoja) {
+  const fuera = [];
+  const mete = (clave, destino) => { if (clave && destino) fuera.push({ clave, destino }); };
+
+  hoja.tomas.forEach((t, k) => {
+    const toma = ep.tomas[k];
+    if (!toma) return;
+    if (t.imagen) mete(claveImagenDe(ep.num, toma), t.imagen);
+    if (t.video) mete(claveVideoDe(ep.num, toma), t.video);
+    if (t.audio) mete(clave.audio(ep.num, toma.i), t.audio);
+  });
+  for (const e of hoja.escenas || []) {
+    if (e.musica) mete(clave.musica(ep.num, e.escena), e.musica);
+  }
+  // Un fotograma reutilizado aparece en varias tomas: se baja una vez y se
+  // copia, pero la lista lo pide en cada destino porque los nombres difieren.
+  return fuera;
+}
+
 /* ── Exportación completa de un episodio ────────────────────── */
 
 export async function exportarEpisodio(ep, cfg, progreso) {

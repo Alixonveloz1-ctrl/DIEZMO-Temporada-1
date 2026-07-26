@@ -45,9 +45,17 @@ export const nube = {
   async listar() {
     const r = await pedir({ action: 'listar' });
     const j = await r.json();
+    // Se guarda la fecha además del tamaño: permite saber si la copia local
+    // es más vieja que la del bucket y hay que traérsela otra vez.
     const mapa = new Map();
-    for (const it of (j.material || [])) mapa.set(it.clave, it.bytes);
+    for (const it of (j.material || [])) mapa.set(it.clave, { bytes: it.bytes, ts: it.ts || 0 });
     return mapa;
+  },
+
+  /** Sube al bucket algo que se terminó de montar en el navegador. */
+  async subir(clave, datos, mime) {
+    const r = await pedir({ action: 'subir', clave, datos, mime });
+    return (await r.json()).guardado === true;
   },
 
   /** Trae un archivo del bucket como Blob. */

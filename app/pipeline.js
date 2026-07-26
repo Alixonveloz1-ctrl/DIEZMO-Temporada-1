@@ -259,7 +259,16 @@ export class Motor {
           const blob = crearWav(partes, ex.rate);
           const dur = partes.reduce((a, p) => a + p.length, 0) / 2 / ex.rate;
 
-          await assets.guardar(clave.audio(ep.num, t.i), blob, { ep: ep.num, toma: t.i, dur });
+          const kAudio = clave.audio(ep.num, t.i);
+          await assets.guardar(kAudio, blob, { ep: ep.num, toma: t.i, dur });
+          /*  La voz se termina de montar aquí —se le añade el silencio del corte
+              de escena—, así que el archivo bueno solo existe en el navegador.
+              Si no se sube, el trabajo vive en una sola máquina y se pierde en
+              cuanto el proyecto se recupere en otro sitio.                     */
+          if (nube.disponible) {
+            try { await nube.subir(kAudio, await blobAb64(blob), 'audio/wav'); }
+            catch (e) { this._log('la voz de la toma ' + (t.i + 1) + ' no se pudo subir al bucket', 'aviso'); }
+          }
           t.audio = { ok: true, dur: +dur.toFixed(2), rate: ex.rate };
           t.segundos = +dur.toFixed(2);
         } catch (e) {
@@ -434,8 +443,14 @@ export class Motor {
       }, { señal: this.señal, aviso: (m) => this._log('toma ' + (t.i + 1) + ': ' + m) });
 
       if (r.video) {
-        await assets.guardar(clave.video(ep.num, t.i), b64toBlob(r.video, r.mimeType || 'video/mp4'),
+        const kVid = clave.video(ep.num, t.i);
+        await assets.guardar(kVid, b64toBlob(r.video, r.mimeType || 'video/mp4'),
           { ep: ep.num, toma: t.i });
+        // Veo lo devolvió en línea, así que nadie lo ha archivado todavía.
+        if (nube.disponible) {
+          try { await nube.subir(kVid, r.video, r.mimeType || 'video/mp4'); }
+          catch (e) { this._log('el clip de la toma ' + (t.i + 1) + ' no se pudo subir al bucket', 'aviso'); }
+        }
         t.video = { ok: true, dur, local: true };
       } else if (r.clip) {
         // El clip se archiva en el bucket bajo su clave y se trae una copia local.

@@ -231,13 +231,19 @@ async function gcsListar(token, bucket, prefijo) {
   let pageToken = '';
   for (let p = 0; p < 40; p++) {
     const u = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
-      '/o?prefix=' + encodeURIComponent(prefijo) + '&maxResults=1000&fields=items(name,size),nextPageToken' +
+      '/o?prefix=' + encodeURIComponent(prefijo) + '&maxResults=1000&fields=items(name,size,updated),nextPageToken' +
       (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : '');
     const r = await fetch(u, { headers: { Authorization: 'Bearer ' + token } });
     if (!r.ok) throw new Error('No se pudo listar el almacén (' + r.status + ')');
     const j = await r.json();
     for (const it of (j.items || [])) {
-      salida.push({ clave: String(it.name).slice(prefijo.length), bytes: Number(it.size) || 0 });
+      salida.push({
+        clave: String(it.name).slice(prefijo.length),
+        bytes: Number(it.size) || 0,
+        // Fecha de la última escritura: sirve para saber cuál es la generación
+        // más reciente cuando el navegador tiene una copia vieja.
+        ts: it.updated ? Date.parse(it.updated) || 0 : 0,
+      });
     }
     pageToken = j.nextPageToken || '';
     if (!pageToken) break;
@@ -802,6 +808,15 @@ module.exports = async (req, res) => {
 
       if (accion === 'listar') {
         return res.status(200).json({ material: await gcsListar(token, bucket, RAIZ + 'material/') });
+      }
+
+      if (accion === 'subir') {
+        // La voz se termina de montar en el navegador —se le añade el silencio
+        // del corte de escena—, así que el archivo bueno solo existe allí.
+        if (!body.clave || !body.datos) return res.status(400).json({ error: 'Faltan clave o datos' });
+        const guardado = await archivar(token, body.clave, String(body.datos),
+          body.mime || 'application/octet-stream');
+        return res.status(200).json({ guardado: !!guardado });
       }
 
       if (accion === 'leer') {

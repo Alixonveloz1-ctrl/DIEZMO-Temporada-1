@@ -1888,6 +1888,21 @@ async function recuperarDeNube() {
     const inventario = await nube.listar();
     if (inventario.size) {
       let recuperados = 0;
+
+      /*  El bucket es la verdad. Si una copia local es más VIEJA que la del
+          bucket, es que se regeneró desde otro sitio: se tira la local para
+          que la próxima lectura traiga la buena. Siempre gana la más reciente. */
+      let refrescados = 0;
+      for (const [k, info] of inventario) {
+        if (!info || !info.ts) continue;
+        const local = await assets.leer(k).catch(() => null);
+        if (local && local.ts && info.ts > local.ts + 2000) {
+          await assets.borrar(k).catch(() => {});
+          refrescados++;
+        }
+      }
+      if (refrescados) log(refrescados + ' archivos tenían una versión más nueva en la nube', 'ok');
+
       for (const ep of P.episodios) {
         for (const t of ep.tomas) {
           if (!(t.audio && t.audio.ok) && inventario.has(clave.audio(ep.num, t.i))) {
@@ -1898,6 +1913,14 @@ async function recuperarDeNube() {
           }
           if (!t.reusaVideo && !(t.video && t.video.ok) && inventario.has(clave.video(ep.num, t.i))) {
             t.video = { ok: true, local: false }; recuperados++;
+          }
+        }
+        // La música iba por escena y no se recuperaba: aparecía como no generada
+        // aunque estuviera en el bucket.
+        ep.musica = ep.musica || {};
+        for (const esc of new Set(ep.tomas.map((t) => t.escena))) {
+          if (!(ep.musica[esc] && ep.musica[esc].ok) && inventario.has(clave.musica(ep.num, esc))) {
+            ep.musica[esc] = { ok: true }; recuperados++;
           }
         }
       }

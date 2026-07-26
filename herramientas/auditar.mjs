@@ -488,6 +488,47 @@ if (olvidados.length) {
     'se perdería al recuperar el proyecto en otro aparato');
 } else ok('el estado guardado lleva plano, voz, imagen, clip, música y reutilizaciones');
 
+/* ── 5d-ter · Todo lo generado acaba en el bucket ──────────── */
+titulo('TODO EN LA NUBE');
+const pl3 = leer('app/pipeline.js');
+const backend3 = leer('api/ep-gemini.js');
+
+// Cada fase tiene que dejar su archivo en el bucket, por una vía o por otra.
+const archiva = {
+  'hojas de personaje': /generarReferencias[\s\S]*?guardarComo: k/.test(pl3),
+  'fondos de lugar': /generarFondos[\s\S]*?guardarComo: k/.test(pl3),
+  'voz': /nube\.subir\(kAudio/.test(pl3),
+  'fotogramas': /guardarComo: clave\.imagen/.test(pl3),
+  'música': /generarMusica[\s\S]*?guardarComo: k/.test(pl3),
+  'clips de Veo': /archivarClip/.test(pl3) && /nube\.subir\(kVid/.test(pl3),
+};
+const huecos = Object.keys(archiva).filter((k) => !archiva[k]);
+if (huecos.length) {
+  mal('no llega al bucket: ' + huecos.join(', '),
+    'ese trabajo viviría solo en este navegador y se perdería al recuperar el proyecto');
+} else ok('las seis clases de material se archivan en el bucket');
+
+if (!/accion === 'subir'/.test(backend3)) mal('el backend no admite subir lo montado en el navegador');
+else ok('el backend admite subir lo que se termina de montar en el cliente');
+
+// Y todo lo del bucket tiene que poder volver.
+const mainN = leer('app/main.js');
+const iInv = mainN.indexOf('if (inventario.size)');
+const recupera = mainN.slice(iInv, mainN.indexOf('for (const per of P.elenco)', iInv));
+const clases = ['clave.audio', 'clave.imagen', 'clave.video', 'clave.musica'];
+const sinRecuperar = clases.filter((c) => !recupera.includes(c));
+if (sinRecuperar.length) {
+  mal('el inventario del bucket no recupera ' + sinRecuperar.join(', '),
+    'aparecería como no generado aunque esté guardado');
+} else ok('voz, fotogramas, clips y música se recuperan del inventario del bucket');
+
+// La generación más reciente gana.
+if (!/info\.ts > local\.ts/.test(mainN)) {
+  mal('una copia local vieja puede tapar una regeneración más nueva de la nube');
+} else if (!/ts: it\.updated/.test(backend3)) {
+  mal('el inventario no trae la fecha de cada archivo');
+} else ok('si la copia del bucket es más nueva, se tira la local y se vuelve a traer');
+
 /* ── 5e-bis · El almacén local se recupera solo ────────────── */
 titulo('ALMACÉN LOCAL');
 const dbJs = leer('app/db.js');

@@ -5,6 +5,8 @@
    el punto de partida, sacado de los doce guiones de la temporada.
    ============================================================ */
 
+import { aplicarTono, SEMILLA_FIJA } from './voz.js';
+
 export const ESTILO_DEFECTO =
   'Anime japonés contemporáneo de alta gama, del estilo que se produce hoy. Dibujo 2D ' +
   'íntegramente a mano, animación tradicional en digital: nada de 3D, nada de CGI, nada de ' +
@@ -458,6 +460,48 @@ export const CONFIG_DEFECTO = {
   // y el audio, y sale de la tarifa oficial en app/veo.js.
   precios: { imagen: 0.15, vozMil: 0.012, episodio: 0.25 },
 };
+
+/*  EL ÚNICO SITIO QUE DECIDE QUÉ GANA, si lo guardado o el repositorio.
+
+    Había dos: cargar() fusionaba y reparaba, y rehidratar() —la recuperación
+    desde el bucket— volvía a fusionar sin reparar nada. Como el proyecto vive
+    en Google Cloud y se recupera en CADA arranque, la segunda pisaba siempre a
+    la primera: la semilla fija que se arregló ayer duraba unos milisegundos y
+    volvía a quedarse vacía, con la voz sorteando el tono en cada llamada. Una
+    reparación que solo se escribe en un camino no llega nunca.               */
+export function normalizarConfig(guardada) {
+  const previa = guardada || {};
+  const c = { ...CONFIG_DEFECTO, ...previa };
+
+  /*  precios es un objeto anidado: la fusión superficial lo sustituye ENTERO,
+      así que una clave nueva dentro de precios no llegaría jamás a un proyecto
+      ya guardado. Es el único campo con esa forma.                           */
+  c.precios = { ...CONFIG_DEFECTO.precios, ...(previa.precios || {}) };
+
+  /*  El tono fija voz, temperatura e instrucción, y se reaplica por si se
+      afinó desde la última vez. Pero solo si la configuración guardada YA
+      traía la clave: un proyecto anterior a los tonos no la tiene, y darle el
+      tono por defecto le borraría la voz que hubiera elegido a mano. En ese
+      caso se marca como personalizado, que es la verdad.                     */
+  if (Object.prototype.hasOwnProperty.call(previa, 'tono')) {
+    if (c.tono) aplicarTono(c, c.tono);
+  } else if (previa.voz || previa.instruccionVoz) {
+    c.tono = null;
+  } else if (c.tono) {
+    aplicarTono(c, c.tono);
+  }
+
+  /*  Semilla vacía significaba «aleatoria». Ya no es una opción válida: con
+      una llamada por bloque eso son trescientos sorteos por temporada, y parte
+      de la variación de tono que se oye entre tomas venía de ahí. null entra
+      aquí a propósito: Number(null) es 0, que es finito, así que la guarda de
+      aplicarTono lo dejaba pasar y acababa mandándose semilla 0.             */
+  if (c.semillaVoz === '' || c.semillaVoz === null || c.semillaVoz === undefined ||
+      !isFinite(Number(c.semillaVoz))) {
+    c.semillaVoz = SEMILLA_FIJA;
+  }
+  return c;
+}
 
 export const VOCES = [
   ['Charon', 'grave, informativa (recomendada para el narrador)'],

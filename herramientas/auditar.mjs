@@ -472,33 +472,130 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
 
+/* ── 5b-bis · Lo que enseña el desplegable es lo que se usa ── */
+titulo('MODELOS GUARDADOS');
+const mainM = leer('app/main.js');
+
+/*  Un modelo guardado puede haber salido del catálogo. llenarSelect corregía el
+    DESPLEGABLE y dejaba el nombre muerto en la configuración: se veía un modelo
+    y el motor pedía otro. Con el de imagen era peor, porque RESOLUCIONES no
+    encontraba lista para el modelo desconocido, caía a la del modelo de 1K y
+    esa caída SÍ se guardaba: la resolución quedaba degradada para siempre.   */
+if (!/function llenarSelect\(sel, pares, valor, preferido\)/.test(mainM) ||
+    !/return sel\.value;/.test(mainM)) {
+  mal('llenarSelect no devuelve el valor que ha quedado seleccionado',
+    'la corrección se queda en pantalla y la configuración conserva el modelo muerto');
+} else {
+  const cuerpo = mainM.slice(mainM.indexOf('function poblarModelos()'),
+    mainM.indexOf('function pintarNotasModelo()'));
+  const escritos = ['modeloTts', 'modeloTexto', 'modeloImagen', 'modeloVideo',
+                    'modeloMusica', 'imageSize']
+    .filter((k) => new RegExp('P\\.config\\.' + k + ' = llenarSelect\\(').test(cuerpo));
+  if (escritos.length !== 6) {
+    mal('hay modelos cuya corrección no se escribe en la configuración',
+      'solo se escriben: ' + (escritos.join(', ') || 'ninguno'));
+  } else if (!/RESOLUCIONES\[P\.config\.modeloImagen\] \|\| RESOLUCIONES\[C\.modeloImagen\]/.test(cuerpo)) {
+    mal('la lista de resoluciones cae a un modelo escrito a mano',
+      'con el modelo de 1K de respaldo, la resolución se degradaba y se guardaba');
+  } else if (!/ya no está disponible/.test(cuerpo)) {
+    mal('cambiar un modelo por su cuenta no se avisa', 'cambia lo que cuesta y lo que sale');
+  } else ok('los seis desplegables escriben su corrección en la configuración, y se avisa del cambio');
+}
+
+// El de voz era el único sin fijar al cambiar, y poblarModelos lo repintaba encima.
+if (!/\$\('cfgModeloTts'\)\.addEventListener\('change'/.test(mainM)) {
+  mal('el modelo de voz no se fija al cambiarlo',
+    'cambiar el de imagen repinta los desplegables y se perdía la elección sin avisar');
+} else if (/c\.modelo(Tts|Imagen|Video|Texto) = \$\(/.test(mainM)) {
+  mal('«Guardar ajustes» vuelve a leer los modelos de la pantalla',
+    'es el camino por el que podía volver un valor viejo');
+} else ok('los cinco modelos se fijan al cambiarlos, y guardar no los relee de la pantalla');
+
+// Tras recuperar de la nube hay que repintar, o «Guardar» sube lo viejo.
+if (!/await rehidratar\(remoto\);[\s\S]{0,320}pintarConfig\(\)/.test(mainM)) {
+  mal('tras recuperar el proyecto de la nube no se repintan los mandos',
+    'abrir Ajustes y guardar subiría al bucket los valores locales viejos sin tocar nada');
+} else ok('recuperar de la nube repinta los mandos antes de que nadie pueda guardarlos');
+
 /* ── 5c-pre · La semilla no se teclea y llega a lo guardado ── */
 titulo('SEMILLA DE VOZ');
 const { SEMILLA_FIJA, aplicarTono: aplT } =
   await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
 const mainS = leer('app/main.js');
 
-// Cambiar CONFIG_DEFECTO no basta: lo guardado gana. Hace falta reparación.
-if (!/P\.config\.semillaVoz = SEMILLA_FIJA/.test(mainS)) {
-  mal('la semilla fija no llega a un proyecto ya guardado',
-    'lo guardado gana sobre CONFIG_DEFECTO: cambiar el valor por defecto no es suficiente');
-} else {
-  const viejo = { tono: null, semillaVoz: '' };
-  const reparado = { ...viejo };
-  if (reparado.semillaVoz === '' || !isFinite(Number(reparado.semillaVoz))) reparado.semillaVoz = SEMILLA_FIJA;
-  if (!Number.isFinite(Number(reparado.semillaVoz))) mal('la reparación de la semilla no produce un número');
-  else ok('un proyecto guardado con semilla aleatoria queda reparado a ' + SEMILLA_FIJA);
+/*  Cambiar CONFIG_DEFECTO no basta: lo guardado gana. Y no basta con reparar en
+    un sitio, porque hay dos caminos que construyen la configuración —el
+    navegador y la recuperación desde el bucket— y el segundo se ejecuta en cada
+    arranque, después del primero. Se comprueba ejecutando la reparación, no
+    buscando una línea: una línea se mueve, el comportamiento no.             */
+const { normalizarConfig: normCfg, CONFIG_DEFECTO } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'biblia.js')).href);
+
+const semillasMalas = [['vacía', ''], ['nula', null], ['ausente', undefined],
+                       ['con texto', 'aleatoria'], ['NaN', NaN]];
+/*  Con tono elegido, aplicarTono ya pone la semilla. Sin tono —voz ajustada a
+    mano— no la pone nadie, y ese es justo el caso que hay que reparar aquí.  */
+const contextos = [['con tono', { tono: 'narrador' }], ['con la voz a mano', { tono: null, voz: 'Puck' }],
+                   ['anterior a los tonos', { voz: 'Puck' }]];
+const noReparadas = [];
+for (const [ctx, base] of contextos) {
+  for (const [nombre, v] of semillasMalas) {
+    const s = Number(normCfg({ ...base, semillaVoz: v }).semillaVoz);
+    if (!Number.isFinite(s) || s === 0) noReparadas.push(nombre + ' ' + ctx);
+  }
 }
+if (noReparadas.length) {
+  mal('la semilla no queda reparada: ' + noReparadas.join(', '),
+    'sin semilla fija el modelo sortea el tono en cada llamada');
+} else if (Number(normCfg({ semillaVoz: 12345, tono: 'narrador' }).semillaVoz) !== 12345) {
+  mal('la reparación pisa una semilla que el usuario ya tenía puesta');
+} else ok('cinco formas de semilla inválida quedan reparadas a ' + SEMILLA_FIJA + ', y la buena se respeta');
+
+/*  Y la reparación tiene que estar en el ÚNICO sitio que construye la
+    configuración: si vuelve a haber dos, el segundo deshace al primero.     */
+const fusiones = (mainS.match(/\{\s*\.\.\.CONFIG_DEFECTO\s*,\s*\.\.\./g) || []).length;
+const usosNorm = (mainS.match(/normalizarConfig\(/g) || []).length;
+if (fusiones) {
+  mal(fusiones + ' sitios fusionan CONFIG_DEFECTO por su cuenta',
+    'el que se ejecute último gana, y se salta las reparaciones');
+} else if (usosNorm < 3) {
+  mal('no todos los caminos pasan por normalizarConfig', 'hay ' + usosNorm + ', hacen falta 3: nuevo, guardado y nube');
+} else ok('los tres caminos —proyecto nuevo, copia local y bucket— pasan por la misma reparación');
+
+// El precio nuevo dentro de precios llega, aunque el proyecto guardara los viejos.
+const conPrecios = normCfg({ precios: { imagen: 0.9 } });
+if (Object.keys(CONFIG_DEFECTO.precios).some((k) => conPrecios.precios[k] === undefined)) {
+  mal('una clave nueva de precios no llega a un proyecto ya guardado',
+    'precios es un objeto anidado: la fusión superficial lo sustituye entero');
+} else if (conPrecios.precios.imagen !== 0.9) {
+  mal('la fusión de precios pisa lo que el usuario había puesto');
+} else ok('precios se fusiona clave a clave: lo nuevo llega y lo tuyo se queda');
+
+// Un proyecto anterior a los tonos no puede perder la voz que eligiera a mano.
+const antiguo = normCfg({ voz: 'Puck', temperaturaVoz: 0.5 });
+if (antiguo.voz !== 'Puck') {
+  mal('a un proyecto anterior a los tonos se le borra la voz elegida a mano',
+    'se le mete el tono por defecto y aplicarTono machaca voz, temperatura e instrucción');
+} else if (antiguo.tono) {
+  mal('un proyecto sin tono aparece como si tuviera uno', 'el selector diría «narrador» con otra voz puesta');
+} else ok('un proyecto anterior a los tonos conserva su voz y sale como personalizado');
 
 // Aplicar un tono no puede pisar una semilla que ya estaba puesta.
 const conSemilla = { semillaVoz: 12345 };
 aplT(conSemilla, 'narrador');
 if (Number(conSemilla.semillaVoz) !== 12345) mal('cambiar de tono pisa la semilla del usuario');
 else {
-  const sinSemilla = { semillaVoz: '' };
-  aplT(sinSemilla, 'narrador');
-  if (!Number.isFinite(Number(sinSemilla.semillaVoz))) mal('aplicar un tono deja la semilla sin poner');
-  else ok('el tono pone semilla si falta y respeta la que ya hubiera');
+  /*  null va aparte de vacío y de ausente: Number(null) es 0, que es finito, y
+      la guarda lo daba por válido. Se acababa mandando semilla 0.            */
+  const sinPoner = [['vacía', ''], ['nula', null], ['ausente', undefined]]
+    .filter(([, v]) => {
+      const c = { semillaVoz: v };
+      aplT(c, 'narrador');
+      return !Number.isFinite(Number(c.semillaVoz)) || Number(c.semillaVoz) === 0;
+    });
+  if (sinPoner.length) {
+    mal('aplicar un tono deja la semilla sin poner: ' + sinPoner.map((x) => x[0]).join(', '));
+  } else ok('el tono pone semilla si falta —vacía, nula o ausente— y respeta la que ya hubiera');
 }
 
 // Y no puede haber un campo donde el usuario tenga que inventarse un número.
@@ -660,7 +757,7 @@ if (!/RIFF'\)\s*\{[\s\S]{0,80}slice\(44\)/.test(back4)) {
 titulo('TONOS DE VOZ');
 const { TONOS, tonoPorId, aplicarTono, coincideConTono } =
   await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
-const { VOCES, CONFIG_DEFECTO } = await import(pathToFileURL(path.join(raiz, 'app', 'biblia.js')).href);
+const { VOCES } = await import(pathToFileURL(path.join(raiz, 'app', 'biblia.js')).href);
 
 const vocesValidas = new Set(VOCES.map((v) => v[0]));
 const tonoMalo = TONOS.filter((t) => !vocesValidas.has(t.voz));
@@ -689,7 +786,8 @@ else {
 }
 
 // Y al cargar el proyecto el tono se reaplica, para que afinarlo llegue al usuario.
-if (!/if \(P\.config\.tono\) aplicarTono\(P\.config, P\.config\.tono\);/.test(leer('app/main.js'))) {
+const afinado = normCfg({ tono: 'grave', voz: 'Puck', temperaturaVoz: 0.1, instruccionVoz: 'vieja' });
+if (afinado.voz !== tonoPorId('grave').voz || !coincideConTono(afinado)) {
   mal('el tono no se reaplica al cargar', 'afinar un tono no llegaría a los proyectos ya guardados');
 } else ok('el tono se reaplica al abrir, salvo que se haya ajustado a mano');
 

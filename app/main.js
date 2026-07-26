@@ -12,7 +12,7 @@ import {
 import {
   CONFIG_DEFECTO, ELENCO_DEFECTO, LUGARES_DEFECTO, VOCES, IDIOMAS,
   ESTILO_DEFECTO, NEGATIVO_DEFECTO, CALIDAD_DEFECTO, BIBLIA_VERSION,
-  variantesDe, vestuarioPara,
+  variantesDe, vestuarioPara, normalizarConfig,
 } from './biblia.js';
 import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js';
 import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob, claveImagenDe, claveVideoDe } from './pipeline.js';
@@ -41,7 +41,7 @@ let filtro = 'todas';
 function proyectoNuevo() {
   return {
     version: 1,
-    config: { ...CONFIG_DEFECTO },
+    config: normalizarConfig(null),
     elenco: ELENCO_DEFECTO.map((p) => ({ ...p, refs: [] })),
     lugares: LUGARES_DEFECTO.map((l) => ({ ...l, ref: null })),
     episodios: [],
@@ -60,21 +60,7 @@ async function guardar() {
 async function cargar() {
   const g = await store.leer('actual');
   P = g && g.version ? g : proyectoNuevo();
-  // Fusionamos con los valores por defecto por si el proyecto viene de una versión anterior.
-  P.config = { ...CONFIG_DEFECTO, ...(P.config || {}) };
-  /*  Si hay tono elegido, la voz, la temperatura y la instrucción SON las del
-      tono: se vuelven a aplicar por si el tono se afinó desde la última vez.
-      Tocar el ajuste fino pone tono a null, así que un ajuste a mano no se
-      pisa nunca.                                                             */
-  if (P.config.tono) aplicarTono(P.config, P.config.tono);
-  /*  Reparación: la semilla vacía significaba «aleatoria», y con ella la voz
-      cambiaba entre llamadas. Ya no es una opción válida. Cambiar el valor por
-      defecto no bastaba: lo guardado gana sobre CONFIG_DEFECTO, así que a un
-      proyecto que ya existía no le llegaba nunca.                            */
-  if (P.config.semillaVoz === '' || P.config.semillaVoz === null ||
-      P.config.semillaVoz === undefined || !isFinite(Number(P.config.semillaVoz))) {
-    P.config.semillaVoz = SEMILLA_FIJA;
-  }
+  P.config = normalizarConfig(P.config);
   if (!P.elenco || !P.elenco.length) P.elenco = ELENCO_DEFECTO.map((p) => ({ ...p, refs: [] }));
   if (!P.lugares || !P.lugares.length) P.lugares = LUGARES_DEFECTO.map((l) => ({ ...l, ref: null }));
   if (!P.episodios) P.episodios = [];
@@ -195,7 +181,7 @@ async function traerGuiones(aviso) {
 /** Reconstruye el proyecto: textos del repositorio, trabajo de la nube. */
 async function rehidratar(compacto) {
   P = proyectoNuevo();
-  P.config = { ...CONFIG_DEFECTO, ...(compacto.config || {}) };
+  P.config = normalizarConfig(compacto.config);
   if (compacto.elenco && compacto.elenco.length) P.elenco = compacto.elenco;
   if (compacto.lugares && compacto.lugares.length) P.lugares = compacto.lugares;
   P.sel = compacto.sel || 1;
@@ -483,8 +469,16 @@ const NOTA_MODELO = {
   'gemini-2.5-flash-preview-tts': 'El estable. Ocho mil tokens de entrada y hasta unos ocho minutos de audio por llamada, de sobra para una escena.',
 };
 
-function llenarSelect(sel, pares, valor) {
-  if (!sel) return;
+/*  Un modelo guardado puede haber desaparecido del catálogo. El desplegable se
+    corregía solo y la configuración se quedaba con el nombre muerto: se veía un
+    modelo y el motor pedía otro —o pedía el retirado, y Google devolvía 404.
+    Ahora la corrección se DEVUELVE, para que quien llame la escriba.
+
+    @returns {*} el valor que ha quedado seleccionado de verdad               */
+function llenarSelect(sel, pares, valor, preferido) {
+  // Sin elemento no hay nada que corregir: se devuelve lo que había.
+  if (!sel) return valor;
+  const validos = pares.map((p) => (Array.isArray(p) ? p[0] : p));
   sel.innerHTML = '';
   for (const par of pares) {
     const [v, etiqueta] = Array.isArray(par) ? par : [par, par];
@@ -493,8 +487,11 @@ function llenarSelect(sel, pares, valor) {
     o.textContent = etiqueta;
     sel.appendChild(o);
   }
-  const validos = pares.map((p) => (Array.isArray(p) ? p[0] : p));
-  sel.value = validos.indexOf(valor) !== -1 ? valor : validos[0];
+  if (validos.indexOf(valor) !== -1) { sel.value = valor; return valor; }
+  // Se cae al valor por defecto del repositorio si sigue existiendo, y solo si
+  // no, al primero de la lista: caer siempre al primero degradaba la calidad.
+  sel.value = validos.indexOf(preferido) !== -1 ? preferido : validos[0];
+  return sel.value;
 }
 
 function pintarTonos() {
@@ -520,23 +517,71 @@ function pintarTonos() {
     : 'La voz está ajustada a mano. Elige un tono de la lista para volver a uno calibrado.';
 }
 
+/*  Vuelca la configuración en los mandos que viven FUERA del diálogo de
+    Ajustes. Estaba escrito a pelo dentro de iniciar(), antes de recuperar el
+    proyecto de la nube: al recuperarlo, P.config se sustituía entero y estos
+    mandos seguían enseñando lo de la copia local. Y como «Guardar ajustes» y
+    «Guardar precios» escriben LO QUE MUESTRAN los mandos, bastaba con abrir y
+    guardar para subir al bucket los valores viejos sin haber tocado nada.   */
+function pintarConfig() {
+  const c = P.config;
+  const pct = (v, d) => Math.round((v ?? d) * 100);
+  $('cfgEstilo').value = c.estilo;
+  $('cfgCalidad').value = c.calidad;
+  $('cfgNegativo').value = c.negativo;
+  $('cfgFormato').value = c.formato;
+  $('cfgMaxRefs').value = String(c.maxReferencias);
+  $('cfgSegToma').value = c.segundosPorToma;
+  $('valSegToma').textContent = c.segundosPorToma + ' s';
+  $('cfgIntensidad').value = pct(c.intensidadCamara, 1);
+  $('valIntensidad').textContent = pct(c.intensidadCamara, 1) + ' %';
+  $('cfgVolMusica').value = pct(c.volumenMusica, 0.3);
+  $('valVolMusica').textContent = pct(c.volumenMusica, 0.3) + ' %';
+  $('cfgMovim').value = pct(c.proporcionMovimiento, 0.35);
+  $('valMovim').textContent = pct(c.proporcionMovimiento, 0.35) + ' %';
+  $('pxImagen').value = c.precios.imagen;
+  $('pxVoz').value = c.precios.vozMil;
+  $('pxTexto').value = c.precios.episodio;
+  poblarModelos();
+}
+
 function poblarModelos() {
   // La voz sí se puede descubrir en tu Vertex; imagen y video son lista cerrada.
   const voces = (modelos && Array.isArray(modelos.tts) && modelos.tts.length)
     ? modelos.tts.map((m) => [m, m]) : MODELOS.voz;
 
-  llenarSelect($('cfgModeloTts'), voces, P.config.modeloTts);
-  llenarSelect($('cfgModeloTexto'), MODELOS.texto, P.config.modeloTexto);
+  /*  Lo que quede seleccionado se escribe en la configuración. Sin esto, un
+      modelo retirado seguía vivo en P.config mientras el desplegable enseñaba
+      otro: el usuario veía Nano Banana Pro y el motor pedía un modelo muerto.
+      Y con el modelo desconocido, RESOLUCIONES no encontraba lista, se caía a
+      la del modelo de 1K y esa caída SÍ se guardaba: la resolución quedaba
+      degradada a 1K para siempre sin que nadie lo dijera.                    */
+  const antes = { ...P.config };
+  const C = CONFIG_DEFECTO;
+
+  P.config.modeloTts = llenarSelect($('cfgModeloTts'), voces, P.config.modeloTts, C.modeloTts);
+  P.config.modeloTexto = llenarSelect($('cfgModeloTexto'), MODELOS.texto, P.config.modeloTexto, C.modeloTexto);
   for (const id of ['cfgModeloImagen', 'selModImgProd', 'selModImgBiblia']) {
-    llenarSelect($(id), MODELOS.imagen, P.config.modeloImagen);
+    P.config.modeloImagen = llenarSelect($(id), MODELOS.imagen, P.config.modeloImagen, C.modeloImagen);
   }
   for (const id of ['cfgModeloVideo', 'selModVidProd']) {
-    llenarSelect($(id), MODELOS.video, P.config.modeloVideo);
+    P.config.modeloVideo = llenarSelect($(id), MODELOS.video, P.config.modeloVideo, C.modeloVideo);
   }
-  llenarSelect($('selModMusProd'), MODELOS.musica, P.config.modeloMusica);
-  const res = RESOLUCIONES[P.config.modeloImagen] || RESOLUCIONES['gemini-2.5-flash-image'];
-  for (const id of ['selResImgProd', 'selResImgBiblia']) llenarSelect($(id), res, P.config.imageSize);
-  P.config.imageSize = $('selResImgProd').value;
+  P.config.modeloMusica = llenarSelect($('selModMusProd'), MODELOS.musica, P.config.modeloMusica, C.modeloMusica);
+
+  const res = RESOLUCIONES[P.config.modeloImagen] || RESOLUCIONES[C.modeloImagen];
+  for (const id of ['selResImgProd', 'selResImgBiblia']) {
+    P.config.imageSize = llenarSelect($(id), res, P.config.imageSize, C.imageSize);
+  }
+
+  /*  Cambiar un modelo por su cuenta cambia lo que cuesta y lo que sale, así
+      que no puede pasar en silencio.                                         */
+  for (const campo of ['modeloTts', 'modeloTexto', 'modeloImagen', 'modeloVideo',
+                       'modeloMusica', 'imageSize']) {
+    if (antes[campo] !== undefined && antes[campo] !== P.config[campo]) {
+      log('«' + antes[campo] + '» ya no está disponible; se usa «' + P.config[campo] + '»', 'aviso');
+    }
+  }
   pintarNotasModelo();
 }
 
@@ -572,6 +617,7 @@ function fijarModelo(tipo, valor) {
   else if (tipo === 'video') P.config.modeloVideo = valor;
   else if (tipo === 'texto') P.config.modeloTexto = valor;
   else if (tipo === 'musica') P.config.modeloMusica = valor;
+  else if (tipo === 'voz') P.config.modeloTts = valor;
   poblarModelos();
   guardar();
   pintarCoste();
@@ -1385,7 +1431,7 @@ function abrirAjustes() {
   $('cfgResVideo').value = c.resolucionVideo;
   $('cfgTempVoz').value = c.temperaturaVoz;
   $('valTempVoz').textContent = Number(c.temperaturaVoz).toFixed(2);
-  $('valSemilla').textContent = c.semillaVoz;
+  $('valSemilla').textContent = c.semillaVoz || SEMILLA_FIJA;
   $('cfgNombre').value = c.nombre || '';
   $('cfgInstruccionVoz').value = c.instruccionVoz;
   $('cfgNormalizar').checked = c.normalizarVoz;
@@ -1399,10 +1445,8 @@ function guardarAjustes() {
   const c = P.config;
   c.voz = $('cfgVoz').value;
   c.idioma = $('cfgIdioma').value;
-  c.modeloTts = $('cfgModeloTts').value;
-  c.modeloImagen = $('cfgModeloImagen').value;
-  c.modeloVideo = $('cfgModeloVideo').value;
-  c.modeloTexto = $('cfgModeloTexto').value;
+  // Los cinco modelos ya se fijaron al cambiarlos (fijarModelo): volver a
+  // leerlos aquí solo servía para reintroducir lo que hubiera en pantalla.
   c.resolucionVideo = $('cfgResVideo').value;
   c.temperaturaVoz = parseFloat($('cfgTempVoz').value);
   // La semilla no se teclea: se conserva la que ya tiene la configuración.
@@ -1474,6 +1518,11 @@ function cablear() {
     $(id).addEventListener('change', (e) => fijarModelo('video', e.target.value));
   }
   $('cfgModeloTexto').addEventListener('change', (e) => fijarModelo('texto', e.target.value));
+  /*  El de voz era el único que no se fijaba al cambiarlo: se leía al pulsar
+      «Guardar». Pero cambiar el modelo de imagen o de video llama a
+      poblarModelos(), que repinta TODOS los desplegables desde P.config, así
+      que la elección de voz aún sin guardar se perdía sin decir nada.       */
+  $('cfgModeloTts').addEventListener('change', (e) => fijarModelo('voz', e.target.value));
   for (const id of ['selResImgProd', 'selResImgBiblia']) {
     $(id).addEventListener('change', (e) => {
       P.config.imageSize = e.target.value;
@@ -1945,6 +1994,9 @@ async function recuperarDeNube() {
     const remoto = await nube.leerEstado();
     if (remoto && remoto.episodios && remoto.episodios.length) {
       await rehidratar(remoto);
+      // La configuración que manda ahora es la del bucket: los mandos tienen
+      // que enseñarla, o el primer «Guardar» devolvería la local encima.
+      pintarConfig();
       await store.guardar('actual', P);
       log('proyecto recuperado de Google Cloud', 'ok');
     }
@@ -2018,24 +2070,7 @@ async function iniciar() {
   await cargar();
   modelos = await store.leer('modelos');
 
-  $('cfgEstilo').value = P.config.estilo;
-  $('cfgCalidad').value = P.config.calidad;
-  $('cfgNegativo').value = P.config.negativo;
-  $('cfgFormato').value = P.config.formato;
-  $('cfgMaxRefs').value = String(P.config.maxReferencias);
-  $('cfgSegToma').value = P.config.segundosPorToma;
-  $('valSegToma').textContent = P.config.segundosPorToma + ' s';
-  $('cfgIntensidad').value = Math.round((P.config.intensidadCamara ?? 1) * 100);
-  $('valIntensidad').textContent = Math.round((P.config.intensidadCamara ?? 1) * 100) + ' %';
-  $('cfgVolMusica').value = Math.round((P.config.volumenMusica ?? 0.3) * 100);
-  $('valVolMusica').textContent = Math.round((P.config.volumenMusica ?? 0.3) * 100) + ' %';
-  $('cfgMovim').value = Math.round(P.config.proporcionMovimiento * 100);
-  $('valMovim').textContent = Math.round(P.config.proporcionMovimiento * 100) + ' %';
-  $('pxImagen').value = P.config.precios.imagen;
-  $('pxVoz').value = P.config.precios.vozMil;
-  $('pxTexto').value = P.config.precios.episodio;
-
-  poblarModelos();
+  pintarConfig();
   alGuardar(pintarEstadoNube);
   cablear();
   pintarTodo();

@@ -180,9 +180,12 @@ export function aplicarTono(config, id) {
   const t = tonoPorId(id);
   config.tono = t.id;
   config.voz = t.voz;
-  // La semilla solo se pone si no había ninguna: cambiar de tono no tiene por
-  // qué tirar una semilla que el usuario ya estaba usando a gusto.
-  if (!Number.isFinite(Number(config.semillaVoz)) || config.semillaVoz === '') {
+  /*  La semilla solo se pone si no había ninguna: cambiar de tono no tiene por
+      qué tirar una semilla que el usuario ya estaba usando a gusto.
+      null va aparte porque Number(null) es 0, que es finito: la guarda lo daba
+      por válido y se acababa mandando semilla 0 en vez de la fija.           */
+  if (config.semillaVoz === '' || config.semillaVoz === null ||
+      config.semillaVoz === undefined || !Number.isFinite(Number(config.semillaVoz))) {
     config.semillaVoz = SEMILLA_FIJA;
   }
   config.temperaturaVoz = t.temperatura;

@@ -19,6 +19,7 @@ import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob, claveImagenDe, 
 import { Proyector } from './player.js';
 import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
 import { MODELOS_MUSICA, precioPieza, escenasDe } from './musica.js';
+import { TONOS, TONO_POR_DEFECTO, tonoPorId, aplicarTono, coincideConTono } from './voz.js';
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
 
@@ -61,6 +62,11 @@ async function cargar() {
   P = g && g.version ? g : proyectoNuevo();
   // Fusionamos con los valores por defecto por si el proyecto viene de una versión anterior.
   P.config = { ...CONFIG_DEFECTO, ...(P.config || {}) };
+  /*  Si hay tono elegido, la voz, la temperatura y la instrucción SON las del
+      tono: se vuelven a aplicar por si el tono se afinó desde la última vez.
+      Tocar el ajuste fino pone tono a null, así que un ajuste a mano no se
+      pisa nunca.                                                             */
+  if (P.config.tono) aplicarTono(P.config, P.config.tono);
   if (!P.elenco || !P.elenco.length) P.elenco = ELENCO_DEFECTO.map((p) => ({ ...p, refs: [] }));
   if (!P.lugares || !P.lugares.length) P.lugares = LUGARES_DEFECTO.map((l) => ({ ...l, ref: null }));
   if (!P.episodios) P.episodios = [];
@@ -478,6 +484,29 @@ function llenarSelect(sel, pares, valor) {
   }
   const validos = pares.map((p) => (Array.isArray(p) ? p[0] : p));
   sel.value = validos.indexOf(valor) !== -1 ? valor : validos[0];
+}
+
+function pintarTonos() {
+  const sel = $('cfgTono');
+  if (!sel) return;
+  const propio = coincideConTono(P.config);
+  sel.innerHTML = '';
+  for (const t of TONOS) {
+    const o = document.createElement('option');
+    o.value = t.id;
+    o.textContent = t.nombre;
+    sel.appendChild(o);
+  }
+  if (!propio) {
+    const o = document.createElement('option');
+    o.value = '__propio';
+    o.textContent = 'Personalizado — ajustado a mano';
+    sel.appendChild(o);
+  }
+  sel.value = propio ? P.config.tono : '__propio';
+  $('pistaTono').textContent = propio
+    ? tonoPorId(P.config.tono).resumen
+    : 'La voz está ajustada a mano. Elige un tono de la lista para volver a uno calibrado.';
 }
 
 function poblarModelos() {
@@ -1339,6 +1368,7 @@ function abrirAjustes() {
     sel.value = val;
   };
   opciones($('cfgVoz'), VOCES, c.voz);
+  pintarTonos();
   opciones($('cfgIdioma'), IDIOMAS, c.idioma);
   poblarModelos();
   $('cfgResVideo').value = c.resolucionVideo;
@@ -1592,6 +1622,23 @@ function cablear() {
     if (proyector) proyector.cfg = P.config;
     aviso('Música al ' + e.target.value + ' %. Se aplica al instante; no hay que regenerarla.', 'ok', 6000);
   });
+  $('cfgTono').addEventListener('change', async (e) => {
+    if (e.target.value === '__propio') { pintarTonos(); return; }
+    const t = aplicarTono(P.config, e.target.value);
+    // Los campos de ajuste fino reflejan el tono elegido, por si se quiere mirar.
+    $('cfgVoz').value = t.voz;
+    $('cfgTempVoz').value = t.temperatura;
+    $('valTempVoz').textContent = Number(t.temperatura).toFixed(2);
+    $('cfgInstruccionVoz').value = t.instruccion;
+    await guardar();
+    pintarTonos();
+    aviso('Tono «' + t.nombre + '» aplicado. Escúchalo antes de generar; si ya hay voz ' +
+      'generada, hay que rehacerla para que cambie.', 'ok', 8000);
+  });
+  // Tocar el ajuste fino desengancha del tono: hay que decirlo.
+  for (const id of ['cfgVoz', 'cfgTempVoz', 'cfgInstruccionVoz']) {
+    $(id).addEventListener('change', () => { P.config.tono = null; pintarTonos(); });
+  }
   $('cfgMovim').addEventListener('input', (e) => { $('valMovim').textContent = e.target.value + ' %'; });
   $('cfgMovim').addEventListener('change', async (e) => {
     P.config.proporcionMovimiento = Number(e.target.value) / 100;
@@ -1828,8 +1875,8 @@ function cablear() {
   $('btnAjCancelar').addEventListener('click', () => $('dlgAjustes').close());
   $('btnAjGuardar').addEventListener('click', guardarAjustes);
   $('cfgTempVoz').addEventListener('input', (e) => { $('valTempVoz').textContent = Number(e.target.value).toFixed(2); });
-  $('btnProbarVoz').addEventListener('click', async () => {
-    const btn = $('btnProbarVoz');
+  $('btnProbarTono').addEventListener('click', async () => {
+    const btn = $('btnProbarTono');
     btn.disabled = true; btn.textContent = 'generando…';
     try {
       const muestra = 'Así llegó la especie humana al mundo-astillero: descargando cajas. ' +
@@ -1851,7 +1898,7 @@ function cablear() {
     } catch (e) {
       alert('La prueba falló: ' + e.message);
     }
-    btn.disabled = false; btn.textContent = 'Probar la voz';
+    btn.disabled = false; btn.textContent = 'Escuchar este tono';
   });
 
   window.addEventListener('beforeunload', (ev) => {

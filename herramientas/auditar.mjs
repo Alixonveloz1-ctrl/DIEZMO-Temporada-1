@@ -453,6 +453,43 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
 
+/* ── 5c-bis · Tonos de voz ya calibrados ───────────────────── */
+titulo('TONOS DE VOZ');
+const { TONOS, tonoPorId, aplicarTono, coincideConTono } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
+const { VOCES, CONFIG_DEFECTO } = await import(pathToFileURL(path.join(raiz, 'app', 'biblia.js')).href);
+
+const vocesValidas = new Set(VOCES.map((v) => v[0]));
+const tonoMalo = TONOS.filter((t) => !vocesValidas.has(t.voz));
+if (!TONOS.length) mal('no hay ningún tono de voz predefinido');
+else if (tonoMalo.length) mal('tonos con una voz que no existe', tonoMalo.map((t) => t.id).join(' · '));
+else ok(TONOS.length + ' tonos listos para usar, todos con voz válida');
+
+// Todos describen el MISMO ritmo medido: es lo que evita probar a ciegas.
+const sinRitmo = TONOS.filter((t) => !/ciento cincuenta palabras por minuto/.test(t.instruccion));
+const sinGenero = TONOS.filter((t) => !/[Vv]oz masculina/.test(t.instruccion));
+if (sinRitmo.length) mal('tonos que no fijan el ritmo medido', sinRitmo.map((t) => t.id).join(' · '));
+else if (sinGenero.length) mal('tonos que no fijan voz masculina', sinGenero.map((t) => t.id).join(' · '));
+else ok('todos fijan voz masculina y el ritmo de la referencia: 150 palabras por minuto');
+
+// El proyecto arranca con un tono aplicado de verdad, no a medias.
+const cfg = { ...CONFIG_DEFECTO };
+if (!cfg.tono) mal('el proyecto no arranca con ningún tono elegido');
+else {
+  aplicarTono(cfg, cfg.tono);
+  if (!coincideConTono(cfg)) mal('aplicar un tono no deja la configuración coincidiendo con él');
+  else {
+    cfg.voz = 'Puck';
+    if (coincideConTono(cfg)) mal('tocar la voz a mano no se detecta como personalizado');
+    else ok('arranca con «' + tonoPorId(CONFIG_DEFECTO.tono).nombre + '» y detecta si se toca a mano');
+  }
+}
+
+// Y al cargar el proyecto el tono se reaplica, para que afinarlo llegue al usuario.
+if (!/if \(P\.config\.tono\) aplicarTono\(P\.config, P\.config\.tono\);/.test(leer('app/main.js'))) {
+  mal('el tono no se reaplica al cargar', 'afinar un tono no llegaría a los proyectos ya guardados');
+} else ok('el tono se reaplica al abrir, salvo que se haya ajustado a mano');
+
 /* ── 5d-bis · No se puede perder un episodio ───────────────── */
 titulo('INTEGRIDAD DEL PROYECTO');
 const mainP = leer('app/main.js');

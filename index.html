@@ -1001,8 +1001,20 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     <label for="cfgNombre">Tu nombre (solo para el saludo; se guarda en este dispositivo)</label>
     <input type="text" id="cfgNombre" placeholder="Estudio">
   </div>
+  <div class="selector-modelo">
+    <div class="cab">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M12 18v4M5 8v8M19 8v8"/></svg>
+      Tono del narrador
+    </div>
+    <select id="cfgTono"></select>
+    <p class="pista" id="pistaTono">—</p>
+    <div class="fila-btn" style="margin-top:11px">
+      <button class="btn chico" id="btnProbarTono">Escuchar este tono</button>
+    </div>
+    <audio id="audioPrueba" controls style="display:none;width:100%;margin-top:10px"></audio>
+  </div>
+
   <div class="rejilla2">
-    <div class="campo"><label for="cfgVoz">Voz del narrador</label><select id="cfgVoz"></select></div>
     <div class="campo"><label for="cfgIdioma">Idioma / acento</label><select id="cfgIdioma"></select></div>
     <div class="campo"><label for="cfgModeloTts">Modelo de voz</label><select id="cfgModeloTts"></select></div>
     <div class="campo"><label for="cfgResVideo">Resolución de los clips de video</label>
@@ -1010,26 +1022,33 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     </div>
     <div class="campo"><label for="cfgModeloImagen">Modelo de imagen por defecto</label><select id="cfgModeloImagen"></select></div>
     <div class="campo"><label for="cfgModeloVideo">Modelo de video por defecto</label><select id="cfgModeloVideo"></select></div>
-    <div class="campo">
-      <label for="cfgTempVoz">Temperatura de la voz</label>
-      <div class="rango"><input type="range" id="cfgTempVoz" min="0" max="2" step="0.05"><span class="val" id="valTempVoz">0.90</span></div>
+  </div>
+
+  <details style="margin:0 0 14px">
+    <summary>Ajuste fino de la voz (normalmente no hace falta)</summary>
+    <p class="nota chica" style="margin-top:10px">Tocar esto separa la voz del tono elegido. El
+      selector pasará a decir «personalizado».</p>
+    <div class="rejilla2" style="margin-top:12px">
+      <div class="campo"><label for="cfgVoz">Voz concreta</label><select id="cfgVoz"></select></div>
+      <div class="campo">
+        <label for="cfgTempVoz">Temperatura</label>
+        <div class="rango"><input type="range" id="cfgTempVoz" min="0" max="2" step="0.05"><span class="val" id="valTempVoz">0.90</span></div>
+      </div>
+      <div class="campo"><label for="cfgSemilla">Semilla</label><input type="number" id="cfgSemilla" placeholder="vacío = aleatoria"></div>
     </div>
-    <div class="campo"><label for="cfgSemilla">Semilla de voz</label><input type="number" id="cfgSemilla" placeholder="vacío = aleatoria"></div>
-  </div>
-  <div class="campo">
-    <label for="cfgInstruccionVoz">Instrucción de estilo de narración</label>
-    <textarea id="cfgInstruccionVoz"></textarea>
-  </div>
+    <div class="campo">
+      <label for="cfgInstruccionVoz">Instrucción de estilo</label>
+      <textarea id="cfgInstruccionVoz"></textarea>
+    </div>
+  </details>
   <div class="campo check"><input type="checkbox" id="cfgNormalizar"><label for="cfgNormalizar">Convertir cifras y símbolos a letras antes de narrar</label></div>
   <div class="campo check"><input type="checkbox" id="cfgAnunciar"><label for="cfgAnunciar">Anunciar el título al empezar cada episodio</label></div>
   <div class="campo check"><input type="checkbox" id="cfgAudioVeo"><label for="cfgAudioVeo">Dejar que Veo genere ambiente sonoro <span style="color:var(--oro)">(encarece el segundo de video y puede pisar la narración)</span></label></div>
   <div class="campo"><label for="cfgSilencio">Silencio en los cortes de escena (segundos)</label><input type="number" id="cfgSilencio" min="0" max="3" step="0.1"></div>
   <div class="dlg-pie">
-    <button class="btn fantasma" id="btnProbarVoz">Probar la voz</button>
     <button class="btn fantasma" id="btnAjCancelar">Cerrar</button>
     <button class="btn primario" id="btnAjGuardar">Guardar</button>
   </div>
-  <audio id="audioPrueba" controls style="width:100%;margin-top:12px;display:none"></audio>
 </dialog>
 
 <!-- ── Diálogo: ficha ── -->

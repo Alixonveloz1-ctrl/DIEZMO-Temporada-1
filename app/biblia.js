@@ -417,7 +417,8 @@ export const CONFIG_DEFECTO = {
   modeloMusica: 'lyria-3-pro-preview',
   modeloTts: 'gemini-2.5-flash-preview-tts',
 
-  // Voz
+  // Voz — los tres campos siguientes los fija el tono elegido (app/voz.js)
+  tono: 'narrador',
   voz: 'Charon',
   idioma: 'es-US',
   temperaturaVoz: 0.9,

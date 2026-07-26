@@ -433,6 +433,30 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
 
+/* ── 5e-bis · El almacén local se recupera solo ────────────── */
+titulo('ALMACÉN LOCAL');
+const dbJs = leer('app/db.js');
+if (!/_db\.onclose/.test(dbJs) || !/_db\.onversionchange/.test(dbJs)) {
+  mal('no se detecta que el navegador cierre la base de datos',
+    'a partir de ahí todo falla con «The database connection is closing»');
+} else if (!/esConexionCerrada\(/.test(dbJs) || !/tx\(store, modo, fn, true\)/.test(dbJs)) {
+  mal('una conexión cerrada no se reabre', 'hay que reintentar con conexión nueva');
+} else if (!/if \(esReintento \|\| !esConexionCerrada\(e\)\) throw e;/.test(dbJs)) {
+  mal('el reintento del almacén podría entrar en bucle');
+} else ok('si el navegador cierra la base, se reabre sola y se reintenta una vez');
+
+// Ninguna imagen puede quedarse mostrando el icono de rota.
+const mainI = leer('app/main.js');
+const crudas = [...mainI.matchAll(/<img src=/g)].length +
+  [...mainI.matchAll(/createElement\('img'\)/g)].length;
+if (!/function ponerImagen\(/.test(mainI)) mal('no hay un punto único para pintar imágenes');
+else if (crudas > 1) {
+  mal('hay ' + crudas + ' sitios que pintan imágenes a mano',
+    'una URL muerta se quedaría como icono roto; usa ponerImagen()');
+} else if (!/assets\.url\(id, true\)/.test(mainI)) {
+  mal('una imagen rota no se reintenta con una URL nueva');
+} else ok('todas las imágenes pasan por un punto que se recupera de una URL muerta');
+
 /* ── 5f-ter · Todo lo generado se puede rehacer ────────────── */
 titulo('REHACER');
 const REHACER = [

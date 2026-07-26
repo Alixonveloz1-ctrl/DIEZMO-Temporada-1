@@ -633,7 +633,7 @@ async function pintarFichas() {
       const caja = d.querySelector('.lienzo[data-var="' + v.id + '"]');
       if (caja) {
         caja.querySelector('.vacio').remove();
-        caja.insertAdjacentHTML('afterbegin', '<img src="' + u + '" alt="' + esc(per.nombre) + '">');
+        ponerImagen(caja, clave.refPersonaje(per.id, v.id), per.nombre);
       }
     }
     const bGen = d.querySelector('[data-acc=gen]');
@@ -669,7 +669,7 @@ async function pintarFichas() {
     cl.appendChild(d);
     if (lug.ref) {
       const u = await assets.url(lug.ref);
-      if (u) d.querySelector('.lienzo').innerHTML = '<img src="' + u + '" alt="' + esc(lug.nombre) + '">';
+      if (u) ponerImagen(d.querySelector('.lienzo'), clave.refLugar(lug.id), lug.nombre, 'unico');
     }
     d.querySelector('[data-acc=gen]').addEventListener('click', async () => {
       jobMostrar('fondos');
@@ -741,6 +741,29 @@ function resumenGuion(ep) {
     (cob ? ' · cobertura de texto ' + (cob.ok ? 'exacta' : 'DESAJUSTADA (' + cob.diferencia + ' caracteres)') : '');
 }
 
+/*  Un blob URL muere si el archivo se regeneró mientras la imagen seguía en
+    pantalla, y entonces se ve el icono de imagen rota. En vez de dejarlo así,
+    se pide la URL otra vez saltándose la caché; si tampoco vale, se quita la
+    imagen en lugar de enseñar un roto.                                       */
+function ponerImagen(caja, id, alt, modo) {
+  if (!caja) return;
+  assets.url(id).then((u) => {
+    if (!u) return;
+    const img = document.createElement('img');
+    img.alt = alt || '';
+    let reintentado = false;
+    img.addEventListener('error', async () => {
+      if (reintentado) { img.remove(); return; }
+      reintentado = true;
+      const otra = await assets.url(id, true).catch(() => null);
+      if (otra) img.src = otra; else img.remove();
+    });
+    img.src = u;
+    if (modo === 'unico') { caja.innerHTML = ''; caja.appendChild(img); }
+    else caja.insertAdjacentElement('afterbegin', img);
+  }).catch(() => { /* el almacén no responde: se queda sin miniatura */ });
+}
+
 function tarjetaToma(ep, t, conAcciones) {
   const d = document.createElement('div');
   const p = t.plano || {};
@@ -764,10 +787,7 @@ function tarjetaToma(ep, t, conAcciones) {
   d.addEventListener('click', () => seleccionarToma(ep, t));
 
   if (t.imagen && t.imagen.ok) {
-    assets.url(claveImagenDe(ep.num, t)).then((u) => {
-      if (u) d.querySelector('.lienzo').insertAdjacentHTML('afterbegin',
-        '<img src="' + u + '" alt="toma ' + (t.i + 1) + '">');
-    });
+    ponerImagen(d.querySelector('.lienzo'), claveImagenDe(ep.num, t), 'toma ' + (t.i + 1));
   }
   return d;
 }
@@ -828,8 +848,7 @@ async function seleccionarToma(ep, t) {
       v.appendChild(el);
     }
   } else if (t.imagen && t.imagen.ok) {
-    const u = await assets.url(claveImagenDe(ep.num, t));
-    if (u) { const el = document.createElement('img'); el.src = u; v.appendChild(el); }
+    ponerImagen(v, claveImagenDe(ep.num, t), 'toma ' + (t.i + 1), 'unico');
   } else {
     v.innerHTML = '<p class="nota" style="padding:26px;text-align:center">Sin fotograma todavía.</p>';
   }
@@ -991,9 +1010,7 @@ async function pintarPanel() {
     // La carátula es el primer fotograma que exista del episodio.
     const conImagen = ep.tomas.find((t) => t.imagen && t.imagen.ok);
     if (conImagen) {
-      assets.url(claveImagenDe(ep.num, conImagen)).then((u) => {
-        if (u) d.insertAdjacentHTML('afterbegin', '<img src="' + u + '" alt="">');
-      });
+      ponerImagen(d, claveImagenDe(ep.num, conImagen), '');
     }
   });
 
@@ -1051,10 +1068,7 @@ async function pintarPanel() {
       const idAsset = campo === 'refs'
         ? ((it.refs || []).find((k) => k.endsWith('/rostro')) || (it.refs || [])[0])
         : it.ref;
-      if (idAsset) {
-        const u = await assets.url(idAsset);
-        if (u) s.innerHTML = '<img src="' + u + '" alt="">';
-      }
+      if (idAsset) ponerImagen(s, idAsset, '', 'unico');
     }
   };
   const acc = $('panelAccesos');

@@ -14,6 +14,19 @@ const VERSION = 1;
 
 let _db = null;
 
+/*  El navegador cierra la conexión cuando le conviene —el móvil manda la
+    pestaña a segundo plano, el sistema reclama memoria, otra pestaña pide una
+    versión nueva— y a partir de ahí toda operación revienta con «The database
+    connection is closing». Guardar la conexión para siempre era el fallo:
+    ahora se suelta en cuanto se cierra y se vuelve a abrir sola.             */
+function esConexionCerrada(e) {
+  if (!e) return false;
+  const nombre = e.name || '';
+  const texto = e.message || '';
+  return nombre === 'InvalidStateError' || nombre === 'TransactionInactiveError' ||
+    /closing|closed|not allowed in this state/i.test(texto);
+}
+
 function abrir() {
   if (_db) return Promise.resolve(_db);
   return new Promise((resolve, reject) => {
@@ -23,14 +36,30 @@ function abrir() {
       if (!db.objectStoreNames.contains('proyecto')) db.createObjectStore('proyecto');
       if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets');
     };
-    req.onsuccess = () => { _db = req.result; resolve(_db); };
+    req.onsuccess = () => {
+      _db = req.result;
+      // Enterarse del cierre es lo que permite reabrir en vez de fallar.
+      _db.onclose = () => { _db = null; };
+      _db.onversionchange = () => {
+        try { _db.close(); } catch (e) { /* ya cerrada */ }
+        _db = null;
+      };
+      resolve(_db);
+    };
     req.onerror = () => reject(req.error);
   });
 }
 
-function tx(store, modo, fn) {
+function tx(store, modo, fn, esReintento) {
   return abrir().then((db) => new Promise((resolve, reject) => {
-    const t = db.transaction(store, modo);
+    let t;
+    try {
+      t = db.transaction(store, modo);
+    } catch (e) {
+      _db = null;               // la conexión ya no sirve
+      reject(e);
+      return;
+    }
     const s = t.objectStore(store);
     let resultado;
     try { resultado = fn(s); } catch (e) { reject(e); return; }
@@ -39,7 +68,11 @@ function tx(store, modo, fn) {
     t.oncomplete = () => resolve(resultado instanceof IDBRequest ? resultado.result : resultado);
     t.onerror = () => reject(t.error);
     t.onabort = () => reject(t.error);
-  }));
+  })).catch((e) => {
+    if (esReintento || !esConexionCerrada(e)) throw e;
+    _db = null;
+    return tx(store, modo, fn, true);   // una sola vez, con conexión nueva
+  });
 }
 
 /* ── Proyecto (JSON) ────────────────────────────────────────── */
@@ -81,9 +114,15 @@ export const assets = {
     return null;
   },
 
-  /** URL de objeto reutilizable; se cachea para no multiplicar handles. */
-  async url(id) {
-    if (urls.has(id)) return urls.get(id);
+  /** URL de objeto reutilizable; se cachea para no multiplicar handles.
+   *  Con `forzar` se tira la cacheada y se crea otra: sirve cuando el archivo
+   *  se regeneró mientras la imagen seguía en pantalla y la anterior murió. */
+  async url(id, forzar) {
+    if (forzar) {
+      const previa = urls.get(id);
+      if (previa) { try { URL.revokeObjectURL(previa); } catch (e) { /* ya liberada */ } }
+      urls.delete(id);
+    } else if (urls.has(id)) return urls.get(id);
     const b = await assets.blob(id);
     if (!b) return null;
     const u = URL.createObjectURL(b);

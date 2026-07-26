@@ -422,7 +422,11 @@ export const CONFIG_DEFECTO = {
   voz: 'Charon',
   idioma: 'es-US',
   temperaturaVoz: 0.9,
-  semillaVoz: '',
+  /*  Semilla FIJA a propósito. Vacía significa aleatoria, y con 134 llamadas
+      por episodio eso son 134 sorteos distintos: parte de la variación de tono
+      que se oye entre tomas viene de aquí. Con semilla fija, el muestreo deja
+      de ser una lotería en cada llamada.                                      */
+  semillaVoz: 20250726,
   instruccionVoz: INSTRUCCION_VOZ_DEFECTO,
   anunciarTitulo: true,
   silencioEscena: 0.7,

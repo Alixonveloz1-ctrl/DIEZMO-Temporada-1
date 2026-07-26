@@ -58,8 +58,11 @@ export const INSTRUCCION_VOZ_DEFECTO =
   'únicamente el texto que sigue.';
 
 /* ── Elenco ─────────────────────────────────────────────────── */
-/*  ficha: descripción canónica que se manda al generar la hoja de
-    referencia y que después acompaña a cada fotograma donde aparece.  */
+/*  ficha:      el cuerpo y la cara. Nunca cambia en toda la serie.
+    vestuarios: la ropa. Varios personajes se cambian a mitad de la
+                temporada, así que cada vestuario tiene su propia hoja
+                de referencia y los episodios en los que se lleva.
+                Sin vestuarios, se entiende que va vestido igual siempre. */
 
 export const ELENCO_DEFECTO = [
   {
@@ -72,10 +75,20 @@ export const ELENCO_DEFECTO = [
       'noche. Alto y esbelto, de hombros rectos, torso estilizado y piernas largas. Pelo negro ' +
       'liso y brillante, algo largo, con flequillo que le cae sobre la frente y mechones ' +
       'sueltos que le dan movimiento. ' +
-      'Ropa sencilla pero cuidada y bien entallada: chaqueta de trabajo azul marino, camiseta ' +
-      'clara de cuello redondo, pantalón oscuro y zapatillas. En la segunda mitad de la ' +
-      'temporada: mono gris de una pieza con una pulsera negra en la muñeca izquierda, ' +
-      'vendada con una tira de tela blanca limpia.',
+      'Complexión delgada y fibrosa de quien carga cajas, no de gimnasio.',
+    vestuarios: [
+      { id: 'calle', nombre: 'Ropa de calle', episodios: [1, 2, 3, 4, 5],
+        desc: 'Chaqueta de trabajo azul marino de cuello camisero, bien entallada y en buen ' +
+          'estado, sobre camiseta blanca de cuello redondo. Pantalón oscuro de faena, cinturón ' +
+          'sencillo, zapatillas de lona grises.' },
+      { id: 'mono', nombre: 'Mono gris de Categoría B', episodios: [6, 7, 9, 10, 11, 12],
+        desc: 'Mono de una pieza en gris cemento, de tejido técnico mate y corte limpio, con ' +
+          'cremallera frontal y cuello bajo. En la muñeca izquierda, una pulsera negra rígida ' +
+          'cubierta con una tira de tela blanca limpia atada encima.' },
+      { id: 'blanco', nombre: 'Conjunto blanco infiltrado', episodios: [8],
+        desc: 'Conjunto deportivo blanco del Programa Puente, limpio y de su talla, con la ' +
+          'muñeca izquierda vendada con tela blanca para tapar la pulsera negra.' },
+    ],
   },
   {
     id: 'hina', nombre: 'Hina', alias: ['Hina Amamiya', 'Amamiya Hina', 'hermana'],
@@ -85,9 +98,20 @@ export const ELENCO_DEFECTO = [
       'largas, boca pequeña. Piel clara y limpia. Figura esbelta, de piernas largas y postura ' +
       'firme; camina con paso corto y la cabeza alta. Pelo negro liso y brillante a la altura ' +
       'de los hombros, con flequillo recto y mechones enmarcándole la cara. ' +
-      'Ropa: uniforme escolar japonés de invierno azul marino, impecable, o campera celeste ' +
-      'sobre ropa de calle. En la nave: conjunto deportivo blanco del Programa Puente. Lleva ' +
-      'siempre un omamori de tela roja y dorada atado a la mochila o a la litera.',
+      'Lleva siempre consigo un omamori de tela roja y dorada.',
+    vestuarios: [
+      { id: 'escuela', nombre: 'Uniforme escolar', episodios: [1, 2, 3, 4],
+        desc: 'Uniforme escolar japonés de invierno azul marino impecable: blusa de marinero ' +
+          'con cuello y pañuelo, falda plisada a la rodilla, calcetines oscuros y mocasines. ' +
+          'Mochila escolar con un omamori de tela roja y dorada colgando del cierre.' },
+      { id: 'calle', nombre: 'Ropa de calle', episodios: [5],
+        desc: 'Campera celeste ligera con capucha sobre camiseta clara, vaqueros y zapatillas ' +
+          'blancas. Bolso de mano pequeño con el omamori rojo y dorado atado al asa.' },
+      { id: 'blanco', nombre: 'Conjunto del Programa Puente', episodios: [6, 7, 8, 9, 10, 11, 12],
+        desc: 'Conjunto deportivo blanco de una pieza del Programa Puente, limpio y de corte ' +
+          'sencillo, con una banda fina en las mangas. El omamori rojo y dorado atado a la ' +
+          'cabecera de la litera o guardado en el bolsillo.' },
+    ],
   },
   {
     id: 'rei', nombre: 'Rei', alias: ['Rei Kurosawa', 'Kurosawa Rei', 'la editora'],
@@ -148,13 +172,23 @@ export const ELENCO_DEFECTO = [
       'ceja derecha, y le sienta bien. Pelo corto entrecano, peinado hacia atrás. Mirada ' +
       'tranquila de quien ya lo vio todo. Por el cuello del mono gris asoma el borde de un ' +
       'tatuaje tradicional japonés de tinta azul y roja.',
+    vestuarios: [
+      { id: 'mono', nombre: 'Mono gris de Categoría B', episodios: [6, 7, 9, 10, 11, 12],
+        desc: 'Mono de una pieza en gris cemento, de tejido técnico mate, con la cremallera ' +
+          'abierta hasta el pecho y el cuello de una camiseta interior asomando.' },
+    ],
   },
   {
     id: 'yuto', nombre: 'Yuto',
     ficha: 'Chico japonés de diecisiete años, de cara dulce y aniñada. Delgado y de estatura ' +
       'media, hombros estrechos. Ojos grandes, redondos y expresivos, que delatan todo lo que ' +
-      'siente. Pelo negro suave y algo revuelto, flequillo largo. Piel clara y limpia. Mono ' +
-      'gris que le queda holgado. Se abraza a sí mismo cuando escucha.',
+      'siente. Pelo negro suave y algo revuelto, flequillo largo. Piel clara y limpia. ' +
+      'Se abraza a sí mismo cuando escucha.',
+    vestuarios: [
+      { id: 'mono', nombre: 'Mono gris de Categoría B', episodios: [6, 7, 9, 10, 11, 12],
+        desc: 'Mono de una pieza en gris cemento que le queda holgado de hombros y le sobra ' +
+          'de manga.' },
+    ],
   },
   {
     id: 'ogata', nombre: 'Ogata', alias: ['señor Ogata', 'el cobrador'],
@@ -190,9 +224,16 @@ export const ELENCO_DEFECTO = [
     id: 'tanaka', nombre: 'Tanaka',
     ficha: 'Chico japonés de diecisiete años, delgado y de cara simpática. Facciones ' +
       'agradables, mandíbula algo marcada, ojos oscuros de mirada tranquila; una cicatriz ' +
-      'leve de acné en la mejilla izquierda que no le afea. Pelo negro corto y ordenado. ' +
-      'Uniforme escolar impecable. Más adelante, en el astillero: conjunto deportivo blanco ' +
-      'descolorido y el pelo rapado por manos ajenas, con la mirada vacía.',
+      'leve de acné en la mejilla izquierda que no le afea. Pelo negro corto y ordenado.',
+    vestuarios: [
+      { id: 'escuela', nombre: 'Uniforme escolar', episodios: [3, 4],
+        desc: 'Uniforme escolar japonés masculino azul marino, impecable, con la chaqueta ' +
+          'abotonada.' },
+      { id: 'apagado', nombre: 'Caminante de servicio', episodios: [9],
+        desc: 'Restos de un conjunto deportivo blanco muy descolorido, puesto del revés. El ' +
+          'pelo rapado a trasquilones por manos ajenas. Un anillo de filamentos pálidos vivos ' +
+          'alrededor del cuello. La mirada vacía, sin nadie detrás.' },
+    ],
   },
   {
     id: 'mizuno', nombre: 'Mizuno', alias: ['Mizuno Kaede', 'la asistente'],
@@ -235,6 +276,22 @@ export const ELENCO_DEFECTO = [
       'Modales de docente paciente: manos siempre a la vista, gestos abiertos y lentos.',
   },
 ];
+
+/** Las hojas de referencia que necesita un personaje: una por vestuario, más el rostro. */
+export function variantesDe(personaje) {
+  const ropa = (personaje.vestuarios && personaje.vestuarios.length)
+    ? personaje.vestuarios.map((v) => ({ id: v.id, nombre: v.nombre, desc: v.desc, cuerpo: true }))
+    : [{ id: 'hoja', nombre: 'Aspecto general', desc: '', cuerpo: true }];
+  return ropa.concat([{ id: 'rostro', nombre: 'Rostro', desc: '', cuerpo: false }]);
+}
+
+/** Qué lleva puesto este personaje en un episodio concreto. */
+export function vestuarioPara(personaje, episodio) {
+  const vs = personaje.vestuarios;
+  if (!vs || !vs.length) return { id: 'hoja', nombre: '', desc: '' };
+  const n = Number(episodio);
+  return vs.find((v) => (v.episodios || []).indexOf(n) !== -1) || vs[0];
+}
 
 /* ── Localizaciones ─────────────────────────────────────────── */
 
@@ -341,7 +398,7 @@ export const MOVIMIENTOS = [
 
 // Sube cada vez que cambia la dirección de arte o el elenco. El estudio compara
 // este número con el del proyecto guardado y refresca lo que no hayas tocado a mano.
-export const BIBLIA_VERSION = 3;
+export const BIBLIA_VERSION = 4;
 
 export const CONFIG_DEFECTO = {
   bibliaVersion: BIBLIA_VERSION,

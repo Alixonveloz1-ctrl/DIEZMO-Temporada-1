@@ -12,6 +12,7 @@ import {
 import {
   CONFIG_DEFECTO, ELENCO_DEFECTO, LUGARES_DEFECTO, VOCES, IDIOMAS,
   ESTILO_DEFECTO, NEGATIVO_DEFECTO, CALIDAD_DEFECTO, BIBLIA_VERSION,
+  variantesDe, vestuarioPara,
 } from './biblia.js';
 import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js';
 import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob } from './pipeline.js';
@@ -497,20 +498,30 @@ async function pintarFichas() {
   for (const per of P.elenco) {
     const d = document.createElement('div');
     d.className = 'ficha';
+    const vars = variantesDe(per);
     d.innerHTML =
-      '<div class="lienzo"><span class="vacio">SIN REFERENCIA</span></div>' +
+      '<div class="lienzos">' + vars.map((v) =>
+        '<div class="lienzo" data-var="' + v.id + '"><span class="vacio">—</span>' +
+        '<span class="etiqueta">' + esc(v.nombre) + '</span></div>').join('') + '</div>' +
       '<div class="cuerpo"><strong>' + esc(per.nombre) +
-      (per.principal ? ' <span class="chip g">principal</span>' : '') + '</strong>' +
+      (per.principal ? ' <span class="chip g">principal</span>' : '') +
+      (per.vestuarios && per.vestuarios.length > 1
+        ? ' <span class="chip">' + per.vestuarios.length + ' vestuarios</span>' : '') + '</strong>' +
       '<p>' + esc(per.ficha) + '</p></div>' +
       '<div class="acc">' +
-      '<button class="btn chico" data-acc="gen">Generar hoja</button>' +
+      '<button class="btn chico" data-acc="gen">Generar sus ' + vars.length + ' hojas</button>' +
       '<button class="btn fantasma chico" data-acc="editar">Editar ficha</button>' +
       '</div>';
     cont.appendChild(d);
 
-    if (per.refs && per.refs.length) {
-      const u = await assets.url(per.refs[0]);
-      if (u) d.querySelector('.lienzo').innerHTML = '<img src="' + u + '" alt="' + esc(per.nombre) + '">';
+    for (const v of vars) {
+      const u = await assets.url(clave.refPersonaje(per.id, v.id));
+      if (!u) continue;
+      const caja = d.querySelector('.lienzo[data-var="' + v.id + '"]');
+      if (caja) {
+        caja.querySelector('.vacio').remove();
+        caja.insertAdjacentHTML('afterbegin', '<img src="' + u + '" alt="' + esc(per.nombre) + '">');
+      }
     }
     d.querySelector('[data-acc=gen]').addEventListener('click', async () => {
       jobMostrar('referencias');
@@ -526,7 +537,7 @@ async function pintarFichas() {
     const d = document.createElement('div');
     d.className = 'ficha';
     d.innerHTML =
-      '<div class="lienzo"><span class="vacio">SIN FONDO</span></div>' +
+      '<div class="lienzos"><div class="lienzo" style="aspect-ratio:16/9"><span class="vacio">SIN FONDO</span></div></div>' +
       '<div class="cuerpo"><strong>' + esc(lug.nombre) + '</strong><p>' + esc(lug.ficha) + '</p></div>' +
       '<div class="acc">' +
       '<button class="btn chico" data-acc="gen">Generar fondo</button>' +
@@ -919,7 +930,9 @@ async function pintarPanel() {
       const s = document.createElement('span');
       s.textContent = it.nombre.slice(0, 1);
       caja.appendChild(s);
-      const idAsset = campo === 'refs' ? (it.refs && it.refs[0]) : it.ref;
+      const idAsset = campo === 'refs'
+        ? ((it.refs || []).find((k) => k.endsWith('/rostro')) || (it.refs || [])[0])
+        : it.ref;
       if (idAsset) {
         const u = await assets.url(idAsset);
         if (u) s.innerHTML = '<img src="' + u + '" alt="">';
@@ -1233,7 +1246,7 @@ function cablear() {
   });
   $('btnRefsTodos').addEventListener('click', async () => {
     jobMostrar('referencias');
-    await nuevoMotor().generarReferencias(P.elenco.filter((p) => !p.refs || !p.refs.length).map((p) => p.id));
+    await nuevoMotor().generarReferencias(null, true);
     await guardar(); pintarFichas();
   });
   $('btnFondos').addEventListener('click', async () => {

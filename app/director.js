@@ -7,7 +7,7 @@
    ============================================================ */
 
 import { api } from './api.js';
-import { ENCUADRES, MOVIMIENTOS } from './biblia.js';
+import { ENCUADRES, MOVIMIENTOS, vestuarioPara } from './biblia.js';
 
 const ESQUEMA = {
   type: 'object',
@@ -238,7 +238,11 @@ export function promptImagen(plano, ctx) {
         'Conserva sus rasgos faciales, peinado, ropa y proporciones sin variación alguna.'
       );
     }
-    partes.push(personajes.map((p) => p.nombre + ': ' + p.ficha).join(' '));
+    // La ropa depende del episodio: varios personajes se cambian a mitad de temporada.
+    partes.push(personajes.map((p) => {
+      const v = vestuarioPara(p, ctx.episodio);
+      return p.nombre + ': ' + p.ficha + (v.desc ? ' VESTUARIO EN ESTA ESCENA: ' + v.desc : '');
+    }).join(' '));
   } else {
     partes.push('Sin personajes identificables en primer término.');
   }
@@ -266,13 +270,15 @@ export function promptVideo(plano, ctx) {
 
 /** Prompt de hoja de referencia de un personaje. */
 export function promptReferencia(personaje, ctx, variante) {
+  const v = typeof variante === 'string' ? { id: variante, desc: '' } : (variante || { id: 'hoja' });
   const base = [
     'HOJA DE REFERENCIA DE PERSONAJE para un anime. ' + ctx.estilo,
     '',
     'PERSONAJE: ' + personaje.nombre + '. ' + personaje.ficha,
   ];
+  if (v.desc) base.push('VESTUARIO: ' + v.desc);
 
-  if (variante === 'hoja') {
+  if (v.id !== 'rostro') {
     // Un lienzo alto con UNA figura: el encuadre tiene forma de persona, así que
     // el modelo no tiene que ensanchar ni acortar el cuerpo para llenarlo. Tres
     // vistas apretadas en un lienzo panorámico eran la causa del aire achaparrado.
@@ -283,21 +289,14 @@ export function promptReferencia(personaje, ctx, variante) {
       'brazos a los costados. Iluminación de estudio suave y pareja, sin sombras dramáticas, sin ' +
       'escenario y sin objetos alrededor. Expresión serena.'
     );
-  } else if (variante === 'rostro') {
+  } else {
     base.push(
       'Composición: primer plano del rostro de UNA sola figura sobre fondo gris neutro y liso, ' +
       'de frente, mirando a cámara, expresión serena. Iluminación suave y pareja. Máximo detalle ' +
       'en la mirada, la piel y el peinado.'
     );
-  } else {
-    base.push(
-      'Composición: plano medio de UNA sola figura sobre fondo gris neutro, en tres cuartos, en ' +
-      'su postura característica. Iluminación suave de estudio.'
-    );
   }
 
-  // Salvaguarda anatómica: los modelos de imagen duplican miembros con facilidad,
-  // y en una hoja de referencia con tres vistas el riesgo se multiplica.
   base.push(
     'ANATOMÍA: un cuerpo completo y correcto, con una única cabeza, un único rostro, dos brazos, ' +
     'dos piernas y manos de cinco dedos. Figura alta y estilizada: piernas largas que ocupan algo ' +

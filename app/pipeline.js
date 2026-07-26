@@ -12,6 +12,7 @@ import { assets } from './db.js';
 import { nube } from './nube.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
 import { promptImagen, promptVideo, promptReferencia, promptLugar } from './director.js';
+import { variantesDe, vestuarioPara } from './biblia.js';
 
 export const clave = {
   audio: (ep, i) => 'ep' + pad(ep) + '/t' + pad3(i) + '/audio',
@@ -83,36 +84,38 @@ export class Motor {
 
   /* ── Hojas de referencia de personaje ─────────────────────── */
 
-  async generarReferencias(ids, variantes) {
+  async generarReferencias(ids, soloFaltantes) {
     const cfg = this.p.config;
-    const vars = variantes && variantes.length ? variantes : ['hoja', 'rostro'];
     const objetivo = this.p.elenco.filter((x) => !ids || ids.indexOf(x.id) !== -1);
 
     return this._correr(async () => {
       let hecho = 0;
-      const total = objetivo.length * vars.length;
+      const total = objetivo.reduce((a, p) => a + variantesDe(p).length, 0);
       for (const per of objetivo) {
         per.refs = per.refs || [];
-        for (const v of vars) {
+        for (const v of variantesDe(per)) {
           if (this.señal.aborted) return;
-          this._prog(hecho, total, per.nombre + ' · ' + v);
+          if (soloFaltantes && per.refs.indexOf(clave.refPersonaje(per.id, v.id)) !== -1) {
+            hecho++; continue;
+          }
+          this._prog(hecho, total, per.nombre + ' · ' + v.nombre);
           const prompt = promptReferencia(per, cfg, v);
           try {
-            const k = clave.refPersonaje(per.id, v);
+            const k = clave.refPersonaje(per.id, v.id);
             const r = await api.imagen({
               prompt,
               model: cfg.modeloImagen,
-              aspectRatio: v === 'hoja' ? '2:3' : '1:1',
+              aspectRatio: v.cuerpo ? '2:3' : '1:1',
               imageSize: cfg.imageSize,
               guardarComo: k,
             }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(per.nombre + ': ' + m) });
 
-            await assets.guardar(k, b64toBlob(r.image, r.mimeType), { personaje: per.id, variante: v });
+            await assets.guardar(k, b64toBlob(r.image, r.mimeType), { personaje: per.id, variante: v.id });
             if (per.refs.indexOf(k) === -1) per.refs.push(k);
-            this._log('referencia lista: ' + per.nombre + ' (' + v + ')', 'ok');
+            this._log('referencia lista: ' + per.nombre + ' · ' + v.nombre, 'ok');
           } catch (e) {
             if (e && e.cancelado) return;
-            this._log('falló la referencia de ' + per.nombre + ' (' + v + '): ' + e.message, 'err');
+            this._log('falló la referencia de ' + per.nombre + ' · ' + v.nombre + ': ' + e.message, 'err');
           }
           hecho++;
           this._prog(hecho, total, per.nombre);
@@ -242,10 +245,12 @@ export class Motor {
     const refs = [];
     for (const id of (plano.personajes || []).slice(0, cfg.maxReferencias)) {
       const per = this.p.elenco.find((p) => p.id === id);
-      if (per && per.refs && per.refs.length) {
-        const b = await assets.blob(per.refs[0]);
-        if (b) refs.push({ data: await blobAb64(b), mimeType: b.type || 'image/png' });
-      }
+      if (!per || !per.refs || !per.refs.length) continue;
+      // La hoja del vestuario que lleva en ESTE episodio; si falta, la primera que haya.
+      const kVest = clave.refPersonaje(per.id, vestuarioPara(per, ep.num).id);
+      const k = per.refs.indexOf(kVest) !== -1 ? kVest : per.refs[0];
+      const b = await assets.blob(k);
+      if (b) refs.push({ data: await blobAb64(b), mimeType: b.type || 'image/png' });
     }
     if (refs.length < 4) {
       const lug = this.p.lugares.find((l) => l.id === plano.lugar);
@@ -257,7 +262,7 @@ export class Motor {
 
     const ctx = {
       estilo: cfg.estilo, calidad: cfg.calidad, negativo: cfg.negativo, formato: cfg.formato,
-      elenco: this.p.elenco, lugares: this.p.lugares,
+      elenco: this.p.elenco, lugares: this.p.lugares, episodio: ep.num,
     };
     const prompt = t.promptImagen || promptImagen(plano, ctx);
 

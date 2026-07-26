@@ -339,8 +339,19 @@ code{background:var(--carta-3);padding:2px 6px;border-radius:5px;font-size:12.5p
 .fichas{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:12px}
 .ficha{background:var(--carta-2);border:1px solid var(--linea);border-radius:var(--r-l);overflow:hidden;display:flex;flex-direction:column;transition:var(--tr)}
 .ficha:hover{border-color:var(--linea-2);transform:translateY(-2px)}
-.ficha .lienzo{aspect-ratio:16/9;background:linear-gradient(150deg,#1B2740,#0A101C);display:flex;align-items:center;justify-content:center;overflow:hidden}
-.ficha .lienzo img{width:100%;height:100%;object-fit:cover;display:block}
+.ficha .lienzos{display:flex;gap:2px;background:#0A101C}
+.ficha .lienzo{
+  flex:1;min-width:0;aspect-ratio:2/3;max-height:340px;
+  background:linear-gradient(150deg,#1B2740,#0A101C);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;
+}
+/* contain, no cover: una hoja de personaje se ve entera o no sirve de nada */
+.ficha .lienzo img{width:100%;height:100%;object-fit:contain;display:block;background:#0A101C}
+.ficha .lienzo .etiqueta{
+  position:absolute;left:0;right:0;bottom:0;padding:5px 7px;font-size:9.5px;font-weight:700;
+  letter-spacing:.05em;text-transform:uppercase;color:rgba(255,255,255,.9);
+  background:linear-gradient(transparent,rgba(5,8,15,.9));text-align:center;
+}
 .ficha .lienzo .vacio{color:rgba(255,255,255,.35);font-size:10px;letter-spacing:.14em;font-weight:600}
 .ficha .cuerpo{padding:12px 13px 8px;flex:1;display:flex;flex-direction:column;gap:6px}
 .ficha .cuerpo strong{font-size:15px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
@@ -371,7 +382,7 @@ code{background:var(--carta-3);padding:2px 6px;border-radius:5px;font-size:12.5p
 .det-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:18px}
 @media (max-width:880px){.det-grid{grid-template-columns:1fr}}
 .det-vista{background:#000;border:1px solid var(--linea);border-radius:var(--r-m);overflow:hidden}
-.det-vista img,.det-vista video{width:100%;display:block;background:#000}
+.det-vista img,.det-vista video{width:100%;max-height:70vh;object-fit:contain;display:block;background:#000}
 .det-vista audio{width:100%;display:block}
 .det-texto{background:var(--azul-suave);border-left:3px solid var(--azul);padding:13px 15px;font-size:14px;line-height:1.65;white-space:pre-wrap;margin:0 0 14px;border-radius:0 var(--r-s) var(--r-s) 0}
 
@@ -490,7 +501,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <div class="hola">Bienvenido de nuevo,</div>
       <div class="nombre" id="heroNombre">Estudio</div>
     </div>
-    <p class="lema" id="heroLema">Un sí comprado con mentiras pesa lo mismo que un sí libre.<br>Su cerebro no distingue. El nuestro tampoco.</p>
+    <p class="lema">Un sí comprado con mentiras pesa lo mismo que un sí libre.<br>Su cerebro no distingue. El nuestro tampoco.</p>
   </div>
 </header>
 
@@ -697,11 +708,11 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <textarea id="cfgNegativo"></textarea>
     </div>
     <div class="campo">
-      <label for="cfgMaxRefs">Referencias por fotograma</label>
+      <label for="cfgMaxRefs">Cuántos personajes llevan su referencia adjunta en cada fotograma</label>
       <select id="cfgMaxRefs">
-        <option value="1">1 personaje</option>
+        <option value="1">1 — solo el más importante del plano</option>
         <option value="2">2 personajes</option>
-        <option value="3">3 personajes (máximo útil)</option>
+        <option value="3">3 personajes (el máximo que el modelo aprovecha)</option>
       </select>
     </div>
     <p class="nota chica" style="margin-top:0">La resolución se elige junto al modelo de imagen, en el recuadro azul de esta misma pestaña y de Producción.</p>

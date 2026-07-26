@@ -91,6 +91,86 @@ export const TONO_POR_DEFECTO = 'narrador';
     gusta, se cambia por otro y se rehace la voz.                              */
 export const SEMILLA_FIJA = 20250726;
 
+/*  CUÁNTA VOZ CABE EN UNA LLAMADA.
+
+    La escena entera de una vez era lo ideal para el tono, pero no cabe: las
+    escenas de DIEZMO duran de 44 s a 5 min 24 s, con dos minutos y medio de
+    mediana, y el servidor pone dos techos que no dependen de Google.
+
+    · El tamaño. Una respuesta de Vercel no puede pasar de 4,5 MB y el audio
+      viaja en base64: a 24 kHz y 16 bits son 64 KB de texto por segundo
+      hablado. Son unos setenta segundos de voz por respuesta, como mucho.
+      Setenta y tres de las setenta y seis escenas de la temporada los pasan.
+    · El tiempo. La función se corta al minuto de ejecución, y generar habla
+      tarda una fracción del tiempo que dura: cuanto más audio, más se acerca.
+
+    Cuarenta y cinco segundos dejan holgados los dos. La escena se parte en
+    bloques SIEMPRE por corte de toma, nunca a mitad de frase, y todos los
+    bloques de una escena van con la misma voz, la misma semilla y la misma
+    instrucción: la costura cae donde el texto ya hacía una pausa.            */
+export const SEGUNDOS_POR_LLAMADA = 45;
+
+/*  Por debajo de esto un bloque no compensa: es una llamada y una costura para
+    casi nada. Se rellena con tomas del bloque de delante.                     */
+const MINIMO_POR_LLAMADA = 12;
+
+/**
+ * Reparte las tomas de una escena en bloques que quepan en una llamada.
+ * Los bloques salen parejos —no uno grande y uno de dos segundos—, y ninguna
+ * toma se parte por la mitad.
+ *
+ * @param {Array} tomas          tomas de la escena, en orden
+ * @param {number} segundosMax   audio máximo por bloque, en segundos
+ * @returns {Array<Array>} bloques de tomas
+ */
+export function repartirEnBloques(tomas, segundosMax) {
+  if (!tomas || !tomas.length) return [];
+  if (tomas.length === 1) return [tomas.slice()];
+  const dur = tomas.map((t) => Math.max(0.5, t.segEstimados || (t.texto || '').length / 16));
+  const total = dur.reduce((a, b) => a + b, 0);
+  const max = Math.max(8, segundosMax || SEGUNDOS_POR_LLAMADA);
+
+  const n = Math.max(1, Math.min(tomas.length, Math.ceil(total / max)));
+  if (n === 1) return [tomas.slice()];
+  const objetivo = total / n;      // reparto parejo en vez de llenar hasta el borde
+
+  const bloques = [];
+  let actual = [];
+  let acc = 0;
+  for (let k = 0; k < tomas.length; k++) {
+    const quedan = tomas.length - k;         // tomas por colocar, contando esta
+    const faltan = n - bloques.length;       // bloques por cerrar, contando el actual
+    // El tope es tope: ningún bloque lo pasa, ni siquiera el último, que es el
+    // que se queda con el resto y era por donde se escapaba.
+    const tope = actual.length && acc + dur[k] > max;
+    // Y dentro del tope, se reparte parejo en vez de llenar hasta el borde y
+    // dejar un último bloque de dos segundos.
+    const parejo = actual.length && faltan > 1 && quedan >= faltan && acc + dur[k] / 2 > objetivo;
+    if (tope || parejo) {
+      bloques.push(actual);
+      actual = [];
+      acc = 0;
+    }
+    actual.push(tomas[k]);
+    acc += dur[k];
+  }
+  if (actual.length) bloques.push(actual);
+
+  /*  Aun así el tope duro puede dejar una cola de cinco segundos suelta, y una
+      llamada entera para cinco segundos es una costura que no hacía falta. Se
+      le pasan tomas del bloque de delante mientras quepan y allí sobren.     */
+  const dondeEsta = new Map(tomas.map((t, k) => [t, k]));
+  const largo = (b) => b.reduce((a, t) => a + dur[dondeEsta.get(t)], 0);
+  for (let b = 1; b < bloques.length; b++) {
+    while (largo(bloques[b]) < MINIMO_POR_LLAMADA && bloques[b - 1].length > 1) {
+      const cede = bloques[b - 1][bloques[b - 1].length - 1];
+      if (largo(bloques[b]) + dur[dondeEsta.get(cede)] > max) break;
+      bloques[b].unshift(bloques[b - 1].pop());
+    }
+  }
+  return bloques;
+}
+
 export function tonoPorId(id) {
   return TONOS.find((t) => t.id === id) || TONOS[0];
 }

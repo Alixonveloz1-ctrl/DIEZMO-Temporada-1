@@ -516,7 +516,9 @@ if (!/porEscena/.test(genVoz) || !/api\.tts\(/.test(genVoz)) {
 } else if (!/if \(indices\) return tomas\.some/.test(genVoz)) {
   mal('regenerar una toma suelta no rehace su escena',
     'esa toma volvería a salir con otro tono y se notaría más');
-} else ok('una sola llamada por escena, repartida después entre sus tomas');
+} else if (!/repartirEnBloques\(/.test(genVoz)) {
+  mal('la escena se pide entera de una vez', 'la mediana dura dos minutos y medio y no cabe en una respuesta');
+} else ok('un solo sitio pide voz, por bloques de escena, repartida después entre sus tomas');
 
 // El reparto por silencios: se comprueba de verdad, no por su forma.
 const { cortarEscena } = await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
@@ -553,24 +555,72 @@ else if (Math.max(...errores) > 0.3) {
   mal('el reparto por silencios se desvía demasiado', 'peor error ' + Math.max(...errores).toFixed(2) + ' s');
 } else ok('reparte una escena de 6 tomas con ' + (Math.max(...errores) * 1000).toFixed(0) + ' ms de error, sin perder audio');
 
-// Ninguna escena puede pasarse del presupuesto de audio del modelo.
+/*  Ninguna llamada puede pasarse de lo que aguanta el servidor. Son dos techos
+    distintos y los dos son de la plataforma, no de Google: una respuesta no
+    puede pasar de 4,5 MB —y el audio viaja en base64, a 64 KB por segundo
+    hablado— y la función se corta al minuto de ejecución. La escena mediana
+    dura dos minutos y medio: pedirla entera fallaba siempre.                 */
 const { limpiarTexto: lt2, segmentar: sg2 } =
   await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
-let peorEscena = 0;
+const { repartirEnBloques, SEGUNDOS_POR_LLAMADA } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
+
+const TOPE_MODELO = 16000 / 32;          // tokens de salida / tokens por segundo
+const MB_POR_SEGUNDO = 24000 * 2 * 4 / 3 / 1e6;   // PCM 24 kHz 16 bits, en base64
+let peorEscena = 0, peorBloque = 0, llamadas = 0, tomasVoz = 0, rotos = 0, bloquesCortos = 0;
 for (let k = 1; k <= 12; k++) {
   const ts = sg2(lt2(leer('episodios/ep' + String(k).padStart(2, '0') + '.md')), { segundosPorToma: 8, cps: 16 });
+  tomasVoz += ts.length;
   const porEsc = new Map();
-  for (const t of ts) porEsc.set(t.escena, (porEsc.get(t.escena) || 0) + t.segEstimados);
-  peorEscena = Math.max(peorEscena, ...porEsc.values());
+  for (const t of ts) { if (!porEsc.has(t.escena)) porEsc.set(t.escena, []); porEsc.get(t.escena).push(t); }
+  for (const tomasEsc of porEsc.values()) {
+    peorEscena = Math.max(peorEscena, tomasEsc.reduce((a, t) => a + t.segEstimados, 0));
+    const bloques = repartirEnBloques(tomasEsc, SEGUNDOS_POR_LLAMADA);
+    llamadas += bloques.length;
+    // Cobertura exacta: ni una toma perdida, ni repetida, ni fuera de orden.
+    const plano = bloques.flat();
+    if (plano.length !== tomasEsc.length || plano.some((t, j) => t !== tomasEsc[j])) rotos++;
+    for (const b of bloques) {
+      const s = b.reduce((a, t) => a + t.segEstimados, 0);
+      peorBloque = Math.max(peorBloque, s);
+      if (bloques.length > 1 && s < 12) bloquesCortos++;
+    }
+  }
 }
-const TOPE = 16000 / 32;      // tokens de salida / tokens por segundo de audio
-if (peorEscena > TOPE) {
-  mal('hay escenas más largas de lo que el modelo puede narrar de una vez',
-    (peorEscena / 60).toFixed(1) + ' min frente a un tope de ' + (TOPE / 60).toFixed(1) + ' min');
+if (rotos) {
+  mal(rotos + ' escenas pierden, repiten o desordenan tomas al repartirse en bloques');
+} else if (peorBloque > SEGUNDOS_POR_LLAMADA + 0.05) {
+  mal('hay bloques por encima del tope de la llamada',
+    peorBloque.toFixed(1) + ' s frente a ' + SEGUNDOS_POR_LLAMADA + ' s');
+} else if (peorBloque * MB_POR_SEGUNDO > 4.0) {
+  mal('la respuesta de un bloque no cabe en el servidor',
+    (peorBloque * MB_POR_SEGUNDO).toFixed(2) + ' MB frente a un techo de 4,5 MB');
+} else if (bloquesCortos) {
+  mal(bloquesCortos + ' bloques quedan por debajo de 12 s', 'son llamadas y costuras que no hacían falta');
 } else {
-  ok('la escena más larga son ' + (peorEscena / 60).toFixed(1) + ' min · caben ' +
-     (TOPE / 60).toFixed(1) + ' min por llamada');
+  ok('escena más larga ' + (peorEscena / 60).toFixed(1) + ' min → ' + llamadas + ' llamadas ' +
+     'de hasta ' + peorBloque.toFixed(0) + ' s (' + (peorBloque * MB_POR_SEGUNDO).toFixed(1) +
+     ' MB de 4,5) en vez de ' + tomasVoz + ' toma a toma');
 }
+if (peorBloque > TOPE_MODELO) {
+  mal('un bloque pasa de lo que el modelo puede narrar de una vez',
+    (peorBloque / 60).toFixed(1) + ' min frente a ' + (TOPE_MODELO / 60).toFixed(1) + ' min');
+}
+
+// Y si aun así el servidor no llega, hay que partir en vez de rendirse.
+if (!/e\.status === 413 \|\| e\.status === 504/.test(genVoz) || !/cola\.unshift\(/.test(genVoz)) {
+  mal('un bloque que no cabe no se parte en dos', 'la escena entera se quedaría sin voz');
+} else if (!/finales: \[504\]/.test(genVoz)) {
+  mal('un 504 de voz se reintenta igual', 'son otros sesenta segundos perdidos por intento');
+} else ok('lo que no cabe se parte en dos y se reintenta solo, sin repetir la espera');
+
+// El servidor tiene que decir que no cabe, en vez de dejar que corte la plataforma.
+const guardaTts = leer('api/ep-gemini.js');
+if (!/inline\.data\.length > LIMITE_RESPUESTA/.test(guardaTts) ||
+    !/status\(413\)[\s\S]{0,400}s de voz de una sola vez/.test(guardaTts)) {
+  mal('el servidor no avisa cuando el audio no cabe en la respuesta',
+    'la plataforma devolvería un error suyo, sin explicación');
+} else ok('el servidor avisa con la cifra exacta cuando la voz no cabe en la respuesta');
 
 /* ── 5c-ter · El audio no puede llegar cortado ─────────────── */
 titulo('AUDIO COMPLETO');

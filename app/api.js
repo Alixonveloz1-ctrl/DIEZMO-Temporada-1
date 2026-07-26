@@ -19,14 +19,14 @@ const POR_CODIGO = {
   401: 'Google rechazó las credenciales. Revisa la cuenta de servicio en las variables de entorno.',
   403: 'Google denegó el permiso. Suele ser la API de Vertex sin habilitar o un rol que falta.',
   404: 'Google no encontró el modelo. Puede que ese modelo no exista en la región que se está usando.',
-  413: 'La petición pesaba demasiado para el servidor. Ocurre cuando se adjuntan ' +
-       'imágenes de referencia muy grandes.',
+  413: 'Se pidió más de lo que cabe en una llamada (4,5 MB de ida o de vuelta). ' +
+       'Ocurre con imágenes de referencia muy grandes o con demasiada voz de una vez.',
   429: 'Se ha agotado la cuota de Google por ahora. Espera unos minutos y reintenta.',
   500: 'Error interno del servidor.',
   502: 'Google respondió, pero sin imagen. Casi siempre es el filtro de contenido.',
   503: 'Google no tiene capacidad en este momento. Suele resolverse reintentando.',
-  504: 'La generación tardó más de lo que el servidor permite esperar. Suele pasar con ' +
-       'imágenes en 4K o con el modelo Pro muy cargado; prueba a bajar la resolución.',
+  504: 'El servidor cortó la espera al minuto, que es su máximo. Casi siempre significa ' +
+       'que se pidió demasiado de una vez: menos texto por llamada, o menos resolución.',
 };
 
 /*  Mientras la pestaña está en segundo plano, el navegador del móvil congela
@@ -103,8 +103,12 @@ export async function llamar(cuerpo, opciones) {
       if (e.name === 'AbortError') throw new Cancelado();
       ultimo = e;
       const red = !!e.red || !e.status;
-      const transitorio = red || e.status === 429 || e.status === 503 ||
-        e.status === 500 || e.status === 502 || e.status === 504;
+      /*  Hay llamadas que saben recuperarse mejor que reintentando lo mismo:
+          la voz, ante un 504, parte el texto en dos en vez de volver a esperar
+          otro minuto entero. Quien lo sepa lo dice en "finales".             */
+      const final = !red && o.finales && o.finales.indexOf(e.status) !== -1;
+      const transitorio = !final && (red || e.status === 429 || e.status === 503 ||
+        e.status === 500 || e.status === 502 || e.status === 504);
       /*  Un corte de red no es lo mismo que un rechazo del servidor: no hay
           nada que corregir, solo esperar a tener conexión otra vez. Se le da
           más margen y esperas más largas, porque tres intentos en seis

@@ -112,6 +112,10 @@ function pickInlinePart(json) {
     Se unen en BINARIO, no concatenando base64: si un trozo no es múltiplo de
     tres bytes, pegar las cadenas base64 produce basura. Y si algún trozo trae
     cabecera RIFF propia, se le quita: solo la del primero vale.              */
+/*  4,5 MB es el techo de una respuesta en Vercel. Se deja medio mega de margen
+    para el resto del JSON.                                                    */
+const LIMITE_RESPUESTA = 4000000;
+
 function juntarAudio(json) {
   const parts = json && json.candidates && json.candidates[0] &&
     json.candidates[0].content && json.candidates[0].content.parts;
@@ -521,11 +525,30 @@ module.exports = async (req, res) => {
       }
       const mime = inline.mimeType || 'audio/L16;codec=pcm;rate=24000';
       const m = mime.match(/rate=(\d+)/);
+      const rate = m ? parseInt(m[1], 10) : 24000;
+
+      /*  La respuesta de una función no puede pasar de 4,5 MB, y el audio viaja
+          en base64: a 24 kHz y 16 bits son 64 KB de texto por segundo hablado,
+          o sea que a partir de poco más de un minuto la plataforma corta la
+          respuesta y devuelve un error suyo, opaco. Es mejor decirlo aquí, con
+          la cifra concreta, para que el cliente sepa que tiene que pedir menos
+          y no crea que falló Google.                                          */
+      if (inline.data.length > LIMITE_RESPUESTA) {
+        const segundos = inline.data.length * 0.75 / 2 / rate;
+        return res.status(413).json({
+          error: 'Se pidieron ' + segundos.toFixed(0) + ' s de voz de una sola vez y la ' +
+            'respuesta no cabe en el servidor (máximo 4,5 MB, unos ' +
+            (LIMITE_RESPUESTA * 0.75 / 2 / rate).toFixed(0) + ' s de audio). Pide menos ' +
+            'texto por llamada.',
+          segundos: +segundos.toFixed(1),
+        });
+      }
+
       const guardado = await archivar(token, body.guardarComo, inline.data, 'audio/wav');
       return res.status(200).json({
         audio: inline.data,
         mimeType: mime,
-        sampleRate: m ? parseInt(m[1], 10) : 24000,
+        sampleRate: rate,
         partes: inline.partes,
         guardado,
       });

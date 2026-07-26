@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/ep-gemini.js": {
-      "maxDuration": 300,
+      "maxDuration": 60,
       "memory": 1024
     }
   },

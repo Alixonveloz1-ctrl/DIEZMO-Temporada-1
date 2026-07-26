@@ -146,14 +146,27 @@ const genRefs = (pipelineFuente => {
   return i > 0 && j > i ? pipelineFuente.slice(i, j) : '';
 })(leer('app/pipeline.js'));
 if (!genRefs) mal('no se encuentra generarReferencias en pipeline.js');
-else if (!/\[maestra\]/.test(genRefs) || !/promptReferencia\([^)]*,\s*conMaestra\)/.test(genRefs)) {
+else if (!/images:\s*ref \? \[ref\] : \[\]/.test(genRefs) ||
+         !/promptReferencia\([^)]*!!ref\)/.test(genRefs) ||
+         !/pedir\(maestra\)/.test(genRefs)) {
   mal('el motor genera cada hoja por separado', 'no adjunta la hoja maestra a las siguientes');
-} else if (!/soloFaltantes[\s\S]{0,400}_refGuardada\(/.test(genRefs)) {
+} else if (!/soloFaltantes[\s\S]{0,400}assets\.blob\(k\)/.test(genRefs)) {
   mal('al saltarse hojas ya generadas no se recupera la maestra del almacén');
-} else if (!/pedir\(false\)/.test(genRefs)) {
-  mal('si falla con la maestra adjunta no se reintenta sin ella',
-    'el personaje se quedaría con una sola hoja');
-} else ok('cada hoja posterior lleva la primera adjunta, con reintento sin ella si falla');
+} else ok('cada hoja posterior se genera con la primera adjunta como referencia');
+
+// El rostro no se negocia: ningún fallo puede acabar generando la hoja sin la
+// referencia, porque saldría otra persona y esa cara se propagaría a las tomas.
+const rendirse = /pedir\(\s*(null|false|undefined)\s*\)/.test(genRefs);
+const catchRefs = (genRefs.match(/catch \(e\) \{[\s\S]*?\n            \}/) || [''])[0];
+if (rendirse) {
+  mal('hay un camino que genera la hoja sin la referencia del rostro',
+    'saldría un personaje distinto y esa cara acabaría en las tomas del episodio');
+} else if (!/e\.status === 413/.test(catchRefs) || !/comoReferencia\(maestraBlob/.test(catchRefs)) {
+  mal('el reintento tras un fallo no conserva la referencia del rostro',
+    'una cuota agotada o una caída de capacidad deben reintentarse con la misma cara');
+} else if (!/intentos:\s*[5-9]/.test(genRefs)) {
+  mal('pocos reintentos para las hojas', 'un límite de cuota dejaría al personaje a medias');
+} else ok('ante cualquier fallo se reintenta con el mismo rostro; nunca sin él');
 
 // Una hoja de 2K en base64 pasa de 3 MB; tres no caben en una petición de 4,5 MB.
 // El primer fotograma que se le da a Veo es la excepción: no es una referencia de
@@ -170,6 +183,18 @@ if (crudos.length) {
 } else if (!/refs\.push\(await comoReferencia\(/.test(fuentePipeline)) {
   mal('los fotogramas no reducen las hojas antes de adjuntarlas');
 } else ok('las referencias se reducen antes de viajar; el fotograma de Veo va entero');
+
+// Y la misma regla en el sitio que de verdad importa: las tomas del episodio.
+const unaImagen = (() => {
+  const i = fuentePipeline.indexOf('async _unaImagen(');
+  const j = fuentePipeline.indexOf('\n  /* ──', i);
+  return i > 0 ? fuentePipeline.slice(i, j > i ? j : undefined) : '';
+})();
+if (!unaImagen) mal('no se encuentra _unaImagen en pipeline.js');
+else if (!/sinCara/.test(unaImagen) || !/t\.imagen = \{ ok: false[\s\S]{0,120}sinCara/.test(unaImagen)) {
+  mal('una toma con un personaje sin hoja se genera igual',
+    'saldría un desconocido con su nombre y el fotograma parecería correcto');
+} else ok('una toma no se genera si falta la cara de alguien que sale en ella');
 
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');

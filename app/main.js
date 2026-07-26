@@ -904,12 +904,16 @@ async function pintarPanel() {
   });
 
   // ── Siguiente paso: lo primero que falta, en orden
-  const sinRefs = P.elenco.filter((p) => p.principal && (!p.refs || !p.refs.length));
+  // Cualquiera del elenco, no solo los principales: una toma con un personaje
+  // sin hoja ya no se genera, así que también bloquea la producción.
+  const sinRefs = P.elenco.filter((p) => !p.refs || !p.refs.length);
   const k = avances.findIndex((a) => a < 0.999);
   const ep = k >= 0 ? P.episodios[k] : null;
   let texto, destino, accion;
   if (sinRefs.length) {
-    texto = 'Genera las hojas de referencia de los ' + sinRefs.length + ' personajes principales que faltan.';
+    texto = 'Faltan las hojas de referencia de ' + sinRefs.length + ' personaje' +
+      (sinRefs.length === 1 ? '' : 's') + '. Sin su hoja, sus tomas no se generan: ' +
+      'saldrían con otra cara.';
     destino = 'biblia'; accion = 'Ir a la biblia';
   } else if (ep && !ep.tomas.some((t) => t.plano)) {
     texto = 'El episodio ' + pad2(ep.num) + ' aún no está dirigido.';

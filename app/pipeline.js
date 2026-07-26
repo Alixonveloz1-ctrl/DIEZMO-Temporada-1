@@ -103,53 +103,65 @@ export class Motor {
         // las proporciones. Las demás se generan con ella adjunta, para que salga
         // la misma persona con otra ropa o en primer plano. Sin esto, cada hoja
         // nacía de cero y el personaje cambiaba de rostro entre una y otra.
-        let maestra = null;
+        let maestra = null;      // ya reducida, lista para adjuntar
+        let maestraBlob = null;  // la hoja entera, por si hay que encogerla más
         for (const v of variantesDe(per)) {
           if (this.señal.aborted) return;
           const k = clave.refPersonaje(per.id, v.id);
           const seráMaestra = !maestra && v.cuerpo;
 
           if (soloFaltantes && per.refs.indexOf(k) !== -1) {
-            if (seráMaestra) maestra = await this._refGuardada(k);
+            if (seráMaestra) {
+              maestraBlob = await assets.blob(k);
+              maestra = maestraBlob ? await comoReferencia(maestraBlob) : null;
+            }
             hecho++;
             this._prog(hecho, total, per.nombre);
             continue;
           }
-          this._prog(hecho, total, per.nombre + ' · ' + v.nombre);
-          const pedir = (conMaestra) => api.imagen({
-            prompt: promptReferencia(per, cfg, v, conMaestra),
-            images: conMaestra ? [maestra] : [],
+          const quién = per.nombre + ' · ' + v.nombre;
+          this._prog(hecho, total, quién);
+          const pedir = (ref) => api.imagen({
+            prompt: promptReferencia(per, cfg, v, !!ref),
+            images: ref ? [ref] : [],
             model: cfg.modeloImagen,
             aspectRatio: v.cuerpo ? '2:3' : '1:1',
             imageSize: cfg.imageSize,
             guardarComo: k,
-          }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(per.nombre + ': ' + m) });
+            // Más paciencia que en el resto: si esto se rinde, el personaje se
+            // queda a medias y hay que rehacerlo entero.
+          }, { intentos: 5, señal: this.señal, aviso: (m) => this._log(quién + ': ' + m) });
 
           try {
             let r;
             try {
-              r = await pedir(!!maestra);
+              r = await pedir(maestra);
             } catch (e) {
-              // Si falla justo cuando lleva la hoja maestra adjunta, el problema es
-              // el adjunto. Vale más una hoja suelta que ninguna: se rehace sin él
-              // y se avisa, porque esa hoja puede no ser la misma cara.
               if (e && e.cancelado) throw e;
-              if (!maestra) throw e;
-              this._log('con la hoja maestra adjunta falló (' + e.message +
-                '); se reintenta ' + per.nombre + ' · ' + v.nombre + ' sin ella', 'err');
-              r = await pedir(false);
-              this._log('hecha sin referencia: revisa que ' + per.nombre + ' · ' + v.nombre +
-                ' sea la misma persona', 'aviso');
+              /*  El rostro NO se negocia. Una cuota agotada, una caída de
+                  capacidad o un tiempo de espera no tienen nada que ver con
+                  el adjunto: rendirse y rehacer la hoja sin él daría un
+                  personaje distinto, y esa cara equivocada acabaría de
+                  referencia en las tomas del episodio. Antes ninguna hoja
+                  que una hoja de otra persona.
+                  Lo único que justifica tocar el adjunto es que la petición
+                  no quepa, y ni siquiera entonces se quita: se encoge.       */
+              if (!(maestra && maestraBlob && e.status === 413)) throw e;
+              this._log('la petición no cabía; se encoge la referencia y se ' +
+                'reintenta ' + quién + ' con el mismo rostro', 'aviso');
+              maestra = await comoReferencia(maestraBlob, 640);
+              r = await pedir(maestra);
             }
 
             const hoja = b64toBlob(r.image, r.mimeType);
             await assets.guardar(k, hoja, { personaje: per.id, variante: v.id });
             if (per.refs.indexOf(k) === -1) per.refs.push(k);
-            if (seráMaestra) maestra = await comoReferencia(hoja);
-            this._log('referencia lista: ' + per.nombre + ' · ' + v.nombre, 'ok');
+            if (seráMaestra) { maestraBlob = hoja; maestra = await comoReferencia(hoja); }
+            this._log('referencia lista: ' + quién, 'ok');
           } catch (e) {
             if (e && e.cancelado) return;
-            this._log('falló la referencia de ' + per.nombre + ' · ' + v.nombre + ': ' + e.message, 'err');
+            this._log('no se generó ' + quién + ': ' + e.message +
+              (maestra ? ' · no se hace sin la referencia del rostro, saldría otra persona' : ''), 'err');
           }
           hecho++;
           this._prog(hecho, total, per.nombre);
@@ -275,16 +287,29 @@ export class Motor {
     const plano = t.plano;
     if (!plano) { t.imagen = { ok: false, error: 'sin plano: dirige el episodio primero' }; return; }
 
-    // Referencias: personajes en cuadro primero, fondo del lugar al final.
+    /*  Referencias: personajes en cuadro primero, fondo del lugar al final.
+        Aquí vale la misma regla que en las hojas: si un personaje sale en el
+        plano y no se puede adjuntar su cara, la toma NO se genera. Dibujarla
+        igualmente daría un desconocido con su nombre, y como el fotograma se
+        ve terminado en la rejilla, el cambiazo pasaría desapercibido hasta
+        tener el episodio montado.                                            */
     const refs = [];
+    const sinCara = [];
     for (const id of (plano.personajes || []).slice(0, cfg.maxReferencias)) {
       const per = this.p.elenco.find((p) => p.id === id);
-      if (!per || !per.refs || !per.refs.length) continue;
+      if (!per) continue;                       // el director nombró a alguien que ya no existe
       // La hoja del vestuario que lleva en ESTE episodio; si falta, la primera que haya.
       const kVest = clave.refPersonaje(per.id, vestuarioPara(per, ep.num).id);
-      const k = per.refs.indexOf(kVest) !== -1 ? kVest : per.refs[0];
-      const b = await assets.blob(k);
+      const k = (per.refs || []).indexOf(kVest) !== -1 ? kVest : (per.refs || [])[0];
+      const b = k ? await assets.blob(k) : null;
       if (b) refs.push(await comoReferencia(b));
+      else sinCara.push(per.nombre);
+    }
+    if (sinCara.length) {
+      t.imagen = { ok: false, error: 'sin hoja de referencia de ' + sinCara.join(' y ') +
+        ': genera sus hojas en la Biblia antes, o saldría otra persona' };
+      this._log('toma ' + (t.i + 1) + ': falta la referencia de ' + sinCara.join(' y '), 'err');
+      return;
     }
     if (refs.length < 4) {
       const lug = this.p.lugares.find((l) => l.id === plano.lugar);

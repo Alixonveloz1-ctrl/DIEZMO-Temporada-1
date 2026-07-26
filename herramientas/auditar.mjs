@@ -453,6 +453,41 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
 
+/* ── 5d-bis · No se puede perder un episodio ───────────────── */
+titulo('INTEGRIDAD DEL PROYECTO');
+const mainP = leer('app/main.js');
+const rehid = (mainP.match(/async function rehidratar\(compacto\)[\s\S]*?\n\}/) || [''])[0];
+if (!rehid) mal('no se encuentra la reconstrucción del proyecto');
+else if (/fetch\([\s\S]{0,120}continue;/.test(rehid)) {
+  mal('un fallo de red al leer un guion borra ese episodio del proyecto',
+    'y acto seguido se guarda la lista recortada: la pérdida queda grabada');
+} else if (!/await traerGuiones\(\)/.test(rehid)) {
+  mal('la lista de episodios no la fijan los guiones del repositorio');
+} else ok('la lista de episodios sale del repositorio; lo guardado solo añade el trabajo');
+
+const traer = (mainP.match(/async function traerGuiones[\s\S]*?\n\}/) || [''])[0];
+if (!traer) mal('no hay un punto único para traer los guiones');
+else if (!/intento <= 3/.test(traer)) mal('leer un guion no se reintenta ante un corte de red');
+else if (!/se conserva lo que hubiera/.test(traer)) {
+  mal('si un guion no se puede leer no se avisa');
+} else ok('cada guion se reintenta tres veces y su fallo se avisa, no se traga');
+
+// La custodia: nunca guardar encima con menos episodios.
+if (!/_maxEpisodios/.test(mainP)) {
+  mal('nada impide guardar un proyecto al que le faltan episodios');
+} else if (!/try \{ estadoCompacto\(\); \} catch \(e\) \{ return; \}/.test(mainP)) {
+  mal('el guardado local no respeta la custodia de episodios');
+} else ok('un proyecto con episodios de menos no puede sobrescribir al bueno');
+
+// Lo que se genera tiene que viajar entero en el estado guardado.
+const compactoTxt = (mainP.match(/function estadoCompacto\(\)[\s\S]*?\n\}/) || [''])[0];
+const campos = ['musica', 'reusa', 'reusaVideo', 'plano', 'audio', 'imagen', 'video', 'segundos'];
+const olvidados = campos.filter((c) => !new RegExp('\\b' + c + ':').test(compactoTxt));
+if (olvidados.length) {
+  mal('el estado guardado no incluye ' + olvidados.join(', '),
+    'se perdería al recuperar el proyecto en otro aparato');
+} else ok('el estado guardado lleva plano, voz, imagen, clip, música y reutilizaciones');
+
 /* ── 5e-bis · El almacén local se recupera solo ────────────── */
 titulo('ALMACÉN LOCAL');
 const dbJs = leer('app/db.js');

@@ -49,6 +49,9 @@ function proyectoNuevo() {
 }
 
 async function guardar() {
+  // estadoCompacto() revienta a propósito si el proyecto perdió episodios:
+  // mejor no guardar nada que grabar la pérdida en los dos sitios.
+  try { estadoCompacto(); } catch (e) { return; }
   await store.guardar('actual', P);
   if (nube.disponible) guardarPronto(estadoCompacto);
 }
@@ -108,7 +111,21 @@ function actualizarBiblia(forzar) {
    tomas se vuelven a cortar igual, porque el corte es determinista.
    Así el archivo pesa una fracción y viaja rápido.                  */
 
+/*  Custodia: nunca se guarda un estado con menos episodios de los que ya se
+    habían visto en esta sesión. La herramienta no tiene forma de borrar un
+    episodio, así que perder uno solo puede ser un fallo, y guardar encima
+    convierte un tropiezo en pérdida definitiva.                             */
+let _maxEpisodios = 0;
+
 function estadoCompacto() {
+  const n = P.episodios.length;
+  if (n > _maxEpisodios) _maxEpisodios = n;
+  else if (n < _maxEpisodios) {
+    const faltan = _maxEpisodios - n;
+    log('NO se guarda: faltan ' + faltan + (faltan === 1 ? ' episodio' : ' episodios') +
+      ' respecto a lo que había. Recarga la página antes de seguir.', 'err');
+    throw new Error('El proyecto perdió ' + faltan + ' episodios: no se guarda encima');
+  }
   return {
     version: 2,
     sel: P.sel,
@@ -118,6 +135,7 @@ function estadoCompacto() {
     episodios: P.episodios.map((e) => ({
       num: e.num,
       titulo: e.titulo,
+      musica: e.musica || null,
       tomas: (e.tomas || []).map((t) => ({
         i: t.i,
         plano: t.plano || null,
@@ -126,11 +144,38 @@ function estadoCompacto() {
         video: t.video || null,
         segundos: t.segundos || null,
         bloqueada: !!t.bloqueada,
+        reusa: t.reusa || null,
+        reusaVideo: t.reusaVideo || null,
         promptImagen: t.promptEditado ? t.promptImagen : null,
         promptEditado: !!t.promptEditado,
       })),
     })),
   };
+}
+
+/*  Los doce guiones son del repositorio y no dependen de nada: se traen
+    siempre, con reintentos. Un episodio que no se pueda leer se deja como
+    estaba en vez de desaparecer.                                            */
+async function traerGuiones(aviso) {
+  let leidos = 0;
+  for (let k = 1; k <= 12; k++) {
+    if (aviso) aviso(k - 1, 12, 'episodio ' + k);
+    let texto = null;
+    for (let intento = 1; intento <= 3 && texto === null; intento++) {
+      try {
+        const r = await fetch('./episodios/' + 'ep' + pad2(k) + '.md', { cache: 'no-cache' });
+        if (r.ok) texto = await r.text();
+      } catch (e) { /* corte de red: se reintenta */ }
+      if (texto === null && intento < 3) await new Promise((r) => setTimeout(r, 700 * intento));
+    }
+    if (texto === null) {
+      log('no se pudo leer el guion del episodio ' + k + '; se conserva lo que hubiera', 'err');
+      continue;
+    }
+    añadirEpisodio('ep' + pad2(k) + '.md', texto);
+    leidos++;
+  }
+  return leidos;
 }
 
 /** Reconstruye el proyecto: textos del repositorio, trabajo de la nube. */
@@ -142,24 +187,34 @@ async function rehidratar(compacto) {
   P.sel = compacto.sel || 1;
   P.episodios = [];
 
+  /*  Antes se recorría lo GUARDADO y se hacía un fetch por episodio: si uno
+      fallaba —un corte de red del móvil, que es lo que llevamos toda la
+      sesión— se hacía «continue» y ese episodio desaparecía del proyecto. Y
+      acto seguido se guardaba la lista recortada, en el navegador y en la
+      nube, así que la pérdida quedaba grabada. Ahora la lista de episodios
+      la fijan los guiones del repositorio, y lo guardado solo aporta el
+      trabajo hecho encima.                                                  */
+  await traerGuiones();
+
+  const porNum = new Map(P.episodios.map((e) => [e.num, e]));
   for (const ce of (compacto.episodios || [])) {
-    try {
-      const r = await fetch('./episodios/ep' + pad2(ce.num) + '.md');
-      if (!r.ok) continue;
-      const ep = añadirEpisodio('ep' + pad2(ce.num) + '.md', await r.text());
-      ep.titulo = ce.titulo || ep.titulo;
-      (ce.tomas || []).forEach((ct, k) => {
-        const t = ep.tomas[k];
-        if (!t) return;
-        t.plano = ct.plano || null;
-        t.audio = ct.audio || null;
-        t.imagen = ct.imagen || null;
-        t.video = ct.video || null;
-        if (ct.segundos) t.segundos = ct.segundos;
-        t.bloqueada = !!ct.bloqueada;
-        if (ct.promptEditado) { t.promptImagen = ct.promptImagen; t.promptEditado = true; }
-      });
-    } catch (e) { /* episodio que no se pudo leer */ }
+    const ep = porNum.get(ce.num);
+    if (!ep) continue;
+    ep.titulo = ce.titulo || ep.titulo;
+    if (ce.musica) ep.musica = ce.musica;
+    (ce.tomas || []).forEach((ct, k) => {
+      const t = ep.tomas[k];
+      if (!t) return;
+      t.plano = ct.plano || null;
+      t.audio = ct.audio || null;
+      t.imagen = ct.imagen || null;
+      t.video = ct.video || null;
+      if (ct.segundos) t.segundos = ct.segundos;
+      t.bloqueada = !!ct.bloqueada;
+      if (ct.reusa) t.reusa = ct.reusa;
+      if (ct.reusaVideo) t.reusaVideo = ct.reusaVideo;
+      if (ct.promptEditado) { t.promptImagen = ct.promptImagen; t.promptEditado = true; }
+    });
   }
 }
 
@@ -517,17 +572,7 @@ function recalcularTomas(ep) {
 
 async function cargarSerie() {
   jobMostrar('carga');
-  let n = 0;
-  for (let k = 1; k <= 12; k++) {
-    jobAvance(k - 1, 12, 'episodio ' + k);
-    try {
-      const r = await fetch('./episodios/ep' + pad2(k) + '.md');
-      if (!r.ok) continue;
-      const texto = await r.text();
-      añadirEpisodio('ep' + pad2(k) + '.md', texto);
-      n++;
-    } catch (e) { /* episodio ausente: se ignora */ }
-  }
+  const n = await traerGuiones(jobAvance);
   jobOcultar();
   await guardar();
   pintarTodo();

@@ -11,6 +11,23 @@ export class Cancelado extends Error {
   constructor() { super('__CANCELADO__'); this.cancelado = true; }
 }
 
+/*  Cuando el fallo lo devuelve la plataforma y no nuestro backend, el cuerpo no
+    es JSON y lo único que queda es el código. Traducirlo aquí evita que el
+    usuario tenga que interpretar un "HTTP 413" para poder contarnos qué pasó. */
+const POR_CODIGO = {
+  400: 'La petición iba mal formada. Es un fallo de la herramienta, no de tu cuenta.',
+  401: 'Google rechazó las credenciales. Revisa la cuenta de servicio en las variables de entorno.',
+  403: 'Google denegó el permiso. Suele ser la API de Vertex sin habilitar o un rol que falta.',
+  404: 'Google no encontró el modelo. Puede que ese modelo no exista en la región que se está usando.',
+  413: 'La petición pesaba demasiado para el servidor. Ocurre cuando se adjuntan ' +
+       'imágenes de referencia muy grandes.',
+  429: 'Se ha agotado la cuota de Google por ahora. Espera unos minutos y reintenta.',
+  500: 'Error interno del servidor.',
+  502: 'Google respondió, pero sin imagen. Casi siempre es el filtro de contenido.',
+  503: 'Google no tiene capacidad en este momento. Suele resolverse reintentando.',
+  504: 'Se agotó el tiempo de espera.',
+};
+
 async function crudo(cuerpo, señal) {
   const r = await fetch(ENDPOINT, {
     method: 'POST',
@@ -21,9 +38,9 @@ async function crudo(cuerpo, señal) {
   let j = {};
   try { j = await r.json(); } catch (e) { /* respuesta vacía o no-JSON */ }
   if (!r.ok) {
-    const msg = j.error || ('HTTP ' + r.status);
+    const msg = j.error || (POR_CODIGO[r.status] || ('Error ' + r.status));
     const det = j.detail ? ' — ' + String(j.detail).slice(0, 240) : '';
-    const err = new Error(msg + det);
+    const err = new Error('[' + r.status + '] ' + msg + det);
     err.status = r.status;
     throw err;
   }
@@ -196,4 +213,80 @@ export function blobAb64(blob) {
     fr.onerror = () => reject(fr.error);
     fr.readAsDataURL(blob);
   });
+}
+
+/* ── Referencias visuales: ligeras a propósito ───────────────── */
+
+/*  Una hoja de 2K en PNG pesa unos 2,3 MB, y en base64 dentro del JSON
+    pasa de 3 MB. El cuerpo de una petición no puede pasar de 4,5 MB, así
+    que una sola referencia ya va en el filo y tres (un fotograma con
+    varios personajes) es imposible.
+
+    Reducirlas no cuesta calidad: el modelo mira las referencias a través
+    de su codificador visual, que trabaja en torno a mil píxeles de lado.
+    Todo lo que sobra de ahí se descarta antes de que el modelo lo vea.
+    La imagen que se GENERA sigue saliendo a la resolución configurada. */
+
+export const LADO_REFERENCIA = 1024;
+
+function lienzo(w, h) {
+  if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(w, h);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return c;
+}
+
+function aBlob(c, tipo, calidad) {
+  if (c.convertToBlob) return c.convertToBlob({ type: tipo, quality: calidad });
+  return new Promise((res, rej) =>
+    c.toBlob((b) => (b ? res(b) : rej(new Error('el lienzo no devolvió imagen'))), tipo, calidad));
+}
+
+async function mapaDeBits(blob) {
+  if (typeof createImageBitmap === 'function') return createImageBitmap(blob);
+  // Safari antiguo: se pasa por un <img>, que siempre está.
+  const url = URL.createObjectURL(blob);
+  try {
+    return await new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error('no se pudo leer la imagen'));
+      im.src = url;
+    });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+}
+
+/**
+ * Prepara un Blob de imagen como referencia para Vertex: lo reduce al lado
+ * máximo indicado y lo recodifica en JPEG. Si algo del camino no está
+ * disponible en este navegador, devuelve la imagen original sin tocar.
+ *
+ * @returns {{data:string, mimeType:string}} listo para el campo images
+ */
+export async function comoReferencia(blob, maxLado) {
+  const lim = maxLado || LADO_REFERENCIA;
+  try {
+    const bmp = await mapaDeBits(blob);
+    const w = bmp.width || bmp.naturalWidth;
+    const h = bmp.height || bmp.naturalHeight;
+    if (!w || !h) throw new Error('imagen sin dimensiones');
+
+    const f = Math.min(1, lim / Math.max(w, h));
+    const nw = Math.max(1, Math.round(w * f));
+    const nh = Math.max(1, Math.round(h * f));
+
+    const c = lienzo(nw, nh);
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = true;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(bmp, 0, 0, nw, nh);
+    if (bmp.close) bmp.close();
+
+    const jpg = await aBlob(c, 'image/jpeg', 0.92);
+    // Si por lo que sea no adelgaza, no merece la pena perder el original.
+    if (jpg.size < blob.size) return { data: await blobAb64(jpg), mimeType: 'image/jpeg' };
+  } catch (e) { /* navegador sin lienzo: se manda tal cual */ }
+  return { data: await blobAb64(blob), mimeType: blob.type || 'image/png' };
 }

@@ -209,7 +209,8 @@ function aviso(txt, tipo, ms) {
 }
 
 function log(txt, tipo) {
-  if (tipo === 'err') aviso(txt, 'err', 8000);
+  if (tipo === 'err') aviso(txt, 'err', 9000);
+  else if (tipo === 'aviso') aviso(txt, 'aviso', 7000);
   const c = $('consola');
   const d = document.createElement('div');
   d.className = tipo || 'info';

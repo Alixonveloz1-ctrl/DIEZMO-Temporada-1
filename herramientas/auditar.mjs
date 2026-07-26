@@ -146,11 +146,30 @@ const genRefs = (pipelineFuente => {
   return i > 0 && j > i ? pipelineFuente.slice(i, j) : '';
 })(leer('app/pipeline.js'));
 if (!genRefs) mal('no se encuentra generarReferencias en pipeline.js');
-else if (!/images:\s*maestra/.test(genRefs) || !/promptReferencia\([^)]*maestra\)/.test(genRefs)) {
+else if (!/\[maestra\]/.test(genRefs) || !/promptReferencia\([^)]*,\s*conMaestra\)/.test(genRefs)) {
   mal('el motor genera cada hoja por separado', 'no adjunta la hoja maestra a las siguientes');
-} else if (!/soloFaltantes[\s\S]{0,400}_comoReferencia\(/.test(genRefs)) {
+} else if (!/soloFaltantes[\s\S]{0,400}_refGuardada\(/.test(genRefs)) {
   mal('al saltarse hojas ya generadas no se recupera la maestra del almacén');
-} else ok('cada hoja posterior se genera con la primera adjunta como referencia');
+} else if (!/pedir\(false\)/.test(genRefs)) {
+  mal('si falla con la maestra adjunta no se reintenta sin ella',
+    'el personaje se quedaría con una sola hoja');
+} else ok('cada hoja posterior lleva la primera adjunta, con reintento sin ella si falla');
+
+// Una hoja de 2K en base64 pasa de 3 MB; tres no caben en una petición de 4,5 MB.
+// El primer fotograma que se le da a Veo es la excepción: no es una referencia de
+// estilo, es el fotograma inicial del clip, y va a resolución completa.
+const fuentePipeline = leer('app/pipeline.js');
+const inicioVeo = fuentePipeline.indexOf('async _unVideo(');
+const finVeo = fuentePipeline.indexOf('\n  /* ──', inicioVeo);
+const crudos = [...fuentePipeline.matchAll(/data:\s*await blobAb64\(/g)]
+  .filter((m) => !(inicioVeo > 0 && m.index > inicioVeo && (finVeo < 0 || m.index < finVeo)))
+  .map((m) => fuentePipeline.slice(m.index, m.index + 60).split('\n')[0].trim());
+if (crudos.length) {
+  mal('se adjunta una imagen de referencia sin reducir', crudos.join(' | ') +
+    ' — usa comoReferencia(), o el cuerpo de la petición pasa del límite');
+} else if (!/refs\.push\(await comoReferencia\(/.test(fuentePipeline)) {
+  mal('los fotogramas no reducen las hojas antes de adjuntarlas');
+} else ok('las referencias se reducen antes de viajar; el fotograma de Veo va entero');
 
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');

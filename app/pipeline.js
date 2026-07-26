@@ -7,7 +7,7 @@
    siguiente.
    ============================================================ */
 
-import { api, generarVideo, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64 } from './api.js';
+import { api, generarVideo, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64, comoReferencia } from './api.js';
 import { assets } from './db.js';
 import { nube } from './nube.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
@@ -84,11 +84,10 @@ export class Motor {
 
   /* ── Hojas de referencia de personaje ─────────────────────── */
 
-  /** Carga una hoja ya guardada en el formato que espera la API como referencia. */
-  async _comoReferencia(k) {
+  /** Carga una hoja ya guardada y la deja lista para adjuntar. */
+  async _refGuardada(k) {
     const b = await assets.blob(k);
-    if (!b) return null;
-    return { data: await blobAb64(b), mimeType: b.type || 'image/png' };
+    return b ? comoReferencia(b) : null;
   }
 
   async generarReferencias(ids, soloFaltantes) {
@@ -111,26 +110,42 @@ export class Motor {
           const seráMaestra = !maestra && v.cuerpo;
 
           if (soloFaltantes && per.refs.indexOf(k) !== -1) {
-            if (seráMaestra) maestra = await this._comoReferencia(k);
+            if (seráMaestra) maestra = await this._refGuardada(k);
             hecho++;
             this._prog(hecho, total, per.nombre);
             continue;
           }
           this._prog(hecho, total, per.nombre + ' · ' + v.nombre);
-          const prompt = promptReferencia(per, cfg, v, !!maestra);
-          try {
-            const r = await api.imagen({
-              prompt,
-              images: maestra ? [maestra] : [],
-              model: cfg.modeloImagen,
-              aspectRatio: v.cuerpo ? '2:3' : '1:1',
-              imageSize: cfg.imageSize,
-              guardarComo: k,
-            }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(per.nombre + ': ' + m) });
+          const pedir = (conMaestra) => api.imagen({
+            prompt: promptReferencia(per, cfg, v, conMaestra),
+            images: conMaestra ? [maestra] : [],
+            model: cfg.modeloImagen,
+            aspectRatio: v.cuerpo ? '2:3' : '1:1',
+            imageSize: cfg.imageSize,
+            guardarComo: k,
+          }, { intentos: 3, señal: this.señal, aviso: (m) => this._log(per.nombre + ': ' + m) });
 
-            await assets.guardar(k, b64toBlob(r.image, r.mimeType), { personaje: per.id, variante: v.id });
+          try {
+            let r;
+            try {
+              r = await pedir(!!maestra);
+            } catch (e) {
+              // Si falla justo cuando lleva la hoja maestra adjunta, el problema es
+              // el adjunto. Vale más una hoja suelta que ninguna: se rehace sin él
+              // y se avisa, porque esa hoja puede no ser la misma cara.
+              if (e && e.cancelado) throw e;
+              if (!maestra) throw e;
+              this._log('con la hoja maestra adjunta falló (' + e.message +
+                '); se reintenta ' + per.nombre + ' · ' + v.nombre + ' sin ella', 'err');
+              r = await pedir(false);
+              this._log('hecha sin referencia: revisa que ' + per.nombre + ' · ' + v.nombre +
+                ' sea la misma persona', 'aviso');
+            }
+
+            const hoja = b64toBlob(r.image, r.mimeType);
+            await assets.guardar(k, hoja, { personaje: per.id, variante: v.id });
             if (per.refs.indexOf(k) === -1) per.refs.push(k);
-            if (seráMaestra) maestra = { data: r.image, mimeType: r.mimeType || 'image/png' };
+            if (seráMaestra) maestra = await comoReferencia(hoja);
             this._log('referencia lista: ' + per.nombre + ' · ' + v.nombre, 'ok');
           } catch (e) {
             if (e && e.cancelado) return;
@@ -269,13 +284,13 @@ export class Motor {
       const kVest = clave.refPersonaje(per.id, vestuarioPara(per, ep.num).id);
       const k = per.refs.indexOf(kVest) !== -1 ? kVest : per.refs[0];
       const b = await assets.blob(k);
-      if (b) refs.push({ data: await blobAb64(b), mimeType: b.type || 'image/png' });
+      if (b) refs.push(await comoReferencia(b));
     }
     if (refs.length < 4) {
       const lug = this.p.lugares.find((l) => l.id === plano.lugar);
       if (lug && lug.ref) {
         const b = await assets.blob(lug.ref);
-        if (b) refs.push({ data: await blobAb64(b), mimeType: b.type || 'image/png' });
+        if (b) refs.push(await comoReferencia(b));
       }
     }
 

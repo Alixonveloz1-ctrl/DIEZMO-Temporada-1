@@ -8,6 +8,7 @@
 
 import { assets } from './db.js';
 import { clave, audioCompleto } from './pipeline.js';
+import { filtroZoompan, planoCamara } from './camara.js';
 
 /* ── Escritor de ZIP (método "store", sin compresión) ───────── */
 /*  Imágenes, audio y video ya vienen comprimidos: comprimir otra
@@ -116,6 +117,7 @@ export function hojaDeMontaje(ep, cfg) {
     episodio: ep.num,
     titulo: ep.titulo,
     formato: cfg.formato,
+    silencioEscena: cfg.silencioEscena || 0,
     duracionTotal: +t0.toFixed(2),
     tomas,
   };
@@ -138,6 +140,8 @@ export function scriptFfmpeg(hoja) {
   L.push('# ============================================================');
   L.push('# DIEZMO — Episodio ' + hoja.episodio + ': ' + hoja.titulo);
   L.push('# Monta el episodio completo a partir de lo exportado.');
+  L.push('# El movimiento de cámara de cada toma fija es el que decidió el');
+  L.push('# director; va anotado en el comentario de cada una.');
   L.push('# Requiere ffmpeg. Ejecutar desde la carpeta del .zip descomprimido:');
   L.push('#   bash montar.sh');
   L.push('# ============================================================');
@@ -146,48 +150,72 @@ export function scriptFfmpeg(hoja) {
   L.push('W=' + w + '; H=' + h + '; FPS=' + fps);
   L.push('');
 
+  /*  Los cortes de escena se marcan con un fundido corto a negro, y el resto
+      de las tomas empalman a corte seco, como en cualquier montaje. El fundido
+      cae dentro del silencio que la voz ya deja en ese punto, así que no se
+      come ni una sílaba. Hacerlo por segmento permite seguir concatenando por
+      copia, sin recodificar el episodio entero una segunda vez.               */
+  const SILENCIO = Math.max(0, Number(hoja.silencioEscena) || 0);
   const lista = [];
-  for (const t of hoja.tomas) {
+  const usable = hoja.tomas.filter((t) => t.audio && (t.video || t.imagen));
+
+  usable.forEach((t, k) => {
     const seg = 'segmentos/seg-' + pad3(t.n) + '.mp4';
-    lista.push(seg);
     const dur = t.duracion.toFixed(3);
-    L.push('# ── Toma ' + t.n + ' · escena ' + t.escena + ' · ' + t.tipo + ' · ' + dur + ' s');
+    const cam = planoCamara(t.plano);
+    const previa = usable[k - 1];
 
-    if (!t.audio) {
-      L.push('echo "toma ' + t.n + ': sin voz, se omite"');
-      L.push('');
-      lista.pop();
-      continue;
-    }
+    // Fundido de entrada: al empezar el episodio y al abrir una escena nueva.
+    const abre = k === 0 || (previa && previa.corteEscena);
+    // Fundido de salida: al cerrar una escena y al terminar el episodio.
+    const cierra = !!t.corteEscena || k === usable.length - 1;
+    const margen = Math.max(0.18, Math.min(SILENCIO || 0.45, 0.7));
+    const fIn = abre ? Math.min(margen, t.duracion / 3) : 0;
+    const fOut = cierra ? Math.min(margen, t.duracion / 3) : 0;
 
-    if (t.tipo === 'video' && t.video) {
-      // El clip de Veo suele ser más corto que la locución: se congela
-      // el último fotograma hasta cubrir la duración de la voz.
-      L.push('ffmpeg -y -loglevel error -i "' + t.video + '" -i "' + t.audio + '" \\');
-      L.push('  -filter_complex "[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,' +
-        'crop=${W}:${H},fps=${FPS},tpad=stop_mode=clone:stop_duration=30,trim=duration=' + dur +
-        ',setpts=PTS-STARTPTS[v]" \\');
-      L.push('  -map "[v]" -map 1:a -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \\');
-      L.push('  -c:a aac -b:a 192k -shortest -t ' + dur + ' "' + seg + '"');
-    } else if (t.imagen) {
-      // Fotograma fijo con un Ken Burns lento: 4 % de acercamiento a lo largo de la toma.
-      const frames = Math.max(2, Math.round(t.duracion * fps));
-      L.push('ffmpeg -y -loglevel error -loop 1 -i "' + t.imagen + '" -i "' + t.audio + '" \\');
-      L.push('  -filter_complex "[0:v]scale=${W}*4:${H}*4,' +
-        "zoompan=z='min(zoom+0.00035,1.06)':d=" + frames + ":x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':" +
-        's=${W}x${H}:fps=${FPS}[v]" \\');
-      L.push('  -map "[v]" -map 1:a -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \\');
-      L.push('  -c:a aac -b:a 192k -t ' + dur + ' "' + seg + '"');
-    } else {
-      L.push('echo "toma ' + t.n + ': sin imagen ni clip, se omite"');
-      lista.pop();
-    }
+    L.push('# ── Toma ' + t.n + ' · escena ' + t.escena + ' · ' + dur + ' s · ' +
+      (t.tipo === 'video' && t.video ? 'clip animado' : 'fija · ' + cam.nombre) +
+      (fIn ? ' · abre escena' : '') + (fOut ? ' · cierra escena' : ''));
+
+    const vFade = (fIn ? ',fade=t=in:st=0:d=' + fIn.toFixed(2) : '') +
+      (fOut ? ',fade=t=out:st=' + (t.duracion - fOut).toFixed(2) + ':d=' + fOut.toFixed(2) : '');
+    const aFade = (fIn ? 'afade=t=in:st=0:d=' + fIn.toFixed(2) : '') +
+      (fIn && fOut ? ',' : '') +
+      (fOut ? 'afade=t=out:st=' + (t.duracion - fOut).toFixed(2) + ':d=' + fOut.toFixed(2) : '');
+
+    const cadenaV = t.tipo === 'video' && t.video
+      // El clip de Veo suele ser más corto que la locución: se congela el último
+      // fotograma hasta cubrir la duración de la voz.
+      ? '[0:v]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${FPS},' +
+        'tpad=stop_mode=clone:stop_duration=30,trim=duration=' + dur + ',setpts=PTS-STARTPTS' +
+        vFade + '[v]'
+      // Fija: se amplía primero para que el movimiento de cámara no pixele, y
+      // después se recorre el fotograma según lo que pidió el director.
+      : '[0:v]scale=${W}*4:${H}*4,' +
+        filtroZoompan(t.plano, Math.max(2, Math.round(t.duracion * fps)), '${W}', '${H}', '${FPS}') +
+        vFade + '[v]';
+
+    const entrada = t.tipo === 'video' && t.video
+      ? '-i "' + t.video + '"'
+      : '-loop 1 -i "' + t.imagen + '"';
+
+    L.push('ffmpeg -y -loglevel error ' + entrada + ' -i "' + t.audio + '" \\');
+    L.push('  -filter_complex "' + cadenaV + (aFade ? ';[1:a]' + aFade + '[a]' : '') + '" \\');
+    L.push('  -map "[v]" -map ' + (aFade ? '"[a]"' : '1:a') +
+      ' -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \\');
+    L.push('  -c:a aac -b:a 192k -t ' + dur + ' "' + seg + '"');
     L.push('');
+    lista.push(seg);
+  });
+
+  for (const t of hoja.tomas) {
+    if (!t.audio) L.push('echo "toma ' + t.n + ': sin voz, se omite"');
+    else if (!t.video && !t.imagen) L.push('echo "toma ' + t.n + ': sin imagen ni clip, se omite"');
   }
 
   L.push('# ── Concatenado final ──');
   L.push('rm -f lista.txt');
-  for (const s of lista) L.push("echo \"file '" + s + "'\" >> lista.txt");
+  for (const s2 of lista) L.push("echo \"file '" + s2 + "'\" >> lista.txt");
   L.push('ffmpeg -y -loglevel error -f concat -safe 0 -i lista.txt -c copy ' +
     '"DIEZMO-EP' + String(hoja.episodio).padStart(2, '0') + '.mp4"');
   L.push('echo "Listo: DIEZMO-EP' + String(hoja.episodio).padStart(2, '0') + '.mp4"');

@@ -50,6 +50,12 @@ const SISTEMA =
   '5. "lugar" solo admite identificadores de la lista de localizaciones.\n' +
   '6. Varía los encuadres: una secuencia de veinte primeros planos seguidos es un error. ' +
   'Alterna escala, altura y distancia como lo haría un anime de verdad.\n' +
+  '6b. "movimiento" no es decorativo: es el movimiento de cámara que tendrá esa toma en el ' +
+  'montaje, se anime o no. Elígelo por lo que pide el plano y varíalo igual que el encuadre. ' +
+  'Un acercamiento aprieta la tensión; un alejamiento revela el contexto; una panorámica ' +
+  'recorre un espacio; una inclinación mide una altura; la cámara en mano inquieta. ' +
+  '"cámara fija" es una decisión legítima y potente para un momento sostenido, pero si la ' +
+  'repites en tomas seguidas el episodio se queda muerto.\n' +
   '7. "accionVideo" describe el movimiento real de ocho segundos que tendría ese plano si se ' +
   'animara: qué se mueve, en qué dirección, a qué velocidad. Sin cortes ni cambios de plano.\n' +
   '8. "prioridad" de 1 a 5: cuánto gana ese plano si se anima de verdad en lugar de quedarse ' +

@@ -196,6 +196,58 @@ else if (!/sinCara/.test(unaImagen) || !/t\.imagen = \{ ok: false[\s\S]{0,120}si
     'saldría un desconocido con su nombre y el fotograma parecería correcto');
 } else ok('una toma no se genera si falta la cara de alguien que sale en ella');
 
+/* ── 5c · El montaje obedece al director ───────────────────── */
+titulo('MOVIMIENTO DE CÁMARA');
+const { CAMARA, planoCamara, filtroZoompan, fotogramasCss, normalizarMovimiento } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'camara.js')).href);
+const { MOVIMIENTOS } = await import(pathToFileURL(path.join(raiz, 'app', 'biblia.js')).href);
+
+// Todo movimiento que el director puede elegir tiene que saber ejecutarse.
+const huerfanosMov = MOVIMIENTOS.filter((m) => !CAMARA[m]);
+if (huerfanosMov.length) mal('el director puede pedir movimientos que el montaje no sabe hacer', huerfanosMov.join(' · '));
+else ok('los ' + MOVIMIENTOS.length + ' movimientos del director tienen traducción al montaje');
+
+// La escala interpola durante la toma: si el desplazamiento se pasa del sobrante
+// en cualquier instante, el movimiento se clava contra el borde a mitad de plano.
+let fuera = [];
+for (const n of Object.keys(CAMARA)) {
+  const c = CAMARA[n];
+  for (let i = 0; i <= 100; i++) {
+    const q = i / 100;
+    const z = c.z0 + (c.z1 - c.z0) * q;
+    const m = (1 - 1 / z) / 2;
+    const dx = Math.abs(c.x0 + (c.x1 - c.x0) * q);
+    const dy = Math.abs(c.y0 + (c.y1 - c.y0) * q);
+    if (Math.max(dx, dy) > m + 1e-9) { fuera.push(n + ' (al ' + i + ' %)'); break; }
+  }
+}
+if (fuera.length) mal('movimientos que se salen del fotograma', fuera.join(' · '));
+else ok('ningún movimiento se sale del fotograma en ningún instante de la toma');
+
+// Sala y montaje tienen que partir de los mismos números, o lo aprobado no es lo que sale.
+const usaCamara = (f, q) => new RegExp(q).test(leer(f));
+if (!usaCamara('app/player.js', 'fotogramasCss') || !usaCamara('app/player.js', 'planoCamara')) {
+  mal('la Sala no usa el movimiento del director');
+} else if (!usaCamara('app/exportar.js', 'filtroZoompan')) {
+  mal('el montaje no usa el movimiento del director', 'volvería al acercamiento fijo para todo');
+} else if (/kenburns/.test(leer('index.html')) || /kenburns/.test(leer('app/player.js'))) {
+  mal('queda la animación antigua, que ignoraba al director');
+} else ok('la Sala y el montaje salen de la misma tabla de movimientos');
+
+// Un texto que el director invente no puede dejar la toma sin movimiento definido.
+const raros = ['', 'algo que no existe', 'TRAVELLING LENTO HACIA DENTRO', null, undefined];
+const malRaros = raros.filter((r) => !CAMARA[normalizarMovimiento(r)]);
+if (malRaros.length) mal('un movimiento no reconocido deja la toma sin definir');
+else ok('cualquier texto del director cae en un movimiento válido');
+
+// El filtro tiene que salir sintácticamente entero, con sus tres ejes.
+const f = filtroZoompan('panorámica lenta a la derecha', 192, 1920, 1080, 24);
+if (!/^zoompan=z=/.test(f) || !/:x='/.test(f) || !/:y='/.test(f) || !/:d=192:/.test(f)) {
+  mal('el filtro de movimiento sale mal formado', f.slice(0, 90));
+} else if (fotogramasCss('cámara fija').length !== 2) {
+  mal('la Sala no recibe los dos extremos de la animación');
+} else ok('el filtro de montaje y la animación de la Sala salen bien formados');
+
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');
 const { ELENCO_DEFECTO, variantesDe, vestuarioPara } =

@@ -8,6 +8,7 @@
 
 import { assets } from './db.js';
 import { clave } from './pipeline.js';
+import { fotogramasCss, planoCamara } from './camara.js';
 
 export class Proyector {
   constructor(nodos) {
@@ -22,6 +23,7 @@ export class Proyector {
     this.orden = [];
     this.pos = 0;
     this.reproduciendo = false;
+    this.anim = null;
     this.cache = new Map();
 
     this.aud.addEventListener('ended', () => this._siguiente());
@@ -45,12 +47,14 @@ export class Proyector {
     this.reproduciendo = true;
     try { await this.aud.play(); } catch (e) { this.reproduciendo = false; return; }
     if (!this.vid.hidden) { try { await this.vid.play(); } catch (e) { /* sin clip */ } }
+    if (this.anim) this.anim.play();
   }
 
   pausar() {
     this.reproduciendo = false;
     this.aud.pause();
     this.vid.pause();
+    if (this.anim) this.anim.pause();
   }
 
   async irA(indice) {
@@ -104,10 +108,17 @@ export class Proyector {
       this.img.hidden = false;
       if (u.imagen) {
         this.img.src = u.imagen;
+        // El movimiento lo eligió el director para ESTA toma. Sale de los mismos
+        // números que usará el montaje, así que lo que ves aquí es lo que saldrá.
         const dur = t.segundos || t.segEstimados || 8;
-        this.img.style.animation = 'none';
-        void this.img.offsetWidth;                       // reinicia la animación
-        this.img.style.animation = 'kenburns ' + dur.toFixed(2) + 's linear forwards';
+        if (this.anim) { this.anim.cancel(); this.anim = null; }
+        const cam = planoCamara(t.plano);
+        const pasos = fotogramasCss(t.plano);
+        this.img.style.transform = pasos[0].transform;
+        if (cam.nombre !== 'cámara fija') {
+          this.anim = this.img.animate(pasos,
+            { duration: dur * 1000, easing: 'linear', fill: 'forwards' });
+        }
       } else {
         this.img.removeAttribute('src');
       }
@@ -117,7 +128,7 @@ export class Proyector {
       const p = t.plano || {};
       this.info.textContent = 'Toma ' + (t.i + 1) + '/' + this.ep.tomas.length +
         ' · escena ' + t.escena + ' · ' + (p.encuadre || '—') +
-        (u.video ? ' · con movimiento' : '');
+        (u.video ? ' · clip animado' : ' · ' + planoCamara(p).nombre);
     }
     if (this.pie) this.pie.textContent = t.texto;
 
@@ -140,6 +151,7 @@ export class Proyector {
 
   liberar() {
     this.pausar();
+    if (this.anim) { this.anim.cancel(); this.anim = null; }
     this.cache.clear();
   }
 }

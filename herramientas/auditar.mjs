@@ -286,7 +286,16 @@ if (flojos.length) {
 // A intensidad cero la imagen se queda de verdad quieta.
 const c0 = planoCamara('travelling de acercamiento lento', 0);
 if (c0.z0 !== c0.z1 || c0.x0 !== c0.x1) mal('a intensidad cero la cámara sigue moviéndose');
-else ok('a intensidad cero la imagen se queda realmente quieta')
+else ok('a intensidad cero la imagen se queda realmente quieta');
+
+/*  Y nadie puede tirar ese cero por el camino. La sala hacía
+    "intensidadCamara || 1", que convierte el cero del usuario en movimiento
+    normal: enseñaba una cosa y el montaje exportaba otra.                   */
+const tiraElCero = ['app/player.js', 'app/exportar.js', 'app/main.js']
+  .filter((f) => /intensidadCamara\s*(\)\s*)?\|\|/.test(leer(f)));
+if (tiraElCero.length) {
+  mal('el cero de intensidad se convierte en movimiento normal', tiraElCero.join(' · '));
+} else ok('el cero del usuario llega intacto a la sala y al montaje');
 
 // Sala y montaje tienen que partir de los mismos números, o lo aprobado no es lo que sale.
 const usaCamara = (f, q) => new RegExp(q).test(leer(f));

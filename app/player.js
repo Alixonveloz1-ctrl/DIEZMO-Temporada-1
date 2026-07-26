@@ -193,7 +193,11 @@ export class Proyector {
         // números que usará el montaje, así que lo que ves aquí es lo que saldrá.
         const dur = t.segundos || t.segEstimados || 8;
         if (this.anim) { this.anim.cancel(); this.anim = null; }
-        const k = (this.cfg && this.cfg.intensidadCamara) || 1;
+        /*  Sin "|| 1": cero es una intensidad válida —imagen quieta— y ese
+            atajo la convertía en movimiento normal. El montaje sí la respeta,
+            así que la sala enseñaba algo distinto de lo que iba a salir.
+            planoCamara ya pone el valor por defecto cuando no viene número.  */
+        const k = this.cfg ? this.cfg.intensidadCamara : undefined;
         const cam = planoCamara(t.plano, k);
         const pasos = fotogramasCss(t.plano, k);
         this.img.style.transform = pasos[0].transform;

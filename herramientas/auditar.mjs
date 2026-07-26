@@ -368,6 +368,75 @@ else if (!/\[maestra\]|musica\/lecho/.test(leer('app/exportar.js'))) {
   mal('la música no cede paso a la narración en la mezcla');
 } else ok('una pieza por escena, mezclada en el montaje y agachándose bajo la voz');
 
+/* ── 5g · Planos repetidos ─────────────────────────────────── */
+titulo('PLANOS REPETIDOS');
+const { agrupar, huella, aplicar: aplicarR, limpiar: limpiarR, ahorroDe } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'repetidos.js')).href);
+
+// Dos tomas solo son el mismo plano si coinciden lugar, personajes y encuadre.
+const pA = { lugar: 'bodega', personajes: ['sota', 'hina'], encuadre: 'plano medio', descripcion: 'x' };
+const pB = { lugar: 'bodega', personajes: ['hina', 'sota'], encuadre: 'plano medio', descripcion: 'y' };
+const pC = { lugar: 'bodega', personajes: ['sota'], encuadre: 'plano medio', descripcion: 'x' };
+if (huella(pA) !== huella(pB)) mal('el orden de los personajes cambia la huella');
+else if (huella(pA) === huella(pC)) mal('dos repartos distintos comparten huella');
+else ok('la huella ignora el orden del reparto pero distingue quién sale');
+
+// Agrupa entre episodios distintos, que es de lo que se trata.
+const mismo = { lugar: 'tokio', personajes: [], encuadre: 'plano general',
+  descripcion: 'Calle vacía al amanecer con niebla baja entre los edificios apagados' };
+const otro = { lugar: 'aula', personajes: [], encuadre: 'primer plano', descripcion: 'Un pupitre vacío junto a la ventana' };
+const eps = [
+  { num: 1, tomas: [{ i: 0, escena: 1, segEstimados: 6, plano: mismo }, { i: 1, escena: 1, segEstimados: 6, plano: otro }] },
+  { num: 7, tomas: [{ i: 3, escena: 2, segEstimados: 6, plano: { ...mismo } }] },
+];
+const gs = agrupar(eps, { umbral: 0.8 });
+if (gs.length !== 1) mal('no agrupa el mismo plano de dos episodios distintos', 'grupos: ' + gs.length);
+else if (gs[0].maestro.ep !== 1) mal('el maestro no es la primera aparición');
+else if (gs[0].miembros.length !== 2) mal('el grupo no reúne las dos apariciones');
+else ok('el mismo plano en dos episodios se agrupa, y manda la primera aparición');
+
+// Aplicar marca a los demás, nunca al maestro, y es reversible.
+const claves = {
+  imagen: (e, i) => 'ep' + e + '/img' + i,
+  video: (e, i) => 'ep' + e + '/vid' + i,
+  duracion: () => 6,
+};
+const marcadas = aplicarR(eps, gs, claves);
+const maestro = eps[0].tomas[0];
+const copia = eps[1].tomas[0];
+if (marcadas !== 1) mal('no marca exactamente las tomas que reutilizan');
+else if (maestro.reusa) mal('el maestro se marcó a sí mismo como reutilizador');
+else if (copia.reusa !== 'ep1/img0') mal('la copia no apunta al fotograma del maestro');
+else if (!copia.reusaVideo) mal('no reutiliza el clip pese a durar lo mismo');
+else if (limpiarR(eps) !== 1 || copia.reusa) mal('deshacer no limpia las marcas');
+else ok('marca solo a las copias, apunta al maestro y se puede deshacer');
+
+// Si la duración no coincide, el clip NO se reutiliza: se quedaría congelado.
+aplicarR(eps, gs, { ...claves, duracion: (t) => (t.i === 0 ? 8 : 4) });
+if (eps[1].tomas[0].reusaVideo) mal('reutiliza un clip de otra duración', 'la toma se quedaría corta o congelada');
+else ok('el clip solo se reutiliza si la duración pedida a Veo es la misma');
+limpiarR(eps);
+
+// Todo el que lea un fotograma tiene que pasar por el resolutor.
+const lectores = ['app/exportar.js', 'app/player.js', 'app/main.js'];
+const sinResolver = [];
+for (const f of lectores) {
+  const txt = leer(f);
+  for (const m of txt.matchAll(/assets\.(blob|url)\(clave\.(imagen|video)\(/g)) {
+    sinResolver.push(f + ' → ' + m[0]);
+  }
+}
+if (sinResolver.length) {
+  mal('se lee un fotograma sin resolver la reutilización', sinResolver.join(' | ') +
+    ' — usa claveImagenDe / claveVideoDe o la toma reutilizada saldrá vacía');
+} else ok('los cinco lectores resuelven la reutilización antes de pedir el archivo');
+
+// Y el motor no puede gastar en una toma que reutiliza.
+const pl = leer('app/pipeline.js');
+if (!/if \(t\.reusa\)[\s\S]{0,600}return;/.test(pl)) mal('el motor genera igualmente las tomas que reutilizan');
+else if (!/if \(t\.reusaVideo\)[\s\S]{0,600}return;/.test(pl)) mal('el motor genera igualmente los clips que reutilizan');
+else ok('una toma marcada no gasta ni una llamada');
+
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');
 const { ELENCO_DEFECTO, variantesDe, vestuarioPara } =

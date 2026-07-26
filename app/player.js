@@ -7,7 +7,7 @@
    ============================================================ */
 
 import { assets } from './db.js';
-import { clave } from './pipeline.js';
+import { clave, claveImagenDe, claveVideoDe } from './pipeline.js';
 import { fotogramasCss, planoCamara } from './camara.js';
 
 export class Proyector {
@@ -99,8 +99,8 @@ export class Proyector {
     if (this.cache.has(k)) return this.cache.get(k);
     const r = {
       audio: await assets.url(clave.audio(this.ep.num, t.i)),
-      imagen: await assets.url(clave.imagen(this.ep.num, t.i)),
-      video: (t.video && t.video.ok) ? await assets.url(clave.video(this.ep.num, t.i)) : null,
+      imagen: await assets.url(claveImagenDe(this.ep.num, t)),
+      video: (t.video && t.video.ok) ? await assets.url(claveVideoDe(this.ep.num, t)) : null,
     };
     this.cache.set(k, r);
     return r;

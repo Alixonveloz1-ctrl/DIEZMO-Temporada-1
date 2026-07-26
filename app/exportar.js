@@ -7,7 +7,7 @@
    ============================================================ */
 
 import { assets } from './db.js';
-import { clave, audioCompleto } from './pipeline.js';
+import { clave, audioCompleto, claveImagenDe, claveVideoDe } from './pipeline.js';
 import { filtroZoompan, planoCamara } from './camara.js';
 
 /* ── Escritor de ZIP (método "store", sin compresión) ───────── */
@@ -302,13 +302,13 @@ export async function exportarEpisodio(ep, cfg, progreso) {
     n++;
     if (progreso) progreso(n, total, 'empaquetando toma ' + n);
 
-    const img = await assets.blob(clave.imagen(ep.num, t.i));
+    const img = await assets.blob(claveImagenDe(ep.num, t));
     if (img) await zip.añadir('fotogramas/toma-' + pad3(t.i + 1) + '.png', img);
 
     const aud = await assets.blob(clave.audio(ep.num, t.i));
     if (aud) await zip.añadir('voz/toma-' + pad3(t.i + 1) + '.wav', aud);
 
-    const vid = await assets.blob(clave.video(ep.num, t.i));
+    const vid = await assets.blob(claveVideoDe(ep.num, t));
     if (vid) await zip.añadir('clips/toma-' + pad3(t.i + 1) + '.mp4', vid);
   }
 

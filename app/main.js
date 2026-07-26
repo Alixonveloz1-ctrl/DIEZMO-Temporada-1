@@ -15,10 +15,11 @@ import {
   variantesDe, vestuarioPara,
 } from './biblia.js';
 import { dirigirEpisodio, repartirMovimiento, promptImagen } from './director.js';
-import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob } from './pipeline.js';
+import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob, claveImagenDe, claveVideoDe } from './pipeline.js';
 import { Proyector } from './player.js';
 import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
 import { MODELOS_MUSICA, precioPieza, escenasDe } from './musica.js';
+import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
 
 const $ = (id) => document.getElementById(id);
@@ -721,7 +722,7 @@ function tarjetaToma(ep, t, conAcciones) {
   d.addEventListener('click', () => seleccionarToma(ep, t));
 
   if (t.imagen && t.imagen.ok) {
-    assets.url(clave.imagen(ep.num, t.i)).then((u) => {
+    assets.url(claveImagenDe(ep.num, t)).then((u) => {
       if (u) d.querySelector('.lienzo').insertAdjacentHTML('afterbegin',
         '<img src="' + u + '" alt="toma ' + (t.i + 1) + '">');
     });
@@ -778,14 +779,14 @@ async function seleccionarToma(ep, t) {
   const v = $('detVista');
   v.innerHTML = '';
   if (t.video && t.video.ok) {
-    const u = await assets.url(clave.video(ep.num, t.i));
+    const u = await assets.url(claveVideoDe(ep.num, t));
     if (u) {
       const el = document.createElement('video');
       el.src = u; el.controls = true; el.playsInline = true; el.muted = true;
       v.appendChild(el);
     }
   } else if (t.imagen && t.imagen.ok) {
-    const u = await assets.url(clave.imagen(ep.num, t.i));
+    const u = await assets.url(claveImagenDe(ep.num, t));
     if (u) { const el = document.createElement('img'); el.src = u; v.appendChild(el); }
   } else {
     v.innerHTML = '<p class="nota" style="padding:26px;text-align:center">Sin fotograma todavía.</p>';
@@ -949,7 +950,7 @@ async function pintarPanel() {
     // La carátula es el primer fotograma que exista del episodio.
     const conImagen = ep.tomas.find((t) => t.imagen && t.imagen.ok);
     if (conImagen) {
-      assets.url(clave.imagen(ep.num, conImagen.i)).then((u) => {
+      assets.url(claveImagenDe(ep.num, conImagen)).then((u) => {
         if (u) d.insertAdjacentHTML('afterbegin', '<img src="' + u + '" alt="">');
       });
     }
@@ -1091,6 +1092,52 @@ function costeEpisodio(ep) {
   };
 }
 
+/* ── Planos repetidos ───────────────────────────────────────── */
+
+let repes = [];          // los grupos encontrados en la última búsqueda
+const repesFuera = new Set();  // los que el usuario ha desmarcado
+
+function contarReusadas() {
+  let n = 0;
+  for (const ep of P.episodios) for (const t of ep.tomas || []) if (t.reusa) n++;
+  return n;
+}
+
+function pintarRepes() {
+  const caja = $('listaRepes');
+  const ya = contarReusadas();
+  $('estRepes').textContent = ya ? ya + ' tomas reutilizan otra' : (repes.length ? 'sin aplicar' : '—');
+  $('estRepes').className = 'pg-est' + (ya ? ' hecho' : '');
+  $('btnDeshacerRepes').hidden = !ya;
+  $('btnAplicarRepes').hidden = !repes.length;
+
+  if (!repes.length) { caja.innerHTML = ''; return; }
+  const a = ahorroDe(repes.filter((g) => !repesFuera.has(g.huella + g.maestro.i)));
+  caja.innerHTML = '<p class="nota chica" style="margin:0 0 8px">' +
+    a.grupos + (a.grupos === 1 ? ' plano repetido' : ' planos repetidos') +
+    ' · se ahorrarían <strong>' + a.repetidas + '</strong> imágenes · ' +
+    a.entreEpisodios + ' cruzan más de un episodio</p>';
+
+  for (const g of repes) {
+    const id = g.huella + g.maestro.i;
+    const d = document.createElement('div');
+    d.className = 'repe';
+    d.innerHTML =
+      '<input type="checkbox"' + (repesFuera.has(id) ? '' : ' checked') + '>' +
+      '<div class="rt"><b>' + esc(g.encuadre) + ' en ' + esc(g.lugar) +
+      (g.personajes.length ? ' · ' + esc(g.personajes.join(', ')) : ' · sin personajes') + '</b>' +
+      '<span>' + esc(g.descripcion.slice(0, 150)) + '</span>' +
+      '<span style="color:var(--tinta-3s)">EP ' + g.episodios.map(pad2).join(', EP ') +
+      ' · se genera la toma ' + (g.maestro.i + 1) + ' del EP ' + pad2(g.maestro.ep) + '</span></div>' +
+      '<span class="rn">' + g.miembros.length + ' veces</span>';
+    d.querySelector('input').addEventListener('change', (e) => {
+      if (e.target.checked) repesFuera.delete(id); else repesFuera.add(id);
+      pintarRepes();
+    });
+    caja.appendChild(d);
+  }
+}
+
 function pintarPasos() {
   const ep = epActual();
   const marca = (n, txt, clase) => {
@@ -1165,6 +1212,7 @@ function pintarTodo() {
   pintarSelectores();
   pintarRejillaProd();
   pintarPasos();
+  pintarRepes();
   pintarCoste();
   pintarResumenTemporada();
   pintarAlmacen();
@@ -1462,6 +1510,34 @@ function cablear() {
   $('btnProdImg').addEventListener('click', () => producir({ imagen: true }, 'fotogramas'));
   $('btnProdVid').addEventListener('click', () => producir({ video: true }, 'movimiento'));
   $('btnProdMus').addEventListener('click', () => producir({ musica: true }, 'música'));
+  $('btnBuscarRepes').addEventListener('click', () => {
+    const dirigidos = P.episodios.filter((e) => (e.tomas || []).some((t) => t.plano));
+    if (!dirigidos.length) {
+      estado('estadoProd', 'Primero hay que dirigir: sin planos no hay nada que comparar.', 'err');
+      return;
+    }
+    repes = agrupar(P.episodios, { umbral: parseFloat($('selRigor').value) });
+    repesFuera.clear();
+    pintarRepes();
+    const a = ahorroDe(repes);
+    log(a.grupos ? 'encontrados ' + a.grupos + ' planos repetidos en ' + dirigidos.length +
+      ' episodios dirigidos: ' + a.repetidas + ' imágenes de menos' : 'no hay planos repetidos', 'ok');
+  });
+  $('selRigor').addEventListener('change', () => { if (repes.length) $('btnBuscarRepes').click(); });
+  $('btnAplicarRepes').addEventListener('click', async () => {
+    const elegidos = repes.filter((g) => !repesFuera.has(g.huella + g.maestro.i));
+    const n = aplicarRepes(P.episodios, elegidos, {
+      imagen: clave.imagen, video: clave.video,
+      duracion: (t) => duracionVeo(P.config.modeloVideo, t.segundos || t.segEstimados || 8),
+    });
+    await guardar(); pintarTodo();
+    aviso(n + ' tomas reutilizarán el fotograma de otra. No se generarán por su cuenta.', 'ok', 7000);
+  });
+  $('btnDeshacerRepes').addEventListener('click', async () => {
+    const n = limpiarRepes(P.episodios);
+    await guardar(); pintarTodo();
+    aviso(n + ' tomas vuelven a generarse por su cuenta.', 'info', 6000);
+  });
   $('selModMusProd').addEventListener('change', (e) => fijarModelo('musica', e.target.value));
   const detener = () => { if (motor) motor.detener(); log('detención solicitada', 'err'); };
   $('btnDetenerProd').addEventListener('click', detener);
@@ -1639,10 +1715,10 @@ async function recuperarDeNube() {
           if (!(t.audio && t.audio.ok) && inventario.has(clave.audio(ep.num, t.i))) {
             t.audio = { ok: true, dur: t.segundos || t.segEstimados }; recuperados++;
           }
-          if (!(t.imagen && t.imagen.ok) && inventario.has(clave.imagen(ep.num, t.i))) {
+          if (!t.reusa && !(t.imagen && t.imagen.ok) && inventario.has(clave.imagen(ep.num, t.i))) {
             t.imagen = { ok: true }; recuperados++;
           }
-          if (!(t.video && t.video.ok) && inventario.has(clave.video(ep.num, t.i))) {
+          if (!t.reusaVideo && !(t.video && t.video.ok) && inventario.has(clave.video(ep.num, t.i))) {
             t.video = { ok: true, local: false }; recuperados++;
           }
         }

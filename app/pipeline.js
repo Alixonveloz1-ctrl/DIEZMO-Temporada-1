@@ -26,6 +26,17 @@ export const clave = {
   episodio: (ep) => 'ep' + pad(ep) + '/completo',
 };
 
+/*  Una toma puede reutilizar el fotograma de otra: el director pidió el mismo
+    plano dos veces y no tiene sentido pagarlo dos veces. Todo el que LEA un
+    fotograma o un clip tiene que pasar por aquí, o vería un hueco donde en
+    realidad hay una imagen compartida.                                       */
+export function claveImagenDe(numEp, t) {
+  return (t && t.reusa) || clave.imagen(numEp, t.i);
+}
+export function claveVideoDe(numEp, t) {
+  return (t && t.reusaVideo) || clave.video(numEp, t.i);
+}
+
 function pad(n) { return String(n).padStart(2, '0'); }
 function pad3(n) { return String(n).padStart(3, '0'); }
 
@@ -290,6 +301,17 @@ export class Motor {
     const plano = t.plano;
     if (!plano) { t.imagen = { ok: false, error: 'sin plano: dirige el episodio primero' }; return; }
 
+    // Este plano ya existe en otra toma: se apunta a ella y no se gasta nada.
+    if (t.reusa) {
+      const prestado = await assets.blob(t.reusa);
+      const deDonde = (String(t.reusa).match(/^ep(\d+)/) || [])[1];
+      t.imagen = prestado
+        ? { ok: true, reusada: t.reusa }
+        : { ok: false, error: 'reutiliza un plano del episodio ' + (deDonde || '?') +
+            ' que aún no está generado: genera antes ese episodio' };
+      return;
+    }
+
     /*  Referencias: personajes en cuadro primero, fondo del lugar al final.
         Aquí vale la misma regla que en las hojas: si un personaje sale en el
         plano y no se puede adjuntar su cara, la toma NO se genera. Dibujarla
@@ -378,7 +400,16 @@ export class Motor {
 
   async _unVideo(ep, t) {
     const cfg = this.p.config;
-    const img = await assets.blob(clave.imagen(ep.num, t.i));
+    if (t.reusaVideo) {
+      const prestado = await assets.blob(t.reusaVideo);
+      const deDonde = (String(t.reusaVideo).match(/^ep(\d+)/) || [])[1];
+      t.video = prestado
+        ? { ok: true, reusada: t.reusaVideo, local: true }
+        : { ok: false, error: 'reutiliza un clip del episodio ' + (deDonde || '?') +
+            ' que aún no está generado: genera antes ese episodio' };
+      return;
+    }
+    const img = await assets.blob(claveImagenDe(ep.num, t));
     if (!img) { t.video = { ok: false, error: 'falta el fotograma' }; return; }
 
     // Veo solo admite ciertos enteros y los rechaza si no coinciden: 4, 6 u 8 en

@@ -368,6 +368,30 @@ else if (!/\[maestra\]|musica\/lecho/.test(leer('app/exportar.js'))) {
   mal('la música no cede paso a la narración en la mezcla');
 } else ok('una pieza por escena, mezclada en el montaje y agachándose bajo la voz');
 
+/* ── 5f-bis · El mando del movimiento hace algo ────────────── */
+titulo('PROPORCIÓN DE MOVIMIENTO');
+const seccionEp = html.slice(html.indexOf('id="fase-episodios"'), html.indexOf('id="fase-biblia"'));
+const posMovim = seccionEp.indexOf('id="cfgMovim"');
+const posPaso4 = seccionEp.indexOf('id="selModVidProd"');
+const posPaso5 = seccionEp.indexOf('id="selModMusProd"');
+if (posMovim < 0) mal('no existe el mando de proporción de movimiento');
+else if (!(posMovim > posPaso4 && (posPaso5 < 0 || posMovim < posPaso5))) {
+  mal('el mando del movimiento no está en el paso de movimiento',
+    'es una decisión de coste: tiene que verse donde se toma');
+} else if (/<details[\s\S]*id="cfgMovim"[\s\S]*<\/details>/.test(seccionEp.slice(0, posMovim + 200))) {
+  mal('el mando del movimiento está escondido en un desplegable');
+} else ok('el mando de proporción vive en el paso de movimiento, a la vista');
+
+// Y moverlo tiene que repartir de nuevo, no solo guardar un número.
+const mainJs = leer('app/main.js');
+const manejador = (mainJs.match(/\$\('cfgMovim'\)\.addEventListener\('change'[\s\S]{0,900}?\n  \}\);/) || [''])[0];
+if (!manejador) mal('nadie escucha el cambio de proporción');
+else if (!/repartirMovimiento\(/.test(manejador)) {
+  mal('cambiar la proporción no reparte de nuevo',
+    'bajarla parecería funcionar y se seguiría pagando la anterior');
+} else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
+else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
+
 /* ── 5g · Planos repetidos ─────────────────────────────────── */
 titulo('PLANOS REPETIDOS');
 const { agrupar, huella, aplicar: aplicarR, limpiar: limpiarR, ahorroDe } =

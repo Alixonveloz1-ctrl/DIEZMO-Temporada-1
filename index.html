@@ -603,14 +603,10 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     <details style="margin-top:14px">
       <summary>Los doce guiones y sus ajustes</summary>
       <ul id="listaEps" style="margin-top:12px"></ul>
-      <div class="rejilla3" style="margin-top:16px">
+      <div class="rejilla2" style="margin-top:16px">
         <div class="campo">
           <label for="cfgSegToma">Segundos por toma</label>
           <div class="rango"><input type="range" id="cfgSegToma" min="4" max="20" step="1"><span class="val" id="valSegToma">8 s</span></div>
-        </div>
-        <div class="campo">
-          <label for="cfgMovim">Tomas con movimiento real</label>
-          <div class="rango"><input type="range" id="cfgMovim" min="0" max="100" step="5"><span class="val" id="valMovim">35 %</span></div>
         </div>
         <div class="campo">
           <label for="cfgFormato">Formato</label>
@@ -713,6 +709,14 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         <p class="pista" id="pistaModVid">—</p>
         <p class="pista" id="tarifaVid" style="color:var(--oro)">—</p>
       </div>
+      <div class="campo">
+        <label for="cfgMovim">Qué parte de las tomas se anima de verdad</label>
+        <div class="rango"><input type="range" id="cfgMovim" min="0" max="100" step="5"><span class="val" id="valMovim">35 %</span></div>
+      </div>
+      <p class="pista" id="cuentaMovim" style="color:var(--oro)">—</p>
+      <p class="pg-txt" style="margin:8px 0 11px">Al mover esto se reparte otra vez el movimiento en
+        todos los episodios ya dirigidos, intercalado a lo largo de cada uno. Las tomas que el
+        director marcó como imprescindibles se animan siempre, esté donde esté el porcentaje.</p>
       <div class="fila-btn"><button class="btn primario" id="btnProdVid">Generar el movimiento</button></div>
     </div>
 

@@ -427,6 +427,20 @@ function pintarNotasModelo() {
     $('tarifaVid').textContent = 'Tarifa aplicada: ' +
       tarifaLegible(P.config.modeloVideo, P.config.resolucionVideo, P.config.audioVeo);
   }
+  if ($('cuentaMovim')) {
+    let clips = 0, segundos = 0;
+    for (const ep of P.episodios) {
+      for (const t of ep.tomas || []) {
+        if (!(t.plano && t.plano.tipo === 'movimiento') || t.reusaVideo) continue;
+        clips++;
+        segundos += duracionVeo(P.config.modeloVideo, t.segundos || t.segEstimados || 8);
+      }
+    }
+    const usd = segundos * precioSegundo(P.config.modeloVideo, P.config.resolucionVideo, P.config.audioVeo);
+    $('cuentaMovim').textContent = clips
+      ? 'En la temporada: ' + clips + ' clips · ' + segundos + ' s de video · $' + usd.toFixed(2)
+      : 'Todavía no hay episodios dirigidos, así que no hay nada repartido.';
+  }
 }
 
 /** Un cambio en cualquier selector de modelo se refleja en todos. */
@@ -1213,6 +1227,7 @@ function pintarTodo() {
   pintarRejillaProd();
   pintarPasos();
   pintarRepes();
+  pintarNotasModelo();
   pintarCoste();
   pintarResumenTemporada();
   pintarAlmacen();
@@ -1479,7 +1494,22 @@ function cablear() {
   $('cfgMovim').addEventListener('input', (e) => { $('valMovim').textContent = e.target.value + ' %'; });
   $('cfgMovim').addEventListener('change', async (e) => {
     P.config.proporcionMovimiento = Number(e.target.value) / 100;
-    await guardar();
+    // Mover el mando tiene que hacer algo. Antes solo guardaba el número y no
+    // se repartía nada hasta pulsar otro botón, así que bajar el porcentaje
+    // parecía funcionar y seguías pagando el anterior.
+    let tocados = 0;
+    for (const ep of P.episodios) {
+      const planos = ep.tomas.map((x) => x.plano);
+      if (planos.some((p) => !p)) continue;
+      const conTipo = repartirMovimiento(planos, P.config.proporcionMovimiento);
+      ep.tomas.forEach((x, i) => { x.plano = conTipo[i]; });
+      tocados++;
+    }
+    await guardar(); pintarTodo();
+    if (tocados) {
+      log('movimiento repartido de nuevo en ' + tocados +
+        (tocados === 1 ? ' episodio dirigido' : ' episodios dirigidos'), 'ok');
+    }
   });
   $('cfgFormato').addEventListener('change', async (e) => {
     P.config.formato = e.target.value;

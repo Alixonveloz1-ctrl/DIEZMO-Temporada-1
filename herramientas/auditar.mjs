@@ -413,9 +413,19 @@ else ok('Lyria 3 Pro: pieza de hasta 184 s por 0,08 $, cobrada por pieza y no po
 
 // La música lleva narración encima: una voz cantada competiría con ella.
 const pm = promptMusica({ escena: 1, segundos: 120, encargo: 'prueba' }, { modeloMusica: 'lyria-3-pro-preview' });
-if (!/INSTRUMENTAL/i.test(pm) || !/sin voces/i.test(pm)) {
-  mal('el encargo de música no exige que sea instrumental', 'una voz cantada pisaría al narrador');
-} else ok('todo encargo de música exige instrumental y deja sitio a la narración');
+/*  Lyria es un modelo de canciones: canta salvo que se le insista. La
+    restricción tiene que ir DELANTE del encargo —lo primero que lee— y
+    repetirse al final, o acaba cantando la descripción de la escena.        */
+if (!/^INSTRUMENTAL ONLY/.test(pm)) {
+  mal('el prompt de música no empieza prohibiendo la voz',
+    'Lyria canta por defecto: la restricción tiene que ir lo primero');
+} else if (!/INSTRUMENTAL ONLY[\s\S]*$/.test(pm.slice(-200))) {
+  mal('el prompt de música no repite la prohibición al final');
+} else if (!/No vocals/.test(pm) || !/No lyrics/.test(pm)) {
+  mal('el prompt no dice explícitamente que no haya voces ni letra');
+} else if (!/no lyrics|not lyrics|nunca una letra/i.test(pm)) {
+  mal('no se aclara que el encargo es una descripción, no una letra para cantar');
+} else ok('el prompt de música prohíbe la voz al principio y al final, y en inglés');
 
 // Una pieza por escena, no por toma.
 const epFalso = { num: 1, tomas: [
@@ -452,6 +462,31 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
     'bajarla parecería funcionar y se seguiría pagando la anterior');
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
+
+/* ── 5c-ter · El audio no puede llegar cortado ─────────────── */
+titulo('AUDIO COMPLETO');
+const back4 = leer('api/ep-gemini.js');
+/*  Gemini parte el audio en varias partes cuando el texto es largo. Quedarse
+    con la primera corta la locución a la mitad, y el reproductor salta a la
+    toma siguiente: es lo que se oía.                                         */
+if (!/function juntarAudio\(/.test(back4)) {
+  mal('el audio se toma de una sola parte de la respuesta',
+    'una locución larga viene troceada y se cortaría a la mitad');
+} else if (!/Buffer\.concat\(trozos\)/.test(back4)) {
+  mal('las partes de audio no se concatenan en binario',
+    'pegar cadenas base64 produce basura si un trozo no es múltiplo de tres bytes');
+} else {
+  const usos = (back4.match(/juntarAudio\(out\.json\)/g) || []).length;
+  const conPick = /mode === 'tts'[\s\S]{0,1600}pickInlinePart\(/.test(back4) ||
+    /mode === 'musica'[\s\S]{0,1400}pickInlinePart\(/.test(back4);
+  if (usos < 2 || conPick) mal('la voz o la música siguen tomando una sola parte del audio');
+  else ok('voz y música juntan todas las partes del audio que devuelve el modelo');
+}
+
+// Y la cabecera RIFF de un trozo intermedio no puede quedarse dentro.
+if (!/RIFF'\)\s*\{[\s\S]{0,80}slice\(44\)/.test(back4)) {
+  mal('una cabecera WAV en mitad del audio no se descarta', 'sonaría un chasquido en la costura');
+} else ok('las cabeceras de los trozos intermedios se descartan al unir');
 
 /* ── 5c-bis · Tonos de voz ya calibrados ───────────────────── */
 titulo('TONOS DE VOZ');

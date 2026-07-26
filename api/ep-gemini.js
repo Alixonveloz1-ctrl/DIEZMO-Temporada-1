@@ -104,6 +104,42 @@ function pickInlinePart(json) {
   return null;
 }
 
+/*  Gemini devuelve el audio PARTIDO EN VARIAS PARTES cuando el texto es largo:
+    una locución de diez segundos puede venir en tres trozos. pickInlinePart se
+    quedaba con el primero, así que la voz se cortaba a mitad de frase y el
+    reproductor pasaba a la toma siguiente. Hay que juntarlos todos.
+
+    Se unen en BINARIO, no concatenando base64: si un trozo no es múltiplo de
+    tres bytes, pegar las cadenas base64 produce basura. Y si algún trozo trae
+    cabecera RIFF propia, se le quita: solo la del primero vale.              */
+function juntarAudio(json) {
+  const parts = json && json.candidates && json.candidates[0] &&
+    json.candidates[0].content && json.candidates[0].content.parts;
+  if (!parts) return null;
+
+  const trozos = [];
+  let mimeType = null;
+  for (const p of parts) {
+    const inl = p.inlineData || p.inline_data;
+    if (!inl || !inl.data) continue;
+    const mt = inl.mimeType || inl.mime_type || '';
+    if (mt.indexOf('image') === 0) continue;      // no es audio
+    if (!mimeType) mimeType = mt;
+    let buf = Buffer.from(inl.data, 'base64');
+    // Cabecera RIFF en un trozo que no es el primero: fuera.
+    if (trozos.length && buf.length > 44 && buf.slice(0, 4).toString('latin1') === 'RIFF') {
+      buf = buf.slice(44);
+    }
+    trozos.push(buf);
+  }
+  if (!trozos.length) return null;
+  return {
+    data: (trozos.length === 1 ? trozos[0] : Buffer.concat(trozos)).toString('base64'),
+    mimeType: mimeType || 'audio/L16;codec=pcm;rate=24000',
+    partes: trozos.length,
+  };
+}
+
 function textoDe(json) {
   const parts = json && json.candidates && json.candidates[0] &&
     json.candidates[0].content && json.candidates[0].content.parts;
@@ -476,7 +512,7 @@ module.exports = async (req, res) => {
           detail: (out.raw || '').slice(0, 800),
         });
       }
-      const inline = pickInlinePart(out.json);
+      const inline = juntarAudio(out.json);
       if (!inline) {
         return res.status(502).json({
           error: motivoBloqueo(out.json) || 'Respuesta de Vertex sin audio',
@@ -490,6 +526,7 @@ module.exports = async (req, res) => {
         audio: inline.data,
         mimeType: mime,
         sampleRate: m ? parseInt(m[1], 10) : 24000,
+        partes: inline.partes,
         guardado,
       });
     }
@@ -646,7 +683,7 @@ module.exports = async (req, res) => {
           detail: (out.raw || '').slice(0, 800),
         });
       }
-      const inline = pickInlinePart(out.json);
+      const inline = juntarAudio(out.json);
       if (!inline) {
         const bloqueo = motivoBloqueo(out.json);
         return res.status(bloqueo ? 422 : 502).json({

@@ -70,7 +70,9 @@ const SISTEMA_MUSICA =
   'cortés, nunca gore. Recibes las escenas de un episodio y escribes el encargo musical de cada ' +
   'una. Reglas innegociables:\n' +
   '1. La música es SIEMPRE instrumental. Nunca voces, nunca coros con letra, nunca palabras ' +
-  'cantadas: encima va la voz de un narrador y cualquier voz cantada competiría con ella.\n' +
+  'cantadas: encima va la voz de un narrador y cualquier voz cantada competiría con ella. ' +
+  'No escribas NUNCA frases que puedan leerse como una letra, ni cites diálogo del guion, ' +
+  'ni menciones voz, canto, coro, cantante ni palabras: el modelo de música las cantaría.\n' +
   '2. Escribe para acompañar, no para protagonizar. Registro medio y grave, sin agudos ' +
   'penetrantes, sin percusión seca que se coma la dicción.\n' +
   '3. Describe género, instrumentación concreta, tempo aproximado, y cómo evoluciona a lo largo ' +
@@ -142,19 +144,36 @@ export async function encargarMusica(ep, ctx, opciones) {
   }));
 }
 
+/*  Lyria es un modelo de CANCIONES: por defecto canta, y si le das prosa
+    descriptiva puede tomarla por letra. Por eso la restricción va delante del
+    todo, en inglés —que es como está entrenado el modelo— y se repite al
+    final. El encargo va etiquetado como estilo, para que no se lea como letra. */
+const SIN_VOZ_EN =
+  'INSTRUMENTAL ONLY. No vocals. No singing. No choir. No lyrics. No spoken word. ' +
+  'No human voice of any kind. This is a background score for a narrated film.';
+
+const SIN_VOZ_ES =
+  'ESTRICTAMENTE INSTRUMENTAL: ni voces, ni coro, ni letra, ni palabras cantadas o ' +
+  'habladas. El texto de arriba es una descripción del ESTILO, nunca una letra para ' +
+  'cantar. Encima de esta música va la voz de un narrador, así que deja sitio: ' +
+  'registro medio y grave, sin agudos punzantes, dinámica contenida y sin silencios ' +
+  'bruscos. Producción limpia, estéreo amplio, sin distorsión.';
+
 /** El prompt final que recibe Lyria, con las salvaguardas que no se negocian. */
 export function promptMusica(escena, ctx) {
-  const seg = Math.max(20, Math.min(duracionMaxima(ctx.modeloMusica), Math.round(escena.segundos)));
+  const seg = Math.max(20, Math.min(duracionMaxima(ctx && ctx.modeloMusica), Math.round(escena.segundos)));
   return [
-    'Pieza instrumental para la banda sonora de un anime seinen de ciencia ficción oscura.',
+    SIN_VOZ_EN,
     '',
-    escena.encargo,
+    'STYLE (this is a description, not lyrics): instrumental score for a dark ' +
+    'science-fiction seinen anime.',
+    '',
+    'ESTILO: ' + String(escena.encargo || '').replace(/\n+/g, ' ').trim(),
     '',
     'Duración objetivo: alrededor de ' + seg + ' segundos.',
-    'ESTRICTAMENTE INSTRUMENTAL: sin voces, sin coro con letra, sin palabras cantadas ni habladas. ' +
-    'Encima de esta música va la voz de un narrador, así que deja sitio: registro medio y grave, ' +
-    'sin agudos punzantes, dinámica contenida y sin silencios bruscos.',
-    'Producción limpia, estéreo amplio, sin distorsión.',
+    SIN_VOZ_ES,
+    '',
+    SIN_VOZ_EN,
   ].join('\n');
 }
 

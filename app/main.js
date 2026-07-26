@@ -1943,7 +1943,11 @@ async function recuperarDeNube() {
       for (const [k, info] of inventario) {
         if (!info || !info.ts) continue;
         const local = await assets.leer(k).catch(() => null);
-        if (local && local.ts && info.ts > local.ts + 2000) {
+        /*  Margen amplio a propósito: lo que se genera aquí se guarda primero
+            en local y se sube después, así que la copia del bucket siempre
+            queda unos segundos por delante. Solo cuenta como «más nueva» una
+            regeneración de verdad, hecha desde otro sitio.                   */
+        if (local && local.ts && info.ts > local.ts + 300000) {
           await assets.borrar(k).catch(() => {});
           refrescados++;
         }

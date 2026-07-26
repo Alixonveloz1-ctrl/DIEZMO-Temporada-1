@@ -84,6 +84,13 @@ export const TONOS = [
 
 export const TONO_POR_DEFECTO = 'narrador';
 
+/*  La semilla fija el muestreo del modelo. Vacía significa aleatoria, y con una
+    llamada por escena eso son setenta y seis sorteos distintos en la temporada.
+    Va dentro del tono porque no es una decisión del usuario: no hay un número
+    «mejor» que otro, solo importa que no cambie. Si un número concreto no
+    gusta, se cambia por otro y se rehace la voz.                              */
+export const SEMILLA_FIJA = 20250726;
+
 export function tonoPorId(id) {
   return TONOS.find((t) => t.id === id) || TONOS[0];
 }
@@ -93,6 +100,11 @@ export function aplicarTono(config, id) {
   const t = tonoPorId(id);
   config.tono = t.id;
   config.voz = t.voz;
+  // La semilla solo se pone si no había ninguna: cambiar de tono no tiene por
+  // qué tirar una semilla que el usuario ya estaba usando a gusto.
+  if (!Number.isFinite(Number(config.semillaVoz)) || config.semillaVoz === '') {
+    config.semillaVoz = SEMILLA_FIJA;
+  }
   config.temperaturaVoz = t.temperatura;
   config.instruccionVoz = t.instruccion;
   return t;

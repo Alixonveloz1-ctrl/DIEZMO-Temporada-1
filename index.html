@@ -1028,13 +1028,22 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     <summary>Ajuste fino de la voz (normalmente no hace falta)</summary>
     <p class="nota chica" style="margin-top:10px">Tocar esto separa la voz del tono elegido. El
       selector pasará a decir «personalizado».</p>
+    <p class="nota chica">La semilla es lo que hace que la voz suene igual en todas las llamadas.
+      No hay un número mejor que otro y no hay que inventarlo: viene puesto. «Probar otra» sortea
+      una distinta, por si esa voz concreta no te convence.</p>
     <div class="rejilla2" style="margin-top:12px">
       <div class="campo"><label for="cfgVoz">Voz concreta</label><select id="cfgVoz"></select></div>
       <div class="campo">
         <label for="cfgTempVoz">Temperatura</label>
         <div class="rango"><input type="range" id="cfgTempVoz" min="0" max="2" step="0.05"><span class="val" id="valTempVoz">0.90</span></div>
       </div>
-      <div class="campo"><label for="cfgSemilla">Semilla</label><input type="number" id="cfgSemilla" placeholder="vacío = aleatoria"></div>
+      <div class="campo">
+        <label>Semilla de muestreo</label>
+        <div class="fila-btn">
+          <span class="chip" id="valSemilla">—</span>
+          <button class="btn fantasma chico" type="button" id="btnNuevaSemilla">Probar otra</button>
+        </div>
+      </div>
     </div>
     <div class="campo">
       <label for="cfgInstruccionVoz">Instrucción de estilo</label>

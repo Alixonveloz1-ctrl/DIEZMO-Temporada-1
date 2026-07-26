@@ -463,6 +463,43 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
 
+/* ── 5c-pre · La semilla no se teclea y llega a lo guardado ── */
+titulo('SEMILLA DE VOZ');
+const { SEMILLA_FIJA, aplicarTono: aplT } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
+const mainS = leer('app/main.js');
+
+// Cambiar CONFIG_DEFECTO no basta: lo guardado gana. Hace falta reparación.
+if (!/P\.config\.semillaVoz = SEMILLA_FIJA/.test(mainS)) {
+  mal('la semilla fija no llega a un proyecto ya guardado',
+    'lo guardado gana sobre CONFIG_DEFECTO: cambiar el valor por defecto no es suficiente');
+} else {
+  const viejo = { tono: null, semillaVoz: '' };
+  const reparado = { ...viejo };
+  if (reparado.semillaVoz === '' || !isFinite(Number(reparado.semillaVoz))) reparado.semillaVoz = SEMILLA_FIJA;
+  if (!Number.isFinite(Number(reparado.semillaVoz))) mal('la reparación de la semilla no produce un número');
+  else ok('un proyecto guardado con semilla aleatoria queda reparado a ' + SEMILLA_FIJA);
+}
+
+// Aplicar un tono no puede pisar una semilla que ya estaba puesta.
+const conSemilla = { semillaVoz: 12345 };
+aplT(conSemilla, 'narrador');
+if (Number(conSemilla.semillaVoz) !== 12345) mal('cambiar de tono pisa la semilla del usuario');
+else {
+  const sinSemilla = { semillaVoz: '' };
+  aplT(sinSemilla, 'narrador');
+  if (!Number.isFinite(Number(sinSemilla.semillaVoz))) mal('aplicar un tono deja la semilla sin poner');
+  else ok('el tono pone semilla si falta y respeta la que ya hubiera');
+}
+
+// Y no puede haber un campo donde el usuario tenga que inventarse un número.
+if (/id="cfgSemilla"/.test(html)) {
+  mal('la semilla sigue siendo un campo de escribir',
+    'el usuario no tiene forma de saber qué número poner');
+} else if (!ids.has('btnNuevaSemilla') || !ids.has('valSemilla')) {
+  mal('no hay forma de ver ni de cambiar la semilla sin teclearla');
+} else ok('la semilla se ve y se cambia con un botón, no se teclea');
+
 /* ── 5c-quater · La voz se pide por escena ─────────────────── */
 titulo('VOZ POR ESCENA');
 const pipeVoz = leer('app/pipeline.js');

@@ -19,7 +19,7 @@ import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob, claveImagenDe, 
 import { Proyector } from './player.js';
 import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
 import { MODELOS_MUSICA, precioPieza, escenasDe } from './musica.js';
-import { TONOS, TONO_POR_DEFECTO, tonoPorId, aplicarTono, coincideConTono } from './voz.js';
+import { TONOS, TONO_POR_DEFECTO, SEMILLA_FIJA, tonoPorId, aplicarTono, coincideConTono } from './voz.js';
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
 
@@ -67,6 +67,14 @@ async function cargar() {
       Tocar el ajuste fino pone tono a null, así que un ajuste a mano no se
       pisa nunca.                                                             */
   if (P.config.tono) aplicarTono(P.config, P.config.tono);
+  /*  Reparación: la semilla vacía significaba «aleatoria», y con ella la voz
+      cambiaba entre llamadas. Ya no es una opción válida. Cambiar el valor por
+      defecto no bastaba: lo guardado gana sobre CONFIG_DEFECTO, así que a un
+      proyecto que ya existía no le llegaba nunca.                            */
+  if (P.config.semillaVoz === '' || P.config.semillaVoz === null ||
+      P.config.semillaVoz === undefined || !isFinite(Number(P.config.semillaVoz))) {
+    P.config.semillaVoz = SEMILLA_FIJA;
+  }
   if (!P.elenco || !P.elenco.length) P.elenco = ELENCO_DEFECTO.map((p) => ({ ...p, refs: [] }));
   if (!P.lugares || !P.lugares.length) P.lugares = LUGARES_DEFECTO.map((l) => ({ ...l, ref: null }));
   if (!P.episodios) P.episodios = [];
@@ -1377,7 +1385,7 @@ function abrirAjustes() {
   $('cfgResVideo').value = c.resolucionVideo;
   $('cfgTempVoz').value = c.temperaturaVoz;
   $('valTempVoz').textContent = Number(c.temperaturaVoz).toFixed(2);
-  $('cfgSemilla').value = c.semillaVoz;
+  $('valSemilla').textContent = c.semillaVoz;
   $('cfgNombre').value = c.nombre || '';
   $('cfgInstruccionVoz').value = c.instruccionVoz;
   $('cfgNormalizar').checked = c.normalizarVoz;
@@ -1397,7 +1405,7 @@ function guardarAjustes() {
   c.modeloTexto = $('cfgModeloTexto').value;
   c.resolucionVideo = $('cfgResVideo').value;
   c.temperaturaVoz = parseFloat($('cfgTempVoz').value);
-  c.semillaVoz = $('cfgSemilla').value;
+  // La semilla no se teclea: se conserva la que ya tiene la configuración.
   c.nombre = $('cfgNombre').value.trim();
   c.instruccionVoz = $('cfgInstruccionVoz').value.trim();
   c.normalizarVoz = $('cfgNormalizar').checked;
@@ -1624,6 +1632,13 @@ function cablear() {
     await guardar();
     if (proyector) proyector.cfg = P.config;
     aviso('Música al ' + e.target.value + ' %. Se aplica al instante; no hay que regenerarla.', 'ok', 6000);
+  });
+  $('btnNuevaSemilla').addEventListener('click', async () => {
+    // Un número cualquiera vale; lo único que importa es que no cambie después.
+    P.config.semillaVoz = Math.floor(Math.random() * 900000000) + 1000;
+    $('valSemilla').textContent = P.config.semillaVoz;
+    await guardar();
+    aviso('Semilla nueva. Escucha el tono para oírla; si te gusta, rehaz la voz.', 'ok', 7000);
   });
   $('cfgTono').addEventListener('change', async (e) => {
     if (e.target.value === '__propio') { pintarTonos(); return; }
@@ -1891,7 +1906,7 @@ function cablear() {
         styleInstruction: $('cfgInstruccionVoz').value,
         temperature: parseFloat($('cfgTempVoz').value),
         languageCode: $('cfgIdioma').value || undefined,
-        seed: $('cfgSemilla').value === '' ? undefined : Number($('cfgSemilla').value),
+        seed: Number(P.config.semillaVoz) || undefined,
       });
       const ex = extraerPCM(b64aBytes(r.audio), r.sampleRate || 24000);
       const a = $('audioPrueba');

@@ -1004,7 +1004,31 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
   <div class="selector-modelo">
     <div class="cab">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M12 18v4M5 8v8M19 8v8"/></svg>
-      Tono del narrador
+      Cómo se narra el episodio
+    </div>
+    <select id="cfgMotorVoz">
+      <option value="largo">Una sola locución por episodio — el mismo narrador de principio a fin</option>
+      <option value="gemini">Por bloques, con Gemini — más expresivo, pero cambia de tono cada 45 s</option>
+    </select>
+    <p class="pista" id="pistaMotorVoz">—</p>
+
+    <div id="bloqueVozLarga">
+      <div class="rejilla2" style="margin-top:12px">
+        <div class="campo"><label for="cfgVozChirp">Voz del narrador</label><select id="cfgVozChirp"></select></div>
+        <div class="campo">
+          <label for="cfgVelocidadVoz">Velocidad</label>
+          <div class="rango"><input type="range" id="cfgVelocidadVoz" min="0.75" max="1.5" step="0.01"><span class="val" id="valVelocidadVoz">1.12x</span></div>
+        </div>
+      </div>
+      <p class="nota chica">La velocidad la aplica el motor, exacta y por igual en todo el
+        episodio. No es una petición que el modelo interprete a su manera.</p>
+    </div>
+  </div>
+
+  <div class="selector-modelo" id="bloqueTonoGemini">
+    <div class="cab">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M12 18v4M5 8v8M19 8v8"/></svg>
+      Tono del narrador (solo para el modo por bloques)
     </div>
     <select id="cfgTono"></select>
     <p class="pista" id="pistaTono">—</p>

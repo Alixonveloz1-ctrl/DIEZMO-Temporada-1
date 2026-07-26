@@ -19,7 +19,10 @@ import { Motor, clave, estadoEpisodio, audioCompleto, b64toBlob, claveImagenDe, 
 import { Proyector } from './player.js';
 import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
 import { MODELOS_MUSICA, precioPieza, escenasDe } from './musica.js';
-import { TONOS, TONO_POR_DEFECTO, SEMILLA_FIJA, tonoPorId, aplicarTono, coincideConTono } from './voz.js';
+import {
+  TONOS, TONO_POR_DEFECTO, SEMILLA_FIJA, tonoPorId, aplicarTono, coincideConTono,
+  VOCES_CHIRP, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO, nombreVozChirp, narraEpisodioEntero,
+} from './voz.js';
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargar, Zip } from './exportar.js';
 
@@ -492,6 +495,29 @@ function llenarSelect(sel, pares, valor, preferido) {
   // no, al primero de la lista: caer siempre al primero degradaba la calidad.
   sel.value = validos.indexOf(preferido) !== -1 ? preferido : validos[0];
   return sel.value;
+}
+
+/*  El motor decide qué mandos tienen sentido: con una locución por episodio no
+    hay tono ni semilla que valgan —Chirp no admite instrucción de estilo—, y
+    con Gemini no hay velocidad exacta que aplicar.                          */
+function pintarMotorVoz() {
+  const sel = $('cfgMotorVoz');
+  if (!sel) return;
+  const largo = narraEpisodioEntero(P.config);
+  sel.value = largo ? 'largo' : 'gemini';
+
+  llenarSelect($('cfgVozChirp'), VOCES_CHIRP, P.config.vozChirp, VOZ_CHIRP_DEFECTO);
+  const v = Number(P.config.velocidadVoz) || VELOCIDAD_DEFECTO;
+  $('cfgVelocidadVoz').value = v;
+  $('valVelocidadVoz').textContent = v.toFixed(2) + 'x';
+
+  $('bloqueVozLarga').hidden = !largo;
+  $('bloqueTonoGemini').hidden = largo;
+  $('pistaMotorVoz').textContent = largo
+    ? 'El episodio entero se narra de una vez y la herramienta lo reparte después entre las ' +
+      'tomas por los silencios. Sin costuras: es una única locución.'
+    : 'Cada 45 segundos es una llamada nueva, y cada llamada es una actuación nueva. Más ' +
+      'expresivo, pero el narrador cambia de tono a lo largo del episodio.';
 }
 
 function pintarTonos() {
@@ -1425,6 +1451,7 @@ function abrirAjustes() {
     sel.value = val;
   };
   opciones($('cfgVoz'), VOCES, c.voz);
+  pintarMotorVoz();
   pintarTonos();
   opciones($('cfgIdioma'), IDIOMAS, c.idioma);
   poblarModelos();
@@ -1689,6 +1716,29 @@ function cablear() {
     await guardar();
     aviso('Semilla nueva. Escucha el tono para oírla; si te gusta, rehaz la voz.', 'ok', 7000);
   });
+  $('cfgMotorVoz').addEventListener('change', async (e) => {
+    P.config.motorVoz = e.target.value;
+    pintarMotorVoz();
+    await guardar();
+    aviso(!narraEpisodioEntero(P.config)
+      ? 'Vuelves al modo por bloques. Si ya hay voz generada, hay que rehacerla para oír el cambio.'
+      : 'El episodio se narrará de una vez, con el mismo narrador de principio a fin. ' +
+        'Hay que rehacer la voz para oírlo.', 'ok', 8000);
+  });
+  $('cfgVozChirp').addEventListener('change', async (e) => {
+    P.config.vozChirp = e.target.value;
+    await guardar();
+    aviso('Narrador: ' + nombreVozChirp(e.target.value) + '. Rehaz la voz para oírlo.', 'ok', 6000);
+  });
+  $('cfgVelocidadVoz').addEventListener('input', (e) => {
+    $('valVelocidadVoz').textContent = Number(e.target.value).toFixed(2) + 'x';
+  });
+  $('cfgVelocidadVoz').addEventListener('change', async (e) => {
+    P.config.velocidadVoz = Number(e.target.value);
+    await guardar();
+    aviso('Velocidad ' + P.config.velocidadVoz.toFixed(2) + 'x. Se aplica al narrar: ' +
+      'hay que rehacer la voz.', 'ok', 7000);
+  });
   $('cfgTono').addEventListener('change', async (e) => {
     if (e.target.value === '__propio') { pintarTonos(); return; }
     const t = aplicarTono(P.config, e.target.value);
@@ -1791,7 +1841,7 @@ function cablear() {
       '. ¿Seguir?')) return;
     jobMostrar('rehacer ' + etiqueta);
     const m = nuevoMotor();
-    if (fase === 'voz') await m.generarVoz(ep, false);
+    if (fase === 'voz') await m.generarVozDe(ep, false);
     else if (fase === 'imagen') await m.generarImagenes(ep, false);
     else if (fase === 'video') await m.generarVideos(ep, false);
     else if (fase === 'musica') await m.generarMusica(ep, false);
@@ -1863,9 +1913,16 @@ function cablear() {
     await nuevoMotor().generarImagenes(ep, false, [t.i]);
   }));
   $('btnRegenVoz').addEventListener('click', conToma(async (ep, t) => {
+    /*  Con una locución por episodio no existe «rehacer solo esta toma»: el
+        audio es una pieza y la toma es un recorte suyo. Se dice antes de
+        gastar, en vez de rehacer el episodio entero por sorpresa.          */
+    if (narraEpisodioEntero(P.config) &&
+        !confirm('La voz de este episodio es una sola locución continua, así que esta toma no ' +
+          'se puede rehacer por separado: se vuelve a narrar el episodio entero.\n\n' +
+          '¿Lo narro otra vez?')) return;
     jobMostrar('voz');
     // Sin soloFaltantes: rehacer significa rehacer, aunque ya exista.
-    await nuevoMotor().generarVoz(ep, false, [t.i]);
+    await nuevoMotor().generarVozDe(ep, false, [t.i]);
   }));
   $('btnRegenMus').addEventListener('click', conToma(async (ep, t) => {
     jobMostrar('música · escena ' + t.escena);

@@ -517,6 +517,116 @@ if (!/await rehidratar\(remoto\);[\s\S]{0,320}pintarConfig\(\)/.test(mainM)) {
     'abrir Ajustes y guardar subiría al bucket los valores locales viejos sin tocar nada');
 } else ok('recuperar de la nube repinta los mandos antes de que nadie pueda guardarlos');
 
+/* ── 5b-ter · Una locución por episodio ─────────────────────── */
+titulo('VOZ DE EPISODIO ENTERO');
+const pipeVL = leer('app/pipeline.js');
+const backVL = leer('api/ep-gemini.js');
+const { VOCES_CHIRP, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO, cortarEscena } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
+const { limpiarTexto: lt2, segmentar: sg2 } =
+  await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
+
+/*  El motor por bloques nunca podrá dar el mismo narrador quince minutos
+    seguidos: cada llamada es una actuación nueva. El de episodio entero sí,
+    y para eso el audio tiene que ir por el bucket —una locución de quince
+    minutos son 45 MB y por la función no caben.                            */
+if (!/mode === 'vozlarga'/.test(backVL)) {
+  mal('no existe el modo de locución por episodio');
+} else if (!/synthesizeLongAudio/.test(backVL)) {
+  mal('la locución larga no usa Long Audio Synthesis',
+    'ninguna otra vía admite un episodio entero de una vez');
+} else if (!/outputGcsUri/.test(backVL)) {
+  mal('la locución no se escribe en el bucket',
+    'quince minutos de audio no caben en una respuesta de la función');
+} else if (!/audioConfig\.speakingRate = Math\.min\(2, Math\.max\(0\.25/.test(backVL)) {
+  mal('la velocidad no se acota al rango que admite el motor (0,25x a 2x)');
+} else ok('el episodio entero se narra de una vez y se escribe directo en el bucket');
+
+// Y el reparto entre tomas tiene que ser el mismo de siempre, no otro distinto.
+const genVL = pipeVL.slice(pipeVL.indexOf('async generarVozLarga('),
+  pipeVL.indexOf('/* ── Fotogramas'));
+if (!genVL) {
+  mal('no existe la generación de voz por episodio');
+} else if (!/cortarEscena\(/.test(genVL)) {
+  mal('la locución no se reparte entre las tomas por los silencios');
+} else if (!/clave\.audio\(ep\.num, t\.i\)/.test(genVL)) {
+  mal('la voz repartida no se guarda donde el resto de la herramienta la busca');
+} else ok('la locución se reparte con el mismo cortador de silencios y se guarda toma a toma');
+
+/*  Y tiene que aguantar un episodio ENTERO, que es el caso nuevo: 134 tomas y
+    dieciséis minutos, no seis tomas y un minuto. Se prueba de verdad, con una
+    locución falsa de ritmo irregular —un narrador no lee a velocidad fija.  */
+{
+  const R = 24000;
+  const tomasEp = sg2(lt2(leer('episodios/ep01.md')), { segundosPorToma: 8, cps: 16 });
+  let sem = 7; const rnd = () => ((sem = (sem * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const dur = tomasEp.map((t) => t.segEstimados * (0.85 + rnd() * 0.3));
+  const pcm = new Int16Array(Math.round(dur.reduce((a, d) => a + d + 0.45, 0) * R));
+  const limites = [];
+  let o = 0;
+  dur.forEach((d, k) => {
+    const n = Math.round(d * R);
+    for (let i = 0; i < n; i++) {
+      pcm[o + i] = ((Math.sin(2 * Math.PI * 118 * (o + i) / R) *
+        (0.5 + 0.5 * Math.sin(2 * Math.PI * 4.5 * i / R)) * 9000) + (rnd() - 0.5) * 90) | 0;
+    }
+    o += n;
+    if (k < dur.length - 1) {
+      const p = Math.round(0.45 * R);
+      for (let i = 0; i < p; i++) pcm[o + i] = ((rnd() - 0.5) * 90) | 0;
+      limites.push(o + p / 2);
+      o += p;
+    }
+  });
+  const trs = cortarEscena(pcm.subarray(0, o), R, tomasEp.map((t) => Math.max(1, t.texto.length)));
+  const err = limites.map((real, k) => Math.abs(trs[k].hasta - real) / R).sort((a, b) => a - b);
+  const suma = trs.reduce((a, t) => a + (t.hasta - t.desde), 0);
+  const seguidos = trs.every((t, k) => t.hasta > t.desde && (k === 0 || t.desde === trs[k - 1].hasta));
+  if (trs.length !== tomasEp.length || suma !== o) {
+    mal('repartir un episodio entero pierde o duplica audio', suma + ' de ' + o + ' muestras');
+  } else if (!seguidos) {
+    mal('los tramos del episodio se solapan o van hacia atrás');
+  } else if (err[err.length - 1] > 0.25) {
+    mal('el reparto del episodio se desvía demasiado',
+      'peor error ' + err[err.length - 1].toFixed(2) + ' s');
+  } else {
+    ok('reparte un episodio de ' + (o / R / 60).toFixed(0) + ' min y ' + tomasEp.length +
+       ' tomas con ' + (err[Math.floor(err.length / 2)] * 1000).toFixed(0) + ' ms de error mediano y ' +
+       (err[err.length - 1] * 1000).toFixed(0) + ' ms el peor');
+  }
+}
+
+/*  Un solo sitio decide el motor: si la condición se repite en cada botón,
+    tarde o temprano uno se queda con el motor antiguo.                     */
+const mainVL = leer('app/main.js');
+const sueltasMotor = ['app/main.js', 'app/pipeline.js', 'app/player.js', 'app/exportar.js']
+  .filter((f) => /motorVoz\s*[!=]==\s*'/.test(leer(f)));
+if (!/async generarVozDe\(/.test(pipeVL)) {
+  mal('no hay un despachador único de motor de voz');
+} else if (/\.generarVoz\(ep, (false|true)\)/.test(mainVL)) {
+  mal('algún botón llama al motor por bloques sin pasar por el despachador');
+} else if (sueltasMotor.length) {
+  mal('la condición del motor se compara a mano en ' + sueltasMotor.join(' · '),
+    'debe salir siempre de narraEpisodioEntero(), o uno se quedará atrás');
+} else ok('un único despachador elige motor y una única función define cuál es');
+
+// Las voces ofrecidas tienen que ser masculinas y del catálogo real de Chirp.
+const malFormadas = VOCES_CHIRP.filter(([id]) => !/^es-US-Chirp3-HD-\w+$/.test(id));
+const varones = ['Charon', 'Orus', 'Fenrir', 'Puck'];
+const intrusas = VOCES_CHIRP.filter(([id]) => varones.indexOf(id.split('-').pop()) === -1);
+if (malFormadas.length) {
+  mal('hay voces con el identificador mal formado', malFormadas.map((v) => v[0]).join(' · '));
+} else if (intrusas.length) {
+  mal('hay voces que no son masculinas', 'el proyecto es de narrador masculino');
+} else if (VOCES_CHIRP.every(([id]) => id !== VOZ_CHIRP_DEFECTO)) {
+  mal('la voz por defecto no está en el catálogo');
+} else if (VELOCIDAD_DEFECTO <= 1) {
+  mal('la velocidad por defecto no acelera la narración', 'se pidió algo más rápida');
+} else {
+  ok(VOCES_CHIRP.length + ' voces masculinas de Chirp 3: HD · por defecto ' +
+     VOZ_CHIRP_DEFECTO.split('-').pop() + ' a ' + VELOCIDAD_DEFECTO + 'x');
+}
+
 /* ── 5c-pre · La semilla no se teclea y llega a lo guardado ── */
 titulo('SEMILLA DE VOZ');
 const { SEMILLA_FIJA, aplicarTono: aplT } =
@@ -627,7 +737,6 @@ if (!/porEscena/.test(genVoz) || !/api\.tts\(/.test(genVoz)) {
 } else ok('un solo sitio pide voz, por bloques de escena, repartida después entre sus tomas');
 
 // El reparto por silencios: se comprueba de verdad, no por su forma.
-const { cortarEscena } = await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
 const R = 24000;
 function escenaFalsa(duraciones, pausa) {
   let sem = 7; const rnd = () => ((sem = (sem * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
@@ -666,8 +775,6 @@ else if (Math.max(...errores) > 0.3) {
     puede pasar de 4,5 MB —y el audio viaja en base64, a 64 KB por segundo
     hablado— y la función se corta al minuto de ejecución. La escena mediana
     dura dos minutos y medio: pedirla entera fallaba siempre.                 */
-const { limpiarTexto: lt2, segmentar: sg2 } =
-  await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
 const { repartirEnBloques, SEGUNDOS_POR_LLAMADA } =
   await import(pathToFileURL(path.join(raiz, 'app', 'voz.js')).href);
 
@@ -931,7 +1038,7 @@ else if (/generar\w+\(ep, true\)/.test(bloqueRehacer)) {
 } else ok('rehacer ignora lo ya hecho y avisa antes de volver a pagarlo');
 
 // Y lo mismo en los botones sueltos del detalle de toma.
-const sueltos = (mainR.match(/\$\('btnRegen(Voz|Img|Vid|Mus)'\)[\s\S]{0,420}?\}\)\);/g) || []);
+const sueltos = (mainR.match(/\$\('btnRegen(Voz|Img|Vid|Mus)'\)[\s\S]{0,900}?\}\)\);/g) || []);
 const conFaltantes = sueltos.filter((b) => /generar\w+\(ep, true/.test(b));
 if (sueltos.length < 4) mal('faltan botones de regenerar en el detalle de toma');
 else if (conFaltantes.length) mal('un botón de regenerar salta lo que ya existe', conFaltantes.length + ' de 4');

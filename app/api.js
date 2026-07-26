@@ -147,7 +147,46 @@ export const api = {
 
   videoConsultar: (p, o) => llamar({ mode: 'video', action: 'poll', ...p }, { intentos: 2, ...o }),
 
+  vozLargaIniciar: (p, o) => llamar({ mode: 'vozlarga', action: 'start', ...p }, o),
+
+  vozLargaConsultar: (p, o) => llamar({ mode: 'vozlarga', action: 'poll', ...p }, { intentos: 2, ...o }),
+
 };
+
+/**
+ * Narra un episodio entero de una vez y espera a que Cloud TTS lo escriba en
+ * el bucket. Quince minutos de audio tardan un rato: se consulta cada 8 s.
+ *
+ * @returns {string} la referencia opaca del WAV, para descargarlo con bajarClip
+ */
+export async function generarVozLarga(params, opciones) {
+  const o = opciones || {};
+  const inicio = await api.vozLargaIniciar(params, o);
+  if (o.aviso) o.aviso('en cola en Cloud Text-to-Speech…');
+
+  const limite = Date.now() + (o.tiempoMaximo || 20 * 60 * 1000);
+  let vuelta = 0;
+
+  while (Date.now() < limite) {
+    if (o.señal && o.señal.aborted) throw new Cancelado();
+    await esperar(vuelta === 0 ? 10000 : 8000);
+    vuelta++;
+    const est = await api.vozLargaConsultar(
+      { operationName: inicio.operationName },
+      { señal: o.señal }
+    );
+    if (est.done) {
+      if (est.error) throw new Error(est.error);
+      return inicio.destino;
+    }
+    if (o.aviso) {
+      o.aviso(est.progreso ? 'narrando… ' + Math.round(est.progreso) + ' %'
+        : 'narrando… ' + Math.round(vuelta * 8 / 60) + ' min esperando');
+    }
+  }
+  throw new Error('La narración tardó más de lo previsto. Vuelve a intentarlo: ' +
+    'si ya estaba escrita en el bucket, se reaprovecha.');
+}
 
 /** Descarga el clip por su referencia opaca. El navegador nunca ve el origen. */
 export async function bajarClip(clip, señal) {

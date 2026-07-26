@@ -7,7 +7,7 @@
    siguiente.
    ============================================================ */
 
-import { api, generarVideo, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64, comoReferencia } from './api.js';
+import { api, generarVideo, generarVozLarga, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64, comoReferencia } from './api.js';
 import { assets } from './db.js';
 import { nube } from './nube.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
@@ -15,7 +15,10 @@ import { promptImagen, promptVideo, promptReferencia, promptLugar } from './dire
 import { variantesDe, vestuarioPara } from './biblia.js';
 import { duracionVeo } from './veo.js';
 import { encargarMusica, promptMusica } from './musica.js';
-import { cortarEscena, repartirEnBloques, SEGUNDOS_POR_LLAMADA } from './voz.js';
+import {
+  cortarEscena, repartirEnBloques, SEGUNDOS_POR_LLAMADA,
+  nombreVozChirp, VOZ_CHIRP_DEFECTO, narraEpisodioEntero,
+} from './voz.js';
 
 export const clave = {
   audio: (ep, i) => 'ep' + pad(ep) + '/t' + pad3(i) + '/audio',
@@ -24,6 +27,7 @@ export const clave = {
   refPersonaje: (id, n) => 'ref/personaje/' + id + '/' + n,
   refLugar: (id) => 'ref/lugar/' + id,
   musica: (ep, esc) => 'ep' + pad(ep) + '/mus/' + pad3(esc),
+  vozEpisodio: (ep) => 'ep' + pad(ep) + '/voz-completa',
   episodio: (ep) => 'ep' + pad(ep) + '/completo',
 };
 
@@ -393,6 +397,108 @@ export class Motor {
       (muestras.length / ex.rate).toFixed(1) + ' s en una sola locución', 'ok');
   }
 
+  /*  UN SOLO SITIO decide qué motor narra, para que no haya que repetir la
+      condición en cada botón. Con la locución por episodio no existe «solo
+      las que faltan» ni «solo esta toma»: el episodio es una pieza entera, y
+      rehacer una toma suelta es rehacer la locución.                        */
+  async generarVozDe(ep, soloFaltantes, indices) {
+    if (!narraEpisodioEntero(this.p.config)) return this.generarVoz(ep, soloFaltantes, indices);
+    if (soloFaltantes && (ep.tomas || []).every((t) => t.audio && t.audio.ok)) return;
+    return this.generarVozLarga(ep);
+  }
+
+  /* ── Voz larga: el episodio entero en una sola locución ───── */
+
+  /*  Una llamada por episodio. No hay costuras que disimular porque no hay
+      costuras: es una única toma de quince minutos, y después se reparte
+      entre las 134 tomas por los silencios que el narrador ya hizo.        */
+  async generarVozLarga(ep) {
+    const cfg = this.p.config;
+
+    return this._correr(async () => {
+      const piezas = ep.tomas.map((t) => {
+        let texto = t.texto;
+        if (cfg.anunciarTitulo && t.i === 0) {
+          texto = 'DIEZMO. Episodio ' + ep.num + ': ' + ep.titulo + '.\n\n' + texto;
+        }
+        if (cfg.normalizarVoz) texto = normalizarParaVoz(texto, cfg.reemplazos || REEMPLAZOS_BASE);
+        return texto.trim();
+      });
+      const texto = piezas.filter(Boolean).join('\n\n');
+      if (!texto) { this._log('el episodio no tiene texto que narrar', 'err'); return; }
+
+      /*  Long Audio Synthesis admite un mega de entrada. El episodio más
+          largo de la temporada no llega a veinte mil caracteres, así que
+          nunca se roza; pero si algún día se rozara, más vale decirlo.     */
+      if (texto.length > 900000) {
+        this._log('el episodio pasa del millón de caracteres que admite una locución', 'err');
+        return;
+      }
+
+      this._prog(0, 1, 'voz · narrando el episodio entero');
+      this._log('voz: una sola locución para las ' + ep.tomas.length + ' tomas · ' +
+        texto.length + ' caracteres · voz ' + nombreVozChirp(cfg.vozChirp) +
+        ' a ' + Number(cfg.velocidadVoz).toFixed(2) + 'x', 'info');
+
+      let ref;
+      try {
+        ref = await generarVozLarga({
+          text: texto,
+          voice: cfg.vozChirp || VOZ_CHIRP_DEFECTO,
+          languageCode: cfg.idioma || 'es-US',
+          speakingRate: cfg.velocidadVoz,
+          clave: clave.vozEpisodio(ep.num),
+        }, {
+          señal: this.señal,
+          aviso: (m) => this._prog(0, 1, 'voz · ' + m),
+        });
+      } catch (e) {
+        if (e && e.cancelado) return;
+        for (const t of ep.tomas) t.audio = { ok: false, error: e.message };
+        this._log('voz: ' + e.message, 'err');
+        return;
+      }
+
+      this._prog(0, 1, 'voz · trayendo la locución del bucket');
+      const blob = await bajarClip(ref, this.señal);
+      const ex = extraerPCM(new Uint8Array(await blob.arrayBuffer()), 24000);
+      const segundos = ex.pcm.length / 2 / ex.rate;
+      this._log('locución lista: ' + (segundos / 60).toFixed(1) + ' min de un tirón', 'ok');
+
+      this._prog(0, 1, 'voz · repartiendo entre las tomas');
+      const muestras = aInt16(ex.pcm);
+      // El peso de cada toma es su texto: es lo que predice cuánto dura.
+      const pesos = piezas.map((p) => Math.max(1, p.length));
+      const tramos = cortarEscena(muestras, ex.rate, pesos);
+
+      for (let k = 0; k < ep.tomas.length; k++) {
+        if (this.señal.aborted) return;
+        const t = ep.tomas[k];
+        this._prog(k, ep.tomas.length, 'voz · guardando toma ' + (k + 1));
+        const trozo = ex.pcm.subarray(tramos[k].desde * 2, tramos[k].hasta * 2);
+        const partes = [trozo];
+        if (t.corteEscena && cfg.silencioEscena > 0) {
+          partes.push(new Uint8Array(Math.round(ex.rate * cfg.silencioEscena) * 2));
+        }
+        const wav = crearWav(partes, ex.rate);
+        const dur = partes.reduce((a, x) => a + x.length, 0) / 2 / ex.rate;
+
+        const kAudio = clave.audio(ep.num, t.i);
+        await assets.guardar(kAudio, wav, { ep: ep.num, toma: t.i, dur });
+        if (nube.disponible) {
+          try { await nube.subir(kAudio, await blobAb64(wav), 'audio/wav'); }
+          catch (e) { this._log('la voz de la toma ' + (t.i + 1) + ' no se pudo subir al bucket', 'aviso'); }
+        }
+        t.audio = { ok: true, dur: +dur.toFixed(2), rate: ex.rate };
+        t.segundos = +dur.toFixed(2);
+      }
+
+      this._prog(ep.tomas.length, ep.tomas.length, 'voz');
+      if (this.avisos.cambio) this.avisos.cambio();
+      this._log('voz repartida entre las ' + ep.tomas.length + ' tomas', 'ok');
+    });
+  }
+
   /* ── Fotogramas ───────────────────────────────────────────── */
 
   async generarImagenes(ep, soloFaltantes, indices) {
@@ -639,7 +745,7 @@ export class Motor {
     const f = fases || { voz: true, imagen: true, video: true, musica: true };
     // El orden importa: la voz fija la duración real de cada toma, y de ahí
     // salen los segundos de vídeo y la longitud de cada pieza de música.
-    if (f.voz) { await this.generarVoz(ep, true); }
+    if (f.voz) { await this.generarVozDe(ep, true); }
     if (f.imagen) { await this.generarImagenes(ep, true); }
     if (f.video) { await this.generarVideos(ep, true); }
     if (f.musica) { await this.generarMusica(ep, true); }

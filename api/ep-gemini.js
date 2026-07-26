@@ -554,6 +554,101 @@ module.exports = async (req, res) => {
       });
     }
 
+    /* ════════ VOZLARGA — el episodio entero en una locución ════════ */
+    /*  Gemini TTS no sirve para narrar largo: cada llamada es una actuación
+        nueva, así que el episodio sonaba a varios narradores distintos. Y no
+        se puede pedir entero, porque su campo de texto admite 4.000 bytes,
+        unos cuatro minutos.
+
+        Long Audio Synthesis de Cloud Text-to-Speech sí: acepta un mega de
+        texto, escribe el WAV DIRECTAMENTE en el bucket —así no toca ninguno
+        de los dos techos de la función, ni el de tamaño ni el de tiempo— y
+        va con voces Chirp 3: HD, que son las que mantienen el mismo carácter
+        de principio a fin.                                                   */
+    if (mode === 'vozlarga') {
+      const accion = body.action || 'start';
+      const bucket = nombreBucket();
+      if (!bucket) {
+        return res.status(400).json({
+          error: 'La voz larga escribe el audio en el bucket, y no hay bucket configurado.',
+        });
+      }
+
+      if (accion === 'start') {
+        if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
+        if (!body.clave) return res.status(400).json({ error: 'Falta "clave"' });
+
+        const audioConfig = { audioEncoding: 'LINEAR16', sampleRateHertz: 24000 };
+        // Chirp 3: HD admite de 0,25x a 2x. Es la velocidad exacta, no una
+        // instrucción que el modelo interprete distinto en cada llamada.
+        const vel = Number(body.speakingRate);
+        if (isFinite(vel) && vel > 0) audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));
+
+        const destino = 'gs://' + bucket + '/' + RAIZ + 'material/' + body.clave + '.wav';
+        const url = 'https://texttospeech.googleapis.com/v1beta1/projects/' + project +
+          '/locations/global:synthesizeLongAudio';
+
+        const out = await callVertex(url, token, {
+          input: { text: String(body.text) },
+          voice: {
+            languageCode: body.languageCode || 'es-US',
+            name: body.voice || 'es-US-Chirp3-HD-Charon',
+          },
+          audioConfig,
+          outputGcsUri: destino,
+        }, project);
+
+        if (!out.ok) {
+          /*  Es una API distinta de Vertex y puede estar sin habilitar en el
+              proyecto: decirlo aquí ahorra media hora de búsqueda a ciegas.  */
+          const pista = out.status === 403
+            ? ' Puede que falte habilitar la API de Cloud Text-to-Speech en tu proyecto.'
+            : '';
+          return res.status(out.status).json({
+            error: 'Voz larga: inicio ' + out.status + '.' + pista,
+            detail: (out.raw || '').slice(0, 800),
+          });
+        }
+        if (!out.json || !out.json.name) {
+          return res.status(502).json({
+            error: 'Cloud TTS no devolvió operación',
+            detail: (out.raw || '').slice(0, 800),
+          });
+        }
+        return res.status(200).json({ operationName: out.json.name, destino: cifrarRuta(destino) });
+      }
+
+      if (accion === 'poll') {
+        if (!body.operationName) return res.status(400).json({ error: 'Falta "operationName"' });
+        const url = 'https://texttospeech.googleapis.com/v1beta1/' + String(body.operationName);
+        const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+        const raw = await r.text();
+        let j = null;
+        try { j = JSON.parse(raw); } catch (e) { /* respuesta no-JSON */ }
+        if (!r.ok) {
+          return res.status(r.status).json({
+            error: 'Voz larga: consulta ' + r.status,
+            detail: raw.slice(0, 800),
+          });
+        }
+        j = j || {};
+        if (!j.done) {
+          // La operación informa del porcentaje: sirve para que la barra avance.
+          const meta = j.metadata || {};
+          return res.status(200).json({ done: false, progreso: meta.progressPercentage || 0 });
+        }
+        if (j.error) {
+          return res.status(200).json({
+            done: true,
+            error: j.error.message || JSON.stringify(j.error).slice(0, 400),
+          });
+        }
+        return res.status(200).json({ done: true });
+      }
+
+      return res.status(400).json({ error: 'Acción de voz larga desconocida: ' + accion });
+    }
+
     /* ════════ TEXT — director de IA / JSON estructurado ════════ */
     if (mode === 'text') {
       if (!body.prompt) return res.status(400).json({ error: 'Falta "prompt"' });

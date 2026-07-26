@@ -5,7 +5,7 @@
    el punto de partida, sacado de los doce guiones de la temporada.
    ============================================================ */
 
-import { aplicarTono, SEMILLA_FIJA } from './voz.js';
+import { aplicarTono, SEMILLA_FIJA, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO } from './voz.js';
 
 export const ESTILO_DEFECTO =
   'Anime japonés contemporáneo de alta gama, del estilo que se produce hoy. Dibujo 2D ' +
@@ -419,7 +419,15 @@ export const CONFIG_DEFECTO = {
   modeloMusica: 'lyria-3-pro-preview',
   modeloTts: 'gemini-2.5-flash-preview-tts',
 
-  // Voz — los tres campos siguientes los fija el tono elegido (app/voz.js)
+  /*  MOTOR DE VOZ. 'largo' narra el episodio entero de una vez con Chirp 3: HD
+      y lo reparte después; 'gemini' actúa mejor pero cada llamada es una
+      actuación nueva, y en quince minutos eso suena a varios narradores.
+      Para una serie de doce episodios la constancia manda.                  */
+  motorVoz: 'largo',
+  vozChirp: VOZ_CHIRP_DEFECTO,
+  velocidadVoz: VELOCIDAD_DEFECTO,
+
+  // Voz de Gemini — los tres campos siguientes los fija el tono (app/voz.js)
   tono: 'narrador',
   voz: 'Charon',
   idioma: 'es-US',

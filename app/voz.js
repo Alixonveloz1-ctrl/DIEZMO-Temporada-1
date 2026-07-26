@@ -84,6 +84,47 @@ export const TONOS = [
 
 export const TONO_POR_DEFECTO = 'narrador';
 
+/* ── El otro motor: una locución por episodio ───────────────── */
+
+/*  Gemini TTS actúa, pero cada llamada es una actuación NUEVA: el timbre lo
+    fija la voz elegida y el registro se vuelve a sortear. En un episodio de
+    quince minutos eso se oye como varios narradores. Y no se puede pedir
+    entero, porque su campo de texto admite 4.000 bytes —unos cuatro minutos.
+
+    Chirp 3: HD, con Long Audio Synthesis, hace el episodio entero de una vez:
+    un mega de texto por llamada, el WAV escrito directamente en el bucket y
+    el mismo narrador de principio a fin. Lee con menos rango dramático, pero
+    para doce episodios narrados por la misma persona la constancia vale más.
+
+    Son las mismas ocho personalidades que Gemini, con los mismos nombres.   */
+export const VOCES_CHIRP = [
+  ['es-US-Chirp3-HD-Charon', 'Charon — grave e informativa (la que ya usabas)'],
+  ['es-US-Chirp3-HD-Orus', 'Orus — firme, algo más tensa'],
+  ['es-US-Chirp3-HD-Fenrir', 'Fenrir — más áspera y rotunda'],
+  ['es-US-Chirp3-HD-Puck', 'Puck — más clara y ligera'],
+];
+
+export const VOZ_CHIRP_DEFECTO = 'es-US-Chirp3-HD-Charon';
+
+/*  La velocidad aquí es un número exacto que aplica el motor, no una petición
+    que el modelo interprete distinto en cada llamada. 1,12 es «un poquito más
+    rápido» sin llegar a atropellarse.                                        */
+export const VELOCIDAD_DEFECTO = 1.12;
+export const VELOCIDAD_MIN = 0.25;
+export const VELOCIDAD_MAX = 2;
+
+/*  ¿Se narra el episodio de una vez, o por bloques? UNA sola definición: si la
+    comparación se escribe suelta en cada botón, tarde o temprano uno se queda
+    con el motor antiguo y nadie se entera hasta oírlo.                       */
+export function narraEpisodioEntero(config) {
+  return !config || config.motorVoz !== 'gemini';
+}
+
+export function nombreVozChirp(id) {
+  const v = VOCES_CHIRP.find((x) => x[0] === id);
+  return v ? v[1].split(' — ')[0] : String(id || '').split('-').pop();
+}
+
 /*  La semilla fija el muestreo del modelo. Vacía significa aleatoria, y con una
     llamada por escena eso son setenta y seis sorteos distintos en la temporada.
     Va dentro del tono porque no es una decisión del usuario: no hay un número

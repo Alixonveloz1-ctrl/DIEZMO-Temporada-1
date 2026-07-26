@@ -6,18 +6,31 @@
    ============================================================ */
 
 export const ESTILO_DEFECTO =
-  'Anime japonés seinen, animación 2D tradicional pintada a mano. Cel shading con sombras duras ' +
-  'de dos tonos, línea de tinta fina y firme, fondos pintados con detalle arquitectónico realista, ' +
-  'grano de película sutil. Paleta: negros marrones cálidos, hueso, bronce y ámbar; el rojo brasa ' +
-  'reservado a lo vessari; los interiores humanos en verdes desaturados y fluorescente frío. ' +
-  'Iluminación naturalista y muy contrastada, abundante contraluz y siluetas. Composición ' +
-  'cinematográfica en escala: figuras humanas pequeñas contra arquitectura enorme. ' +
-  'Registro adulto y sobrio, sin exageración cómica, sin deformación caricaturesca.';
+  'Anime japonés contemporáneo de alta gama, del estilo que se produce hoy. Dibujo 2D ' +
+  'íntegramente a mano, animación tradicional en digital: nada de 3D, nada de CGI, nada de ' +
+  'fotorrealismo. Línea de tinta limpia y nítida, de grosor parejo. Sombreado cel moderno: ' +
+  'dos o tres tonos por superficie con transiciones suaves, luz de contorno recortando las ' +
+  'figuras contra el fondo y reflejo cálido en el pelo. Ojos grandes y detallados, con el ' +
+  'iris pintado en capas y brillos nítidos. Color rico y profundo, contraste alto, ' +
+  'iluminación cinematográfica con una fuente de luz clara. Fondos pintados con gran detalle ' +
+  'arquitectónico y profundidad atmosférica. Acabado limpio y de alta definición: sin grano ' +
+  'de película, sin textura de papel, sin trama de puntos, sin aspecto envejecido ni retro. ' +
+  'Paleta: negros marrones cálidos, hueso, bronce y ámbar; el rojo brasa reservado a lo ' +
+  'vessari; los interiores humanos en verdes desaturados y fluorescente frío. ' +
+  'Las figuras humanas se dibujan con anatomía correcta y elegante, de constitución esbelta ' +
+  'y piernas largas, tal como se estilizan los adultos en el anime moderno. ' +
+  'Registro adulto y sobrio, sin exageración cómica.';
 
 export const NEGATIVO_DEFECTO =
+  'una cabeza de más, dos cabezas, cabezas adicionales, un brazo de más, tres brazos, ' +
+  'una pierna de más, una mano de más, dedos de más, extremidades duplicadas, cuerpos ' +
+  'fusionados, rostros duplicados en la misma figura, anatomía imposible, articulaciones ' +
+  'torcidas, manos deformes, cabeza demasiado grande, cuerpo achaparrado, piernas cortas, ' +
+  'proporciones infantiles, enanismo, ' +
   'texto, letras, subtítulos, marca de agua, logotipo, firma, collage, rejilla de viñetas, ' +
-  'manos deformes, dedos de más, estilo chibi, moe, kawaii, render 3D, CGI, fotorrealismo, ' +
-  'colores saturados de caramelo, sonrisas publicitarias, poses de videojuego';
+  'estilo chibi, moe, kawaii, render 3D, CGI, modelado por ordenador, fotorrealismo, ' +
+  'fotografía, grano de película, textura de papel, trama de puntos, aspecto retro, ' +
+  'colores lavados, dibujo de los años ochenta, sonrisas publicitarias, poses de videojuego';
 
 export const INSTRUCCION_VOZ_DEFECTO =
   'Narra en español latino neutro, con voz grave y profunda, a un ritmo medio, con pausas ' +
@@ -69,18 +82,25 @@ export const ELENCO_DEFECTO = [
   {
     id: 'vaal', nombre: 'Vaal', alias: ['Emisario Vaal', 'el Emisario'],
     principal: true,
-    ficha: 'Alienígena vessari, dos metros y pico. Piel gris pálida y lisa, sin poros. Cráneo ' +
-      'alargado hacia atrás, rasgos casi humanos pero de simetría imposible. Ojos de oro uniforme, ' +
-      'sin pupila ni párpado visible. Va envuelto en capas de un tejido gris que cae como agua ' +
-      'quieta. No gesticula. Se mueve con una economía absoluta, sin prisa.',
+    ficha: 'Alienígena vessari. Figura alta y estilizada, de más de dos metros, de una elegancia ' +
+      'serena. Rostro casi humano y de una belleza fría: facciones finas y limpias, pómulos altos, ' +
+      'mandíbula estrecha, nariz recta y pequeña, labios delgados; la simetría es perfecta hasta ' +
+      'resultar imposible, y eso es lo único que delata que no es humano. Piel pálida de nácar, ' +
+      'lisa y luminosa, con un tenue subtono gris perla. Cabeza calva y de cráneo liso, sin cejas ' +
+      'ni pestañas. Ojos grandes y almendrados de oro uniforme, sin pupila. Cuello largo, manos de ' +
+      'dedos largos y finos. Va envuelto en capas de un tejido gris claro que cae como agua quieta. ' +
+      'Expresión serena y cortés; nunca gesticula. Bello y evidentemente no humano.',
   },
   {
     id: 'sereth', nombre: 'Sereth', alias: ['el archivista', 'el último lector'],
     principal: true,
-    ficha: 'Alienígena vessari de la casta archivista. Más angosto y liviano que los demás, algo ' +
-      'encorvado de inclinarse sobre cosas durante siglos. Envuelto en un tejido gris sin forma. ' +
-      'Los dedos de la mano derecha manchados de ámbar seco. Mismos ojos de moneda de oro, pero ' +
-      'con algo rápido y vivo moviéndose detrás.',
+    ficha: 'Alienígena vessari de la casta archivista. El mismo rostro fino y bello de su especie, ' +
+      'pero desgastado por el tiempo: mejillas hundidas, piel pálida de nácar con marcas de edad, ' +
+      'expresión de cansancio inteligente. Más angosto y liviano que los demás, de hombros ' +
+      'estrechos y espalda algo encorvada de siglos inclinado sobre cosas. Ojos grandes de oro ' +
+      'uniforme, sin pupila, pero con algo rápido y despierto moviéndose detrás. Envuelto en un ' +
+      'tejido gris sin forma, con capucha que a veces lleva echada. Los dedos de la mano derecha ' +
+      'manchados de ámbar seco.',
   },
   {
     id: 'goro', nombre: 'Gorō', alias: ['el yakuza'],
@@ -135,9 +155,12 @@ export const ELENCO_DEFECTO = [
   },
   {
     id: 'cuidador', nombre: 'cuidador vessari', alias: ['los cuidadores', 'el cuidador'],
-    ficha: 'Vessari de casta obrera: más ancho y duro que Vaal, mandíbula pesada, piel gris sin ' +
-      'poros, ojos de moneda de oro. Traje sellado gris oscuro con visor espejado adherido al casco ' +
-      '(a veces retirado). Lleva una vara viva de escaneo.',
+    ficha: 'Vessari de casta obrera: la versión de trabajo de la misma especie. Parte del mismo ' +
+      'rostro base, pero todo en él es más ancho y más duro: mandíbula pesada y cuadrada, frente ' +
+      'baja, cuello grueso, hombros anchos. Piel gris lisa y sin poros, más apagada que la de los ' +
+      'de casta alta. Cabeza calva de cráneo alargado hacia atrás. Ojos de oro uniforme, sin ' +
+      'pupila. Traje sellado gris oscuro de una pieza, con visor espejado adherido al casco que a ' +
+      'veces se retira. Lleva una vara viva de escaneo.',
   },
   {
     id: 'caminante', nombre: 'caminante de servicio', alias: ['el ser del collar', 'los caminantes'],
@@ -148,8 +171,10 @@ export const ELENCO_DEFECTO = [
   },
   {
     id: 'instructor', nombre: 'instructor vessari', alias: ['el instructor'],
-    ficha: 'Vessari alto y sobrio, envuelto en tejido claro, ojos de oro. Modales de docente ' +
-      'paciente: manos siempre a la vista, gestos abiertos y lentos.',
+    ficha: 'Vessari de casta alta, alto y sobrio: mismo rostro fino y bello de Vaal, misma piel ' +
+      'pálida de nácar y mismos ojos de oro sin pupila, pero de expresión más cálida y accesible. ' +
+      'Envuelto en tejido claro. Modales de docente paciente: manos siempre a la vista, gestos ' +
+      'abiertos y lentos.',
   },
 ];
 

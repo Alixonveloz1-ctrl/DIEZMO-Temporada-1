@@ -273,21 +273,31 @@ export function promptReferencia(personaje, ctx, variante) {
 
   if (variante === 'hoja') {
     base.push(
-      'Composición: el mismo personaje repetido tres veces sobre fondo gris neutro y liso, de cuerpo ' +
-      'entero, alineado a la misma altura: de frente, de perfil y de espaldas. Iluminación plana y ' +
+      'Composición: UN SOLO personaje, el mismo, mostrado tres veces sobre un fondo gris neutro y ' +
+      'liso: de frente, de perfil y de espaldas. Las tres figuras de cuerpo entero, grandes, ' +
+      'alineadas a la misma altura y ocupando todo el alto del encuadre. Iluminación plana y ' +
       'uniforme de estudio, sin sombras dramáticas, sin escenario, sin objetos. Expresión neutra.'
     );
   } else if (variante === 'rostro') {
     base.push(
-      'Composición: primer plano del rostro sobre fondo gris neutro y liso, de frente, mirando a ' +
-      'cámara, expresión neutra. Iluminación plana y uniforme. Máximo detalle facial y de peinado.'
+      'Composición: primer plano del rostro de UN SOLO personaje sobre fondo gris neutro y liso, ' +
+      'de frente, mirando a cámara, expresión neutra. Iluminación plana y uniforme. Máximo detalle ' +
+      'facial, de mirada y de peinado.'
     );
   } else {
     base.push(
-      'Composición: plano medio del personaje sobre fondo gris neutro, tres cuartos, en su postura ' +
-      'característica. Iluminación suave de estudio.'
+      'Composición: plano medio de UN SOLO personaje sobre fondo gris neutro, en tres cuartos, en ' +
+      'su postura característica. Iluminación suave de estudio.'
     );
   }
+
+  // Salvaguarda anatómica: los modelos de imagen duplican miembros con facilidad,
+  // y en una hoja de referencia con tres vistas el riesgo se multiplica.
+  base.push(
+    'ANATOMÍA: cada figura es un cuerpo completo y correcto, con una única cabeza, un único ' +
+    'rostro, dos brazos, dos piernas y manos de cinco dedos. Constitución esbelta y adulta, de ' +
+    'piernas largas y torso proporcionado; nada de cuerpos achaparrados ni cabezas grandes.'
+  );
 
   base.push('EVITAR: ' + ctx.negativo + ', múltiples personajes distintos, fondo con escenario.');
   return base.join('\n');

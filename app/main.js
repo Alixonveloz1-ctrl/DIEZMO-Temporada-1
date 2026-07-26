@@ -1372,27 +1372,6 @@ function cablear() {
     descargar(new Blob([scriptFfmpeg(hoja)], { type: 'text/plain' }), 'montar-ep' + pad2(ep.num) + '.sh');
     descargar(new Blob([JSON.stringify(hoja, null, 2)], { type: 'application/json' }), 'montaje-ep' + pad2(ep.num) + '.json');
   });
-  $('btnExportProyecto').addEventListener('click', () => {
-    descargar(new Blob([JSON.stringify(P, null, 2)], { type: 'application/json' }),
-      'diezmo-proyecto-' + new Date().toISOString().slice(0, 10) + '.json');
-  });
-  $('fileProyecto').addEventListener('change', async (ev) => {
-    const f = (ev.target.files || [])[0];
-    if (!f) return;
-    if (!confirm('Esto reemplaza el guion técnico y los ajustes actuales. El material generado se conserva. ¿Seguir?')) return;
-    try {
-      const j = JSON.parse(await f.text());
-      if (!j || !j.version) throw new Error('El archivo no es una copia del proyecto');
-      P = j;
-      P.config = { ...CONFIG_DEFECTO, ...(P.config || {}) };
-      await guardar(); pintarTodo(); pintarFichas();
-      estado('estadoExport', 'Proyecto restaurado.', 'ok');
-    } catch (e) {
-      estado('estadoExport', 'No se pudo restaurar: ' + e.message, 'err');
-    }
-    ev.target.value = '';
-  });
-
   // Ajustes
   $('btnAjustes').addEventListener('click', abrirAjustes);
   $('btnAjCancelar').addEventListener('click', () => $('dlgAjustes').close());

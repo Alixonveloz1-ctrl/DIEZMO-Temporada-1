@@ -22,11 +22,12 @@ export const ESTILO_DEFECTO =
   'Registro adulto y sobrio, sin exageración cómica.';
 
 export const NEGATIVO_DEFECTO =
-  'una cabeza de más, dos cabezas, cabezas adicionales, un brazo de más, tres brazos, ' +
-  'una pierna de más, una mano de más, dedos de más, extremidades duplicadas, cuerpos ' +
-  'fusionados, rostros duplicados en la misma figura, anatomía imposible, articulaciones ' +
-  'torcidas, manos deformes, cabeza demasiado grande, cuerpo achaparrado, piernas cortas, ' +
-  'proporciones infantiles, enanismo, ' +
+  // Los defectos se nombran como defectos, nunca describiendo la imagen indeseada:
+  // «duplicación de cabezas» no puede leerse como una instrucción de dibujarlas.
+  'duplicación de cabezas, duplicación de rostros, duplicación de miembros, extremidades ' +
+  'sobrantes, dedos sobrantes, miembros fusionados, cuerpos fusionados, anatomía imposible, ' +
+  'articulaciones torcidas, manos deformes, cabeza desproporcionada, cuerpo achaparrado, ' +
+  'piernas acortadas, proporciones infantiles, enanismo, ' +
   'texto, letras, subtítulos, marca de agua, logotipo, firma, collage, rejilla de viñetas, ' +
   'estilo chibi, moe, kawaii, render 3D, CGI, modelado por ordenador, fotorrealismo, ' +
   'fotografía, grano de película, textura de papel, trama de puntos, aspecto retro, ' +

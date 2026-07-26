@@ -82,10 +82,14 @@ function actualizarBiblia(forzar) {
       const v = lista.find((x) => x.id === d.id);
       if (!v) { lista.push({ ...d, refs: [], ref: null }); cambios++; continue; }
       if (v.editada) continue;                 // ficha tocada a mano: intocable
-      v.nombre = d.nombre;
-      v.alias = d.alias;
-      v.ficha = d.ficha;
-      if (d.principal !== undefined) v.principal = d.principal;
+      // Se copia TODO lo que define al personaje. Copiar campo a campo fue el
+      // error anterior: los vestuarios nuevos nunca llegaban al proyecto.
+      const refs = v.refs, ref = v.ref, editada = v.editada;
+      for (const k of Object.keys(v)) delete v[k];
+      Object.assign(v, JSON.parse(JSON.stringify(d)));
+      v.refs = refs || [];
+      if (ref) v.ref = ref;
+      v.editada = editada;
       cambios++;
     }
   };
@@ -1529,9 +1533,11 @@ async function recuperarDeNube() {
         }
       }
       for (const per of P.elenco) {
-        const hoja = clave.refPersonaje(per.id, 'hoja');
-        const rostro = clave.refPersonaje(per.id, 'rostro');
-        per.refs = [hoja, rostro].filter((k) => inventario.has(k));
+        // Las hojas dependen del vestuario del personaje, no son dos fijas: hay que
+        // recorrer sus variantes reales o se borran las que sí están generadas.
+        const posibles = variantesDe(per).map((v) => clave.refPersonaje(per.id, v.id));
+        const previas = per.refs || [];
+        per.refs = posibles.filter((k) => inventario.has(k) || previas.indexOf(k) !== -1);
       }
       for (const lug of P.lugares) {
         lug.ref = inventario.has(clave.refLugar(lug.id)) ? clave.refLugar(lug.id) : lug.ref;

@@ -269,13 +269,22 @@ export function promptVideo(plano, ctx) {
 }
 
 /** Prompt de hoja de referencia de un personaje. */
-export function promptReferencia(personaje, ctx, variante) {
+export function promptReferencia(personaje, ctx, variante, conMaestra) {
   const v = typeof variante === 'string' ? { id: variante, desc: '' } : (variante || { id: 'hoja' });
   const base = [
     'HOJA DE REFERENCIA DE PERSONAJE para un anime. ' + ctx.estilo,
     '',
     'PERSONAJE: ' + personaje.nombre + '. ' + personaje.ficha,
   ];
+  // Sin esto, cada hoja sale de cero y el personaje cambia de cara entre una y otra.
+  if (conMaestra) {
+    base.push(
+      'IMPORTANTE — la imagen de referencia adjunta es ESTE MISMO PERSONAJE, ya diseñado. ' +
+      'Conserva sin ninguna variación su rostro, sus facciones, el color y el peinado del pelo, ' +
+      'el color de los ojos, la complexión, la estatura y las proporciones. Es la misma persona. ' +
+      'Lo único que cambia es ' + (v.id === 'rostro' ? 'el encuadre.' : 'la ropa que lleva puesta.')
+    );
+  }
   if (v.desc) base.push('VESTUARIO: ' + v.desc);
 
   if (v.id !== 'rostro') {
@@ -297,11 +306,15 @@ export function promptReferencia(personaje, ctx, variante) {
     );
   }
 
-  base.push(
-    'ANATOMÍA: un cuerpo completo y correcto, con una única cabeza, un único rostro, dos brazos, ' +
-    'dos piernas y manos de cinco dedos. Figura alta y estilizada: piernas largas que ocupan algo ' +
-    'más de la mitad de la altura total, torso esbelto, cuello definido y cabeza pequeña en ' +
-    'relación con el cuerpo, como se dibuja a los adultos en el anime moderno.'
+  // La salvaguarda cambia según el encuadre: describir piernas largas dentro de un
+  // primer plano de rostro hacía que el modelo dibujara el cuerpo entero.
+  base.push(v.id === 'rostro'
+    ? 'ANATOMÍA: un único rostro, con dos ojos, una nariz y una boca. Encuadre cerrado: se ve ' +
+      'la cabeza, el cuello y como mucho los hombros. El cuerpo queda fuera del cuadro.'
+    : 'ANATOMÍA: un cuerpo completo y correcto, con una única cabeza, un único rostro, dos ' +
+      'brazos, dos piernas y manos de cinco dedos. Figura alta y estilizada: piernas largas que ' +
+      'ocupan algo más de la mitad de la altura total, torso esbelto, cuello definido y cabeza ' +
+      'pequeña en relación con el cuerpo, como se dibuja a los adultos en el anime moderno.'
   );
 
   if (ctx.calidad) base.push(ctx.calidad);

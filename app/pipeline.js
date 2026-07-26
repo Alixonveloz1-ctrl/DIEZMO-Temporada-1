@@ -84,6 +84,13 @@ export class Motor {
 
   /* ── Hojas de referencia de personaje ─────────────────────── */
 
+  /** Carga una hoja ya guardada en el formato que espera la API como referencia. */
+  async _comoReferencia(k) {
+    const b = await assets.blob(k);
+    if (!b) return null;
+    return { data: await blobAb64(b), mimeType: b.type || 'image/png' };
+  }
+
   async generarReferencias(ids, soloFaltantes) {
     const cfg = this.p.config;
     const objetivo = this.p.elenco.filter((x) => !ids || ids.indexOf(x.id) !== -1);
@@ -93,17 +100,28 @@ export class Motor {
       const total = objetivo.reduce((a, p) => a + variantesDe(p).length, 0);
       for (const per of objetivo) {
         per.refs = per.refs || [];
+        // La primera hoja de cuerpo entero es la MAESTRA: fija la cara, el pelo y
+        // las proporciones. Las demás se generan con ella adjunta, para que salga
+        // la misma persona con otra ropa o en primer plano. Sin esto, cada hoja
+        // nacía de cero y el personaje cambiaba de rostro entre una y otra.
+        let maestra = null;
         for (const v of variantesDe(per)) {
           if (this.señal.aborted) return;
-          if (soloFaltantes && per.refs.indexOf(clave.refPersonaje(per.id, v.id)) !== -1) {
-            hecho++; continue;
+          const k = clave.refPersonaje(per.id, v.id);
+          const seráMaestra = !maestra && v.cuerpo;
+
+          if (soloFaltantes && per.refs.indexOf(k) !== -1) {
+            if (seráMaestra) maestra = await this._comoReferencia(k);
+            hecho++;
+            this._prog(hecho, total, per.nombre);
+            continue;
           }
           this._prog(hecho, total, per.nombre + ' · ' + v.nombre);
-          const prompt = promptReferencia(per, cfg, v);
+          const prompt = promptReferencia(per, cfg, v, !!maestra);
           try {
-            const k = clave.refPersonaje(per.id, v.id);
             const r = await api.imagen({
               prompt,
+              images: maestra ? [maestra] : [],
               model: cfg.modeloImagen,
               aspectRatio: v.cuerpo ? '2:3' : '1:1',
               imageSize: cfg.imageSize,
@@ -112,6 +130,7 @@ export class Motor {
 
             await assets.guardar(k, b64toBlob(r.image, r.mimeType), { personaje: per.id, variante: v.id });
             if (per.refs.indexOf(k) === -1) per.refs.push(k);
+            if (seráMaestra) maestra = { data: r.image, mimeType: r.mimeType || 'image/png' };
             this._log('referencia lista: ' + per.nombre + ' · ' + v.nombre, 'ok');
           } catch (e) {
             if (e && e.cancelado) return;

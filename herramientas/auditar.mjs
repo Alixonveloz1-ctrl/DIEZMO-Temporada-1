@@ -112,6 +112,46 @@ const cuentas = negativo.match(/\b(una|dos|tres|cuatro|cinco|seis|siete|ocho|nue
 if (cuentas) mal('la lista de exclusiones nombra cantidades de partes del cuerpo', cuentas.join(' | '));
 else ok('las exclusiones nombran defectos, no imágenes');
 
+/* ── 5b · Las hojas de referencia son del mismo personaje ──── */
+titulo('HOJAS DE REFERENCIA');
+const { promptReferencia } = await import(pathToFileURL(path.join(raiz, 'app', 'director.js')).href);
+const ctxPrueba = { estilo: 'ESTILO', calidad: 'CALIDAD', negativo: 'NEGATIVO' };
+const dePrueba = { nombre: 'Prueba', ficha: 'ficha de prueba' };
+
+// El encuadre de rostro no puede describir el cuerpo: el modelo lo dibujaba entero.
+const pRostro = promptReferencia(dePrueba, ctxPrueba, { id: 'rostro', cuerpo: false }, true);
+const invasores = ['cuerpo entero', 'de pie', 'piernas', 'los pies', 'brazos a los costados']
+  .filter((f) => pRostro.toLowerCase().includes(f));
+if (invasores.length) mal('la hoja de rostro describe el cuerpo', invasores.join(' | '));
+else ok('la hoja de rostro solo describe cabeza, cuello y hombros');
+
+// Y la de cuerpo sí debe pedirlo entero, o vuelven los personajes achaparrados.
+const pCuerpo = promptReferencia(dePrueba, ctxPrueba, { id: 'calle', desc: 'ropa', cuerpo: true }, false);
+if (!/cuerpo entero/i.test(pCuerpo) || !/piernas largas/i.test(pCuerpo)) {
+  mal('la hoja de cuerpo ya no pide figura entera y estilizada');
+} else ok('la hoja de cuerpo pide figura entera con proporciones de anime moderno');
+
+// La segunda hoja y siguientes deben llevar adjunta la primera, o sale otra cara.
+if (!/la imagen de referencia adjunta es ESTE MISMO PERSONAJE/.test(
+  promptReferencia(dePrueba, ctxPrueba, { id: 'mono', desc: 'ropa', cuerpo: true }, true))) {
+  mal('el prompt no advierte que la referencia adjunta es el mismo personaje');
+} else if (/la imagen de referencia adjunta es ESTE MISMO PERSONAJE/.test(pCuerpo)) {
+  mal('la primera hoja habla de una referencia adjunta que todavía no existe');
+} else ok('la advertencia de "mismo personaje" solo aparece cuando hay hoja maestra');
+
+// Y el motor tiene que adjuntarla de verdad, no solo prometerlo en el texto.
+const genRefs = (pipelineFuente => {
+  const i = pipelineFuente.indexOf('async generarReferencias(');
+  const j = pipelineFuente.indexOf('\n  async generarFondos(');
+  return i > 0 && j > i ? pipelineFuente.slice(i, j) : '';
+})(leer('app/pipeline.js'));
+if (!genRefs) mal('no se encuentra generarReferencias en pipeline.js');
+else if (!/images:\s*maestra/.test(genRefs) || !/promptReferencia\([^)]*maestra\)/.test(genRefs)) {
+  mal('el motor genera cada hoja por separado', 'no adjunta la hoja maestra a las siguientes');
+} else if (!/soloFaltantes[\s\S]{0,400}_comoReferencia\(/.test(genRefs)) {
+  mal('al saltarse hojas ya generadas no se recupera la maestra del almacén');
+} else ok('cada hoja posterior se genera con la primera adjunta como referencia');
+
 /* ── 6 · Vestuario coherente ───────────────────────────────── */
 titulo('VESTUARIO');
 const { ELENCO_DEFECTO, variantesDe, vestuarioPara } =

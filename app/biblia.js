@@ -398,7 +398,7 @@ export const MOVIMIENTOS = [
 
 // Sube cada vez que cambia la dirección de arte o el elenco. El estudio compara
 // este número con el del proyecto guardado y refresca lo que no hayas tocado a mano.
-export const BIBLIA_VERSION = 4;
+export const BIBLIA_VERSION = 5;
 
 export const CONFIG_DEFECTO = {
   bibliaVersion: BIBLIA_VERSION,

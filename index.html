@@ -676,7 +676,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     <div class="paso-gen">
       <div class="pg-cab"><span class="pg-n">2</span> Voz<span class="pg-est" id="estPaso2">—</span></div>
       <p class="pg-txt">La narración de cada toma. Va antes que todo lo demás porque manda el tiempo.</p>
-      <div class="fila-btn"><button class="btn primario" id="btnProdVoz">Generar la voz</button></div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdVoz">Generar la voz</button><button class="btn fantasma" id="btnRehacerVoz">Rehacer toda la voz</button></div>
     </div>
 
     <div class="paso-gen">
@@ -693,7 +693,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         <select id="selResImgProd"></select>
         <p class="pista" id="pistaModImg">—</p>
       </div>
-      <div class="fila-btn"><button class="btn primario" id="btnProdImg">Generar los fotogramas</button></div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdImg">Generar los fotogramas</button><button class="btn fantasma" id="btnRehacerImg">Rehacer todos los fotogramas</button></div>
     </div>
 
     <div class="paso-gen">
@@ -717,7 +717,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <p class="pg-txt" style="margin:8px 0 11px">Al mover esto se reparte otra vez el movimiento en
         todos los episodios ya dirigidos, intercalado a lo largo de cada uno. Las tomas que el
         director marcó como imprescindibles se animan siempre, esté donde esté el porcentaje.</p>
-      <div class="fila-btn"><button class="btn primario" id="btnProdVid">Generar el movimiento</button></div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdVid">Generar el movimiento</button><button class="btn fantasma" id="btnRehacerVid">Rehacer todo el movimiento</button></div>
     </div>
 
     <div class="paso-gen">
@@ -732,7 +732,7 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         <select id="selModMusProd"></select>
         <p class="pista" id="pistaModMus">—</p>
       </div>
-      <div class="fila-btn"><button class="btn primario" id="btnProdMus">Generar la música</button></div>
+      <div class="fila-btn"><button class="btn primario" id="btnProdMus">Generar la música</button><button class="btn fantasma" id="btnRehacerMus">Rehacer toda la música</button></div>
     </div>
 
     <div class="fila-btn" style="margin-top:18px">
@@ -783,7 +783,8 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
         <div class="fila-btn" style="margin-top:10px">
           <button class="btn chico" id="btnRegenImg">Regenerar fotograma</button>
           <button class="btn chico" id="btnRegenVoz">Regenerar voz</button>
-          <button class="btn chico" id="btnRegenVid">Generar movimiento</button>
+          <button class="btn chico" id="btnRegenVid">Regenerar movimiento</button>
+          <button class="btn chico" id="btnRegenMus">Regenerar la música de su escena</button>
           <button class="btn fantasma chico" id="btnAlternarTipo">Fijo / movimiento</button>
           <button class="btn fantasma chico" id="btnBloquear">Bloquear</button>
         </div>

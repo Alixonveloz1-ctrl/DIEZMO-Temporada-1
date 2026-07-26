@@ -63,6 +63,47 @@ const sinUso = [...ids].filter((i) =>
 if (sinUso.length) mal('elementos que nadie usa', sinUso.join(' '));
 else ok('ningún elemento huérfano en la página');
 
+/* ── 2b · Nadie llama a una función que ya no existe ───────── */
+/*  Al unificar la pestaña borré pintarRejillaGuion y dejé una llamada viva.
+    La página seguía pintándose, pero el detalle de toma reventaba al final y
+    los botones de regenerar parecían no hacer nada. La auditoría miraba
+    elementos del HTML, no funciones: por ahí se coló.                       */
+titulo('LLAMADAS');
+const GLOBALES = new Set([
+  'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function', 'await', 'super',
+  'Promise', 'Array', 'Object', 'String', 'Number', 'Boolean', 'Math', 'JSON', 'Date', 'Set',
+  'Map', 'Error', 'RegExp', 'Blob', 'File', 'FileReader', 'Image', 'URL', 'Audio', 'Uint8Array',
+  'DataView', 'ArrayBuffer', 'AbortController', 'TextEncoder', 'TextDecoder', 'OffscreenCanvas',
+  'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'requestAnimationFrame',
+  'fetch', 'alert', 'confirm', 'prompt', 'atob', 'btoa', 'isNaN', 'isFinite', 'parseInt',
+  'parseFloat', 'encodeURIComponent', 'decodeURIComponent', 'structuredClone', 'queueMicrotask',
+  'createImageBitmap', 'indexedDB', 'CustomEvent', 'Event', 'IDBRequest', 'IDBKeyRange',
+]);
+let llamadasRotas = [];
+for (const f of ['app/main.js', 'app/player.js']) {
+  const txt = leer(f);
+  const definidos = new Set(GLOBALES);
+  for (const m of txt.matchAll(/(?:function|class)\s+([A-Za-z_$][\w$]*)/g)) definidos.add(m[1]);
+  for (const m of txt.matchAll(/(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g)) definidos.add(m[1]);
+  // Desestructuraciones y parámetros: se admiten todos los nombres que aparecen.
+  for (const m of txt.matchAll(/(?:const|let|var)\s*\{([^}]*)\}/g)) {
+    m[1].split(',').forEach((x) => definidos.add(x.trim().split(':').pop().trim()));
+  }
+  for (const m of txt.matchAll(/import\s*\{([^}]+)\}/g)) {
+    m[1].split(',').forEach((x) => definidos.add(x.trim().split(/\s+as\s+/).pop().trim()));
+  }
+  for (const m of txt.matchAll(/\(([^()]*)\)\s*=>/g)) {
+    m[1].split(',').forEach((x) => definidos.add(x.trim().replace(/[=[\]{}.]/g, '').split(' ')[0]));
+  }
+  // Solo las funciones propias del proyecto: verbo + MayúsculaCamello.
+  for (const m of txt.matchAll(/(^|[^.\w$'"`])((?:pintar|generar|abrir|cerrar|cablear|guardar|cargar|producir|dirigir|recalcular|seleccionar|mostrar|aplicar|limpiar|actualizar|contar|preparar|mantener|soltar|nuevo|job)[A-Z][\w$]*)\s*\(/g)) {
+    if (!definidos.has(m[2])) llamadasRotas.push(f + ' → ' + m[2] + '()');
+  }
+}
+if (llamadasRotas.length) {
+  mal('se llama a funciones que no existen', [...new Set(llamadasRotas)].join('\n      '));
+} else ok('todas las funciones propias que se llaman están definidas o importadas');
+
 /* ── 3 · Importaciones ─────────────────────────────────────── */
 titulo('IMPORTACIONES');
 const exporta = {};
@@ -391,6 +432,44 @@ else if (!/repartirMovimiento\(/.test(manejador)) {
     'bajarla parecería funcionar y se seguiría pagando la anterior');
 } else if (!/id="cuentaMovim"/.test(html)) mal('no se ve cuánto cuesta la proporción elegida');
 else ok('cambiar la proporción reparte de nuevo y enseña los clips, los segundos y el gasto');
+
+/* ── 5f-ter · Todo lo generado se puede rehacer ────────────── */
+titulo('REHACER');
+const REHACER = [
+  { fase: 'voz',        boton: 'btnRehacerVoz', suelto: 'btnRegenVoz' },
+  { fase: 'fotogramas', boton: 'btnRehacerImg', suelto: 'btnRegenImg' },
+  { fase: 'movimiento', boton: 'btnRehacerVid', suelto: 'btnRegenVid' },
+  { fase: 'música',     boton: 'btnRehacerMus', suelto: 'btnRegenMus' },
+];
+const sinRehacer = REHACER.filter((r) => !ids.has(r.boton));
+const sinSuelto = REHACER.filter((r) => !ids.has(r.suelto));
+if (sinRehacer.length) mal('fases que no se pueden rehacer enteras', sinRehacer.map((r) => r.fase).join(' · '));
+else if (sinSuelto.length) mal('fases que no se pueden rehacer de una en una', sinSuelto.map((r) => r.fase).join(' · '));
+else ok('las cuatro fases se pueden rehacer enteras y elemento a elemento');
+
+// Rehacer tiene que pasar soloFaltantes=false, o no rehace nada.
+const mainR = leer('app/main.js');
+const bloqueRehacer = (mainR.match(/const rehacer = async[\s\S]*?\n  \};/) || [''])[0];
+if (!bloqueRehacer) mal('no existe la función de rehacer una fase');
+else if (/generar\w+\(ep, true\)/.test(bloqueRehacer)) {
+  mal('rehacer usa soloFaltantes', 'saltaría justo lo que se quiere rehacer');
+} else if (!/confirm\(/.test(bloqueRehacer)) {
+  mal('rehacer no avisa de que se vuelve a pagar lo ya generado');
+} else ok('rehacer ignora lo ya hecho y avisa antes de volver a pagarlo');
+
+// Y lo mismo en los botones sueltos del detalle de toma.
+const sueltos = (mainR.match(/\$\('btnRegen(Voz|Img|Vid|Mus)'\)[\s\S]{0,420}?\}\)\);/g) || []);
+const conFaltantes = sueltos.filter((b) => /generar\w+\(ep, true/.test(b));
+if (sueltos.length < 4) mal('faltan botones de regenerar en el detalle de toma');
+else if (conFaltantes.length) mal('un botón de regenerar salta lo que ya existe', conFaltantes.length + ' de 4');
+else ok('regenerar una toma suelta rehace de verdad, exista o no');
+
+// El truco de sustituir ep.tomas rompía el guardado: no puede volver.
+const pl2 = leer('app/main.js');
+if (/ep\.tomas = \[/.test(pl2)) {
+  mal('se sustituye la lista de tomas del episodio para generar una sola',
+    'el guardado automático corre con el episodio truncado y lo persiste así');
+} else ok('nadie trunca la lista de tomas para generar un elemento suelto');
 
 /* ── 5g · Planos repetidos ─────────────────────────────────── */
 titulo('PLANOS REPETIDOS');

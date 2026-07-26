@@ -218,9 +218,12 @@ export class Motor {
   /*  Secuencial a propósito: el TTS mantiene mejor el tono entre
       fragmentos consecutivos si no se pisan las llamadas.          */
 
-  async generarVoz(ep, soloFaltantes) {
+  async generarVoz(ep, soloFaltantes, indices) {
     const cfg = this.p.config;
-    const pendientes = ep.tomas.filter((t) => !soloFaltantes || !t.audio || !t.audio.ok);
+    const pendientes = ep.tomas.filter((t) => {
+      if (indices && indices.indexOf(t.i) === -1) return false;
+      return !soloFaltantes || !t.audio || !t.audio.ok;
+    });
 
     return this._correr(async () => {
       let hecho = 0;
@@ -454,13 +457,13 @@ export class Motor {
   /*  Una pieza por escena, no por toma. Lyria cobra por pieza y no por
       segundo, así que una de tres minutos cuesta lo mismo que una de treinta.  */
 
-  async generarMusica(ep, soloFaltantes) {
+  async generarMusica(ep, soloFaltantes, escenas) {
     const cfg = this.p.config;
     return this._correr(async () => {
       this._prog(0, 1, 'encargando la música del episodio');
-      let escenas;
+      let todas;
       try {
-        escenas = await encargarMusica(ep, cfg, {
+        todas = await encargarMusica(ep, cfg, {
           señal: this.señal, aviso: (m) => this._log('música: ' + m),
         });
       } catch (e) {
@@ -471,13 +474,14 @@ export class Motor {
 
       ep.musica = ep.musica || {};
       let hecho = 0;
-      for (const esc of escenas) {
+      const lista = escenas ? todas.filter((e) => escenas.indexOf(e.escena) !== -1) : todas;
+      for (const esc of lista) {
         if (this.señal.aborted) return;
         const k = clave.musica(ep.num, esc.escena);
         const ya = ep.musica[esc.escena];
-        if (soloFaltantes && ya && ya.ok) { hecho++; this._prog(hecho, escenas.length, 'música'); continue; }
+        if (soloFaltantes && ya && ya.ok) { hecho++; this._prog(hecho, lista.length, 'música'); continue; }
 
-        this._prog(hecho, escenas.length, 'música · escena ' + esc.escena);
+        this._prog(hecho, lista.length, 'música · escena ' + esc.escena);
         try {
           const r = await api.musica({
             prompt: promptMusica(esc, cfg),
@@ -498,7 +502,7 @@ export class Motor {
           this._log('música escena ' + esc.escena + ': ' + e.message, 'err');
         }
         hecho++;
-        this._prog(hecho, escenas.length, 'música');
+        this._prog(hecho, lista.length, 'música');
         if (this.avisos.cambio) this.avisos.cambio();
       }
     });

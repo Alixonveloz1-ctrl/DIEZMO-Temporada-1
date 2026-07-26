@@ -839,7 +839,6 @@ async function seleccionarToma(ep, t) {
   }
   $('btnBloquear').textContent = t.bloqueada ? 'Desbloquear' : 'Bloquear';
   pintarRejillaProd();
-  pintarRejillaGuion();
 }
 
 /* ── Sala ───────────────────────────────────────────────────── */
@@ -1588,6 +1587,32 @@ function cablear() {
   $('btnProdImg').addEventListener('click', () => producir({ imagen: true }, 'fotogramas'));
   $('btnProdVid').addEventListener('click', () => producir({ video: true }, 'movimiento'));
   $('btnProdMus').addEventListener('click', () => producir({ musica: true }, 'música'));
+
+  /*  «Generar» completa lo que falta; «Rehacer» tira lo hecho y lo vuelve a
+      generar. Hace falta cuando lo que cambia no es el resultado sino la
+      receta: otra voz, otro modelo de imagen, otra dirección de arte.        */
+  const rehacer = async (fase, etiqueta, contarCoste) => {
+    const ep = epActual();
+    if (!ep) return;
+    const n = fase === 'musica' ? escenasDe(ep).length
+      : fase === 'video' ? ep.tomas.filter((t) => t.plano && t.plano.tipo === 'movimiento').length
+        : ep.tomas.length;
+    if (!n) { estado('estadoProd', 'No hay nada que rehacer en este episodio.', 'info'); return; }
+    if (!confirm('Se va a rehacer ' + etiqueta + ' del episodio ' + pad2(ep.num) + ': ' + n +
+      (contarCoste ? ' generaciones que ya están hechas y se van a pagar otra vez' : ' elementos') +
+      '. ¿Seguir?')) return;
+    jobMostrar('rehacer ' + etiqueta);
+    const m = nuevoMotor();
+    if (fase === 'voz') await m.generarVoz(ep, false);
+    else if (fase === 'imagen') await m.generarImagenes(ep, false);
+    else if (fase === 'video') await m.generarVideos(ep, false);
+    else if (fase === 'musica') await m.generarMusica(ep, false);
+    await guardar(); pintarTodo();
+  };
+  $('btnRehacerVoz').addEventListener('click', () => rehacer('voz', 'la voz', true));
+  $('btnRehacerImg').addEventListener('click', () => rehacer('imagen', 'los fotogramas', true));
+  $('btnRehacerVid').addEventListener('click', () => rehacer('video', 'el movimiento', true));
+  $('btnRehacerMus').addEventListener('click', () => rehacer('musica', 'la música', true));
   $('btnBuscarRepes').addEventListener('click', () => {
     const dirigidos = P.episodios.filter((e) => (e.tomas || []).some((t) => t.plano));
     if (!dirigidos.length) {
@@ -1651,11 +1676,12 @@ function cablear() {
   }));
   $('btnRegenVoz').addEventListener('click', conToma(async (ep, t) => {
     jobMostrar('voz');
-    t.audio = null;
-    const m = nuevoMotor();
-    const guardadas = ep.tomas;
-    ep.tomas = [t];
-    try { await m.generarVoz(ep, true); } finally { ep.tomas = guardadas; }
+    // Sin soloFaltantes: rehacer significa rehacer, aunque ya exista.
+    await nuevoMotor().generarVoz(ep, false, [t.i]);
+  }));
+  $('btnRegenMus').addEventListener('click', conToma(async (ep, t) => {
+    jobMostrar('música · escena ' + t.escena);
+    await nuevoMotor().generarMusica(ep, false, [t.escena]);
   }));
   $('btnRegenVid').addEventListener('click', conToma(async (ep, t) => {
     if (!t.imagen || !t.imagen.ok) { alert('Genera antes el fotograma de esta toma.'); return; }

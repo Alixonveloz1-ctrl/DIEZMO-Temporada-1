@@ -522,10 +522,8 @@ function pintarMotorVoz() {
   $('valVelocidadVoz').textContent = v.toFixed(2) + 'x';
 
   $('bloqueVozLarga').hidden = !largo;
-  /*  El bloque de Gemini se queda visible aunque no sea el motor activo: su
-      título dice a cuál pertenece, y así se pueden escuchar las dos voces una
-      detrás de otra sin cambiar de motor y volver. Comparar era el problema. */
-  $('bloqueTonoGemini').hidden = false;
+  // Fuera de la vista cuando no es el motor activo: en esta serie no se usa.
+  $('bloqueTonoGemini').hidden = largo;
   $('pistaMotorVoz').textContent = largo
     ? 'El episodio entero se narra de una vez y la herramienta lo reparte después entre las ' +
       'tomas por los silencios. Sin costuras: es una única locución.'

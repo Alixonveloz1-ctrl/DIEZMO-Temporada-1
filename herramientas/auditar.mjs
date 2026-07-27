@@ -996,7 +996,15 @@ if (!genVL) {
   mal('la locución no se reparte entre las tomas por los silencios');
 } else if (!/clave\.audio\(ep\.num, t\.i\)/.test(genVL)) {
   mal('la voz repartida no se guarda donde el resto de la herramienta la busca');
-} else ok('la locución se reparte con el mismo cortador de silencios y se guarda toma a toma');
+} else if ((pipeVL.match(/if \(k === 0\) partes\.push\(new Uint8Array/g) || []).length < 2) {
+  /*  La primera toma de cada llamada arranca en la muestra cero, pegada al
+      primer fonema. Al cambiar de archivo el reproductor pierde unos
+      milisegundos y se come el ataque: se oía la primera palabra cortada al
+      empezar cada escena. Las tomas 2..n no lo sufren porque el corte cae en
+      mitad de un silencio y ya arrancan con aire delante.                   */
+  mal('la primera toma de cada llamada no lleva respiro delante',
+    'se come las primeras letras al empezar cada escena');
+} else ok('la locución se reparte por silencios, con respiro al empezar cada llamada');
 
 /*  Long Audio Synthesis es un servicio por lotes: un episodio puede tardar
     HORAS, y el teléfono no va a estar abierto todo ese rato. Si la operación no

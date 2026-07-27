@@ -403,7 +403,14 @@ export class Motor {
     for (let k = 0; k < tomas.length; k++) {
       const t = tomas[k];
       const trozo = ex.pcm.subarray(tramos[k].desde * 2, tramos[k].hasta * 2);
-      const partes = [trozo];
+      /*  RESPIRO AL EMPEZAR. Las tomas 2..n de un bloque se cortan en mitad
+          de un silencio, así que arrancan con aire delante. La PRIMERA
+          arranca en la muestra cero, pegada al primer fonema: al cambiar de
+          archivo el reproductor pierde unos milisegundos y se come el ataque
+          —«las primeras letras»—. Un dedal de silencio delante lo resuelve. */
+      const partes = [];
+      if (k === 0) partes.push(new Uint8Array(Math.round(ex.rate * 0.12) * 2));
+      partes.push(trozo);
       if (t.corteEscena && cfg.silencioEscena > 0) {
         partes.push(new Uint8Array(Math.round(ex.rate * cfg.silencioEscena) * 2));
       }
@@ -517,7 +524,14 @@ export class Motor {
         const t = ep.tomas[k];
         this._prog(k, ep.tomas.length, 'voz · guardando toma ' + (k + 1));
         const trozo = ex.pcm.subarray(tramos[k].desde * 2, tramos[k].hasta * 2);
-        const partes = [trozo];
+        /*  RESPIRO AL EMPEZAR. Las tomas 2..n de un bloque se cortan en mitad
+            de un silencio, así que arrancan con aire delante. La PRIMERA
+            arranca en la muestra cero, pegada al primer fonema: al cambiar de
+            archivo el reproductor pierde unos milisegundos y se come el ataque
+            —«las primeras letras»—. Un dedal de silencio delante lo resuelve. */
+        const partes = [];
+        if (k === 0) partes.push(new Uint8Array(Math.round(ex.rate * 0.12) * 2));
+        partes.push(trozo);
         if (t.corteEscena && cfg.silencioEscena > 0) {
           partes.push(new Uint8Array(Math.round(ex.rate * cfg.silencioEscena) * 2));
         }

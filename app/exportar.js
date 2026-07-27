@@ -202,9 +202,14 @@ export function scriptFfmpeg(hoja) {
 
     const vFade = (fIn ? ',fade=t=in:st=0:d=' + fIn.toFixed(2) : '') +
       (fOut ? ',fade=t=out:st=' + (t.duracion - fOut).toFixed(2) + ':d=' + fOut.toFixed(2) : '');
-    const aFade = (fIn ? 'afade=t=in:st=0:d=' + fIn.toFixed(2) : '') +
-      (fIn && fOut ? ',' : '') +
-      (fOut ? 'afade=t=out:st=' + (t.duracion - fOut).toFixed(2) + ':d=' + fOut.toFixed(2) : '');
+    /*  LA VOZ NO LLEVA FUNDIDO DE ENTRADA. La imagen sí, pero aplicar el mismo
+        al audio significaba subir el volumen desde cero durante siete décimas
+        justo cuando el narrador arranca: se comía la primera palabra de cada
+        escena, en todo el episodio. Y no hace falta ninguno, porque la toma
+        que cierra escena ya lleva detrás un silencio de verdad.             */
+    const aFade = fOut
+      ? 'afade=t=out:st=' + (t.duracion - fOut).toFixed(2) + ':d=' + fOut.toFixed(2)
+      : '';
 
     const cadenaV = t.tipo === 'video' && t.video
       // El clip de Veo suele ser más corto que la locución: se congela el último
@@ -304,7 +309,11 @@ export function scriptFfmpeg(hoja) {
     for (const e of hoja.escenas) {
       const d = Math.max(0.1, Number(e.duracion) || 0).toFixed(3);
       const trozo = 'musica/lecho/esc-' + pad3(e.escena) + '.wav';
-      const fade = Math.min(1.8, Math.max(0.3, (Number(e.duracion) || 2) / 6)).toFixed(2);
+      /*  El relevo de una pieza a la siguiente se oía como un tajo. Fundidos
+          largos —de segundo y medio a tres y medio— lo convierten en un
+          relevo: la música es un lecho de fondo y nadie echa de menos su
+          primer segundo, pero el salto sí se nota.                          */
+      const fade = Math.min(3.5, Math.max(1.2, (Number(e.duracion) || 2) / 4)).toFixed(2);
       if (e.musica) {
         // Si la pieza es más corta que la escena, se repite; el fundido de
         // entrada y salida tapa la costura y separa una escena de la siguiente.

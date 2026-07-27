@@ -923,6 +923,13 @@ titulo('CALIDAD DEL MONTAJE');
       'pedírsela al modelo es letra pequeña, y la letra pequeña sale deforme');
   } else ok('la firma se dibuja aquí y entra en el único encode: ni edición después ni recodificar');
 
+  /*  LA VOZ NO PUEDE LLEVAR FUNDIDO DE ENTRADA. Aplicar el mismo fundido que
+      la imagen significa subir el volumen desde cero justo cuando el narrador
+      arranca: se comía la primera palabra de cada escena, en todo el episodio. */
+  if (/-i "voz\/toma-\d+\.wav" -af "[^"]*afade=t=in/.test(g)) {
+    mal('la voz lleva fundido de entrada', 'se come la primera palabra de cada escena');
+  } else ok('la voz entra a pleno volumen: no se pierde la primera palabra');
+
   // El video tampoco puede recodificarse dos veces.
   const concatVideo = /-f concat[^\n]*lista\.txt[^\n]*-c copy/.test(g);
   const remuxFinal = /-map 0:v[^\n]*-c:v copy/.test(g);

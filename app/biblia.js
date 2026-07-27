@@ -6,6 +6,7 @@
    ============================================================ */
 
 import { aplicarTono, SEMILLA_FIJA, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO } from './voz.js';
+import { FIRMA_DEFECTO } from './firma.js';
 
 export const ESTILO_DEFECTO =
   'Anime japonés contemporáneo de alta gama, del estilo que se produce hoy. Dibujo 2D ' +
@@ -407,6 +408,12 @@ export const CONFIG_DEFECTO = {
 
   // Solo para el saludo de la cabecera. Vive en este dispositivo.
   nombre: '',
+
+  /*  La marca del canal, incrustada en el episodio y en las portadas. La
+      dibuja el navegador, no el modelo: un nombre de canal es letra pequeña y
+      la letra pequeña es la que sale deforme.                               */
+  firma: FIRMA_DEFECTO,
+  firmaActiva: true,
 
   // Formato
   formato: '16:9',

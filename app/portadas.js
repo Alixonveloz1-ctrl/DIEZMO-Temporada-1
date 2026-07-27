@@ -17,12 +17,14 @@
     tres porque una portada recortada por el sitio equivocado pierde la cara
     del personaje, que es justo lo que se quería enseñar.                     */
 export const FORMATOS = [
-  ['9:16', 'Vertical — historias y reels'],
+  ['16:9', 'Apaisado — como subes todo'],
+  ['9:16', 'Vertical — historias'],
   ['4:5', 'Publicación de muro'],
-  ['16:9', 'Cabecera y miniatura'],
 ];
 
-export const FORMATO_PORTADA = '9:16';
+/*  16:9 porque es como sube el canal: el reel lo convierte solo a vertical
+    rellenando con negro, y ese acabado es el que le gusta a su público.     */
+export const FORMATO_PORTADA = '16:9';
 
 /*  Los carteles no salen de ningún episodio: son la promesa de la serie. Cada
     uno ataca por un lado distinto para que la página no repita la misma imagen
@@ -175,6 +177,21 @@ export function lineasCartel(cartel) {
   return filas;
 }
 
+/*  La lista de «evitar» de los fotogramas prohíbe texto, letras, logotipo y
+    firma —y con razón: un fotograma con letras encima está arruinado—. Pero la
+    portada SÍ lleva título rotulado y firma del canal, así que pedir las dos
+    cosas a la vez es contradecirse, y el modelo hace lo que le parece. Aquí se
+    quitan solo esos términos; el resto de la lista sigue entera.            */
+const PERMITIDO_EN_PORTADA = /^(texto|letras|subt[íi]tulos|marca de agua|logotipo|firma)$/i;
+
+export function negativoDePortada(negativo) {
+  return String(negativo || '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter((t) => t && !PERMITIDO_EN_PORTADA.test(t))
+    .join(', ');
+}
+
 function bloqueReparto(personajes, conReferencia) {
   if (!personajes.length) return [];
   const fichas = personajes.map((p) => '· ' + p.nombre + ': ' + p.ficha);
@@ -213,12 +230,12 @@ export function promptPortada(ep, ctx, personajes, conReferencia) {
     '',
     ...bloqueReparto(personajes, conReferencia),
     '',
-    'COMPOSICIÓN: vertical. Deja una zona tranquila y despejada en el tercio superior ' +
+    'COMPOSICIÓN: deja una zona tranquila y despejada en el tercio superior ' +
     'para que el título quepa ahí sin tapar ninguna cara. Un solo punto de interés, ' +
     'profundidad real entre figura y fondo, iluminación cinematográfica con una fuente clara.',
     bloqueTexto(lineasPortada(ep)),
     ctx.calidad || '',
-    'EVITAR: ' + ctx.negativo,
+    'EVITAR: ' + negativoDePortada(ctx.negativo),
   ].filter((l) => l !== null && l !== undefined).join('\n');
 }
 
@@ -242,7 +259,7 @@ export function promptCartel(cartel, ctx, personajes, conReferencia) {
     'título. Iluminación cinematográfica, profundidad real, un solo punto de interés.',
     bloqueTexto(lineasCartel(cartel)),
     ctx.calidad || '',
-    'EVITAR: ' + ctx.negativo,
+    'EVITAR: ' + negativoDePortada(ctx.negativo),
   ].filter((l) => l !== null && l !== undefined).join('\n');
 }
 

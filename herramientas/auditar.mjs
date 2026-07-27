@@ -595,7 +595,9 @@ if (!/mode === 'montar'/.test(backM)) {
   /*  Lo que el script CREA por su cuenta no hace falta bajarlo. Se listan las
       rutas con y sin comillas: mirando solo las entrecomilladas, media cadena
       se quedaba fuera del examen y la comprobación pasaba por suerte.       */
-  const creados = /^(segmentos\/|musica\/lecho|voz\/(completa|pieza-))/;
+  /*  firma.png no está entre el material: la dibuja el navegador y viaja con
+      el encargo, y el contenedor la copia junto a hoja.json.                */
+  const creados = /^(segmentos\/|musica\/lecho|voz\/(completa|pieza-)|firma\.png$)/;
   const pedidos = new Set();
   for (const m of guion.matchAll(/-i (?:"([^"]+)"|(\S+))/g)) {
     const ruta = m[1] || m[2];
@@ -658,7 +660,14 @@ titulo('PORTADAS Y CARTELES');
   } else if (!conFichas) {
     mal('la portada no lleva las fichas ni pide respetar las hojas de referencia',
       'saldrían personajes con otra cara');
-  } else if ([port, cart].some((p) => p.indexOf(C.negativo) === -1)) {
+  } else if ([port, cart].some((p) => /EVITAR:[^\n]*\b(texto|letras|logotipo|firma)\b/.test(p))) {
+    /*  La lista de los fotogramas prohíbe texto, logotipo y firma —con razón:
+        un fotograma con letras encima está arruinado—. Pero la portada SÍ lleva
+        título rotulado y la marca del canal. Pedir las dos cosas a la vez es
+        contradecirse, y entonces decide el modelo.                          */
+    mal('la portada prohíbe el texto y a la vez lo pide',
+      'hay que quitar esos términos concretos del «evitar», no la lista entera');
+  } else if ([port, cart].some((p) => p.indexOf('manos deformes') === -1)) {
     mal('las portadas no heredan la lista de lo que hay que evitar');
   } else {
     ok('portada y cartel llevan el título rotulado en grande —con el capítulo—, la letra ' +
@@ -767,6 +776,25 @@ titulo('CALIDAD DEL MONTAJE');
   } else if (encodesAudio !== 1) {
     mal('el audio se codifica ' + encodesAudio + ' veces', 'debe codificarse una sola vez, al final');
   } else ok('la voz va en PCM de principio a fin y se codifica una sola vez, al final');
+
+  /*  LA FIRMA DEL CANAL. Va incrustada para no tener que editar nada después,
+      y entra en la ÚNICA codificación que tiene cada toma: estamparla sobre el
+      episodio ya montado obligaría a recodificar los dieciséis minutos.     */
+  const conFirma = sff2(hdm2(epQ, { formato: '16:9', intensidadCamara: 1, volumenMusica: 0.3,
+    silencioEscena: 0.7, firma: 'Mundo Isekai', firmaActiva: true }));
+  const sinFirma = g;
+  const enc = (x) => (x.match(/libx264/g) || []).length;
+  if (!/-i "firma\.png"/.test(conFirma) || !/overlay=0:0/.test(conFirma)) {
+    mal('la firma no se incrusta en el video');
+  } else if (enc(conFirma) !== enc(sinFirma)) {
+    mal('poner la firma añade una codificación de más',
+      enc(conFirma) + ' frente a ' + enc(sinFirma) + ': sería otra generación de x264');
+  } else if (/-i "firma\.png"/.test(sinFirma)) {
+    mal('la firma se cuela aunque esté desactivada');
+  } else if (!/firmaPng\(/.test(leer('app/main.js')) || !/conFirma\(/.test(leer('app/pipeline.js'))) {
+    mal('la firma no la dibuja la herramienta',
+      'pedírsela al modelo es letra pequeña, y la letra pequeña sale deforme');
+  } else ok('la firma se dibuja aquí y entra en el único encode: ni edición después ni recodificar');
 
   // El video tampoco puede recodificarse dos veces.
   const concatVideo = /-f concat[^\n]*lista\.txt[^\n]*-c copy/.test(g);

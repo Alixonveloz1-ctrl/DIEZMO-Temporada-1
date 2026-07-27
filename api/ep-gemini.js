@@ -693,6 +693,12 @@ module.exports = async (req, res) => {
           Buffer.from(String(body.script)), 'text/x-shellscript');
         await gcsSubir(token, bucket, carpeta + '/descargas.txt',
           Buffer.from(lista), 'text/plain');
+        // La firma la dibuja el navegador y viaja con el encargo: el montador
+        // solo la superpone, no tiene que saber escribir.
+        if (body.firma) {
+          await gcsSubir(token, bucket, carpeta + '/firma.png',
+            Buffer.from(String(body.firma), 'base64'), 'image/png');
+        }
 
         const url = 'https://run.googleapis.com/v2/projects/' + project +
           '/locations/' + region + '/jobs/' + job + ':run';

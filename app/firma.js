@@ -1,0 +1,105 @@
+/* ============================================================
+   firma.js — la marca de la página, incrustada
+   ============================================================
+   El nombre del canal en la esquina, tanto en el episodio como
+   en las portadas, y ya puesto: nada de editar después.
+
+   NO se la pedimos al modelo de imagen. Un nombre de página es
+   letra pequeña, y la letra pequeña es justo lo que sale
+   deforme —lo comprobó el usuario en otros proyectos—. Se
+   dibuja aquí, con la tipografía del navegador: sale nítida,
+   siempre igual, y en el sitio exacto.
+   ============================================================ */
+
+export const FIRMA_DEFECTO = 'Mundo Isekai';
+
+/*  Proporciones respecto al alto del fotograma, no en píxeles: así la firma se
+    ve igual de grande en 1080p que en un cartel vertical.                    */
+const ALTO_TEXTO = 0.032;     // cuerpo de la letra
+const MARGEN = 0.030;         // separación al borde
+
+/**
+ * Dibuja la firma sobre un lienzo ya existente, arriba a la izquierda.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} w  ancho del lienzo en píxeles
+ * @param {number} h  alto del lienzo en píxeles
+ * @param {string} texto
+ */
+export function dibujarFirma(ctx, w, h, texto) {
+  const cuerpo = Math.max(11, Math.round(h * ALTO_TEXTO));
+  const m = Math.round(h * MARGEN);
+  ctx.save();
+  ctx.font = '600 ' + cuerpo + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  /*  Sombra en vez de caja: una caja opaca tapa la ilustración, y sobre un
+      fondo claro el texto blanco solo se pierde si no lleva nada debajo.     */
+  ctx.shadowColor = 'rgba(0,0,0,0.85)';
+  ctx.shadowBlur = Math.round(cuerpo * 0.5);
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = Math.max(1, Math.round(cuerpo * 0.06));
+  ctx.fillStyle = 'rgba(255,255,255,0.92)';
+  ctx.fillText(texto, m, m);
+  ctx.restore();
+}
+
+/** El tamaño que ocupará la firma, para reservarle sitio. */
+export function medidaFirma(w, h, texto) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  const cuerpo = Math.max(11, Math.round(h * ALTO_TEXTO));
+  ctx.font = '600 ' + cuerpo + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const m = Math.round(h * MARGEN);
+  return { cuerpo, margen: m, ancho: Math.ceil(ctx.measureText(texto).width) };
+}
+
+/**
+ * La firma sola, en PNG transparente del tamaño del fotograma.
+ * Es lo que se superpone al video: ffmpeg la coloca sin escalarla, así que
+ * sale con el mismo grosor de trazo que en las portadas.
+ *
+ * @returns {Promise<Blob>}
+ */
+export function firmaPng(w, h, texto) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  dibujarFirma(c.getContext('2d'), w, h, texto);
+  return new Promise((listo, falla) => {
+    c.toBlob((b) => (b ? listo(b) : falla(new Error('no se pudo dibujar la firma'))), 'image/png');
+  });
+}
+
+/**
+ * Una imagen ya generada, con la firma incrustada encima.
+ * Se hace aquí y no en el modelo por lo dicho arriba: nítida y siempre igual.
+ *
+ * @param {Blob} blob   la portada o el cartel recién generado
+ * @returns {Promise<Blob>}
+ */
+export async function conFirma(blob, texto) {
+  if (!texto) return blob;
+  const bitmap = await crearBitmap(blob);
+  const c = document.createElement('canvas');
+  c.width = bitmap.width;
+  c.height = bitmap.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0);
+  dibujarFirma(ctx, c.width, c.height, texto);
+  if (bitmap.close) bitmap.close();
+  return new Promise((listo) => {
+    // PNG: la portada lleva tipografía grande y un JPEG le metería halos.
+    c.toBlob((b) => listo(b || blob), 'image/png');
+  });
+}
+
+function crearBitmap(blob) {
+  if (typeof createImageBitmap === 'function') return createImageBitmap(blob);
+  return new Promise((listo, falla) => {
+    const u = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(u); listo(img); };
+    img.onerror = () => { URL.revokeObjectURL(u); falla(new Error('imagen ilegible')); };
+    img.src = u;
+  });
+}

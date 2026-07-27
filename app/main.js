@@ -4,7 +4,7 @@
 
 import { proyecto as store, assets, cuota, pedirPersistencia } from './db.js';
 import { nube, guardarPronto, vaciarCola, alGuardar } from './nube.js';
-import { api, crearWav, extraerPCM, b64aBytes, bajarClip, montarEpisodio } from './api.js';
+import { api, crearWav, extraerPCM, b64aBytes, blobAb64, bajarClip, montarEpisodio } from './api.js';
 import {
   limpiarTexto, tituloDe, segmentar, verificarCobertura,
   normalizarParaVoz, REEMPLAZOS_BASE,
@@ -26,6 +26,7 @@ import {
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargasDe, descargar, Zip } from './exportar.js';
 import { CARTELES, FORMATOS, FORMATO_PORTADA, repartoDe } from './portadas.js';
+import { FIRMA_DEFECTO, firmaPng } from './firma.js';
 
 const $ = (id) => document.getElementById(id);
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -1533,6 +1534,8 @@ function abrirAjustes() {
   $('valTempVoz').textContent = Number(c.temperaturaVoz).toFixed(2);
   $('valSemilla').textContent = c.semillaVoz || SEMILLA_FIJA;
   $('cfgNombre').value = c.nombre || '';
+  $('cfgFirma').value = c.firma === undefined ? FIRMA_DEFECTO : c.firma;
+  $('cfgFirmaActiva').checked = c.firmaActiva !== false;
   $('cfgInstruccionVoz').value = c.instruccionVoz;
   $('cfgNormalizar').checked = c.normalizarVoz;
   $('cfgAnunciar').checked = c.anunciarTitulo;
@@ -1551,6 +1554,8 @@ function guardarAjustes() {
   c.temperaturaVoz = parseFloat($('cfgTempVoz').value);
   // La semilla no se teclea: se conserva la que ya tiene la configuración.
   c.nombre = $('cfgNombre').value.trim();
+  c.firma = $('cfgFirma').value.trim();
+  c.firmaActiva = $('cfgFirmaActiva').checked;
   c.instruccionVoz = $('cfgInstruccionVoz').value.trim();
   c.normalizarVoz = $('cfgNormalizar').checked;
   c.anunciarTitulo = $('cfgAnunciar').checked;
@@ -2087,11 +2092,20 @@ function cablear() {
     jobMostrar('montaje');
     estado('estadoExport', 'Enviando el encargo al montador…', 'info');
     try {
+      /*  La firma se dibuja aquí, del tamaño exacto del fotograma, y viaja con
+          el encargo. El montador solo la superpone: no tiene que escribir.  */
+      let firma = null;
+      if (hoja.firma) {
+        const d = hoja.formato === '9:16' ? [1080, 1920]
+          : hoja.formato === '1:1' ? [1080, 1080] : [1920, 1080];
+        firma = await blobAb64(await firmaPng(d[0], d[1], hoja.firma));
+      }
       const ref = await montarEpisodio({
         episodio: ep.num,
         hoja,
         script: scriptFfmpeg(hoja),
         descargas: descargasDe(ep, hoja),
+        firma,
       }, {
         aviso: (m) => { jobAvance(0, 0, m); estado('estadoExport', m, 'info'); },
       });

@@ -84,6 +84,11 @@ export class Zip {
   }
 }
 
+/*  La firma viaja como un PNG transparente del tamaño del fotograma, con el
+    nombre del canal ya dibujado. No se le pide al modelo ni se rotula después:
+    se superpone dentro del encode de cada toma.                              */
+export const FIRMA_ARCHIVO = 'firma.png';
+
 /* ── Hoja de montaje ────────────────────────────────────────── */
 
 function pad3(n) { return String(n).padStart(3, '0'); }
@@ -132,6 +137,7 @@ export function hojaDeMontaje(ep, cfg) {
     episodio: ep.num,
     titulo: ep.titulo,
     formato: cfg.formato,
+    firma: cfg.firmaActiva === false ? '' : (cfg.firma || ''),
     escenas,
     silencioEscena: cfg.silencioEscena || 0,
     duracionTotal: +t0.toFixed(2),
@@ -221,6 +227,13 @@ export function scriptFfmpeg(hoja) {
       ? '-i "' + t.video + '"'
       : '-loop 1 -i "' + t.imagen + '"';
 
+    /*  La firma se incrusta AQUÍ, dentro de la única codificación que tiene
+        cada toma. Ponerla al final, sobre el episodio ya montado, obligaría a
+        recodificarlo entero: una segunda generación de x264 sobre los dieciséis
+        minutos, justo lo que se quitó para que no perdiera calidad.          */
+    const conFirma = !!hoja.firma;
+    const marca = conFirma ? ' -i "' + FIRMA_ARCHIVO + '"' : '';
+
     /*  EL SEGMENTO VA MUDO, a propósito. Antes cada toma se codificaba con su
         audio en AAC y luego se pegaban con «concat -c copy». AAC no se puede
         pegar así: cada trozo lleva unas muestras de precarga y un relleno al
@@ -229,8 +242,13 @@ export function scriptFfmpeg(hoja) {
         audio se recodificaba una segunda vez encima.
         Ahora la voz no se corta ni se pega nunca en comprimido: va en PCM de
         principio a fin y se codifica UNA sola vez, al final de todo.        */
-    L.push('ffmpeg -y -loglevel error ' + entrada + ' \\');
-    L.push('  -filter_complex "' + cadenaV + '" \\');
+    const cadenaFinal = conFirma
+      // La firma viene ya del tamaño exacto del fotograma: no hay que escalarla.
+      ? cadenaV.replace(/\[v\]$/, '[base];[base][1:v]overlay=0:0[v]')
+      : cadenaV;
+
+    L.push('ffmpeg -y -loglevel error ' + entrada + marca + ' \\');
+    L.push('  -filter_complex "' + cadenaFinal + '" \\');
     L.push('  -map "[v]" -an -c:v libx264 -preset medium -crf 18 -pix_fmt yuv420p \\');
     L.push('  -t ' + dur + ' "' + seg + '"');
 

@@ -23,6 +23,8 @@ mkdir -p fotogramas voz clips musica segmentos bajado
 
 echo "── Encargo: $TRABAJO"
 gcloud storage cp "$TRABAJO/hoja.json" "$TRABAJO/montar.sh" "$TRABAJO/descargas.txt" .
+# La firma solo existe si está activada; sin ella el guion no la menciona.
+gcloud storage cp "$TRABAJO/firma.png" . 2>/dev/null || true
 
 # Una sola llamada para todo el material del episodio. Bajar 134 archivos con
 # 134 invocaciones costaría más tiempo que el propio montaje.

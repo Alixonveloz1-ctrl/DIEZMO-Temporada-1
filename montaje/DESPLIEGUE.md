@@ -67,7 +67,9 @@ Abre el **editor de Cloud Shell** y pásale al asistente este bloque completo:
 > mkdir -p fotogramas voz clips musica segmentos bajado
 >
 > echo "── Encargo: $TRABAJO"
+>
 > gcloud storage cp "$TRABAJO/hoja.json" "$TRABAJO/montar.sh" "$TRABAJO/descargas.txt" .
+> gcloud storage cp "$TRABAJO/firma.png" . 2>/dev/null || true
 >
 > if [ -n "${PREFIJO:-}" ]; then
 >   echo "── Material: $PREFIJO"

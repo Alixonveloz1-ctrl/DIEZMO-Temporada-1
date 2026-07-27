@@ -18,6 +18,7 @@ import { encargarMusica, promptMusica } from './musica.js';
 import {
   promptPortada, promptCartel, repartoDe, CARTELES, FORMATO_PORTADA,
 } from './portadas.js';
+import { conFirma } from './firma.js';
 import {
   cortarEscena, repartirEnBloques, SEGUNDOS_POR_LLAMADA,
   nombreVozChirp, VOZ_CHIRP_DEFECTO, narraEpisodioEntero,
@@ -541,13 +542,19 @@ export class Motor {
       guardarComo: clave_,
     }, { intentos: 4, señal: this.señal, aviso: (m) => this._log(quién + ': ' + m) });
 
-    const blob = b64toBlob(r.image, r.mimeType);
-    await assets.guardar(clave_, blob, { portada: true, formato });
+    /*  La firma se estampa aquí, no se le pide al modelo: un nombre de canal
+        es letra pequeña, y la letra pequeña es justo la que sale deforme.
+        Dibujada por el navegador sale nítida y siempre en el mismo sitio.  */
+    let blob = b64toBlob(r.image, r.mimeType);
+    const firma = cfg.firmaActiva === false ? '' : (cfg.firma || '');
+    if (firma) blob = await conFirma(blob, firma);
+
+    await assets.guardar(clave_, blob, { portada: true, formato, firma: !!firma });
     if (nube.disponible) {
-      try { await nube.subir(clave_, r.image, r.mimeType || 'image/png'); }
+      try { await nube.subir(clave_, await blobAb64(blob), 'image/png'); }
       catch (e) { this._log(quién + ': no se pudo subir al bucket', 'aviso'); }
     }
-    return { ok: true, formato, ts: Date.now() };
+    return { ok: true, formato, firma: !!firma, ts: Date.now() };
   }
 
   /** Portadas de episodio. Sin lista, las hace todas las que falten. */

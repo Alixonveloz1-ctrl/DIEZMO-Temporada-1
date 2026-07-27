@@ -25,6 +25,7 @@ import {
 } from './voz.js';
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargasDe, descargar, Zip } from './exportar.js';
+import { CARTELES, FORMATOS, FORMATO_PORTADA, repartoDe } from './portadas.js';
 
 const $ = (id) => document.getElementById(id);
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -135,10 +136,15 @@ function estadoCompacto() {
     config: P.config,
     elenco: P.elenco.map((p) => ({ ...p })),
     lugares: P.lugares.map((l) => ({ ...l })),
+    // Lo que se genera para publicar también es trabajo pagado: si no se
+    // guarda aquí, una recarga lo da por no hecho y se vuelve a pagar.
+    portadas: P.portadas || {},
+    carteles: P.carteles || {},
     episodios: P.episodios.map((e) => ({
       num: e.num,
       titulo: e.titulo,
       musica: e.musica || null,
+      montaje: e.montaje || null,
       tomas: (e.tomas || []).map((t) => ({
         i: t.i,
         plano: t.plano || null,
@@ -188,6 +194,8 @@ async function rehidratar(compacto) {
   if (compacto.elenco && compacto.elenco.length) P.elenco = compacto.elenco;
   if (compacto.lugares && compacto.lugares.length) P.lugares = compacto.lugares;
   P.sel = compacto.sel || 1;
+  P.portadas = compacto.portadas || {};
+  P.carteles = compacto.carteles || {};
   P.episodios = [];
 
   /*  Antes se recorría lo GUARDADO y se hacía un fetch por episodio: si uno
@@ -205,6 +213,7 @@ async function rehidratar(compacto) {
     if (!ep) continue;
     ep.titulo = ce.titulo || ep.titulo;
     if (ce.musica) ep.musica = ce.musica;
+    if (ce.montaje) ep.montaje = ce.montaje;
     (ce.tomas || []).forEach((ct, k) => {
       const t = ep.tomas[k];
       if (!t) return;
@@ -369,7 +378,7 @@ function nuevoMotor() {
   motor = new Motor(P, {
     progreso: ({ hecho, total, texto }) => jobAvance(hecho, total, texto),
     log,
-    cambio: () => { pintarRejillaProd(); pintarListaEps(); },
+    cambio: () => { pintarRejillaProd(); pintarListaEps(); pintarPortadas(); },
     fin: () => { jobOcultar(); guardar(); pintarTodo(); },
   });
   return motor;
@@ -565,6 +574,7 @@ function pintarConfig() {
   $('valVolMusica').textContent = pct(c.volumenMusica, 0.3) + ' %';
   $('cfgMovim').value = pct(c.proporcionMovimiento, 0.35);
   $('valMovim').textContent = pct(c.proporcionMovimiento, 0.35) + ' %';
+  llenarSelect($('selFormatoPortada'), FORMATOS, c.formatoPortada, FORMATO_PORTADA);
   $('pxImagen').value = c.precios.imagen;
   $('pxVoz').value = c.precios.vozMil;
   $('pxTexto').value = c.precios.episodio;
@@ -756,6 +766,69 @@ function pintarSelectores() {
 }
 
 /* ── Biblia ─────────────────────────────────────────────────── */
+
+/*  Portadas y carteles. Una tarjeta por pieza, con su miniatura, su botón de
+    rehacer y su descarga: lo que se genera para publicar hay que poder sacarlo
+    de aquí sin pasar por el montaje ni por el bucket.                        */
+async function pintarPortadas() {
+  const fmt = P.config.formatoPortada || FORMATO_PORTADA;
+  const hechas = P.episodios.filter((e) => (P.portadas || {})[e.num] &&
+    P.portadas[e.num].ok).length;
+  const listos = CARTELES.filter((c) => (P.carteles || {})[c.id] &&
+    P.carteles[c.id].ok).length;
+  $('cuentaPortadas').textContent = hechas + '/' + P.episodios.length + ' portadas · ' +
+    listos + '/' + CARTELES.length + ' carteles';
+
+  const tarjeta = (cont, clv, titulo, sub, estado, alRehacer) => {
+    const d = document.createElement('div');
+    d.className = 'ficha';
+    d.innerHTML =
+      '<div class="lienzos"><div class="lienzo" data-caja="1"><span class="vacio">—</span></div></div>' +
+      '<div class="cuerpo"><strong>' + esc(titulo) + '</strong><p>' + esc(sub) + '</p>' +
+      (estado && estado.ok === false
+        ? '<p class="nota err">' + esc(estado.error || 'falló') + '</p>' : '') + '</div>' +
+      '<div class="acc">' +
+      '<button class="btn fantasma chico" data-acc="rehacer">' +
+      (estado && estado.ok ? 'Rehacer' : 'Generar') + '</button>' +
+      (estado && estado.ok ? '<button class="btn chico" data-acc="bajar">Descargar</button>' : '') +
+      '</div>';
+    cont.appendChild(d);
+    const caja = d.querySelector('[data-caja]');
+    if (estado && estado.ok) {
+      assets.url(clv).then((u) => {
+        if (!u) return;
+        const v = caja.querySelector('.vacio');
+        if (v) v.remove();
+        ponerImagen(caja, clv, titulo, 'unico');
+      }).catch(() => {});
+    }
+    d.querySelector('[data-acc=rehacer]').addEventListener('click', alRehacer);
+    const bajar = d.querySelector('[data-acc=bajar]');
+    if (bajar) {
+      bajar.addEventListener('click', async () => {
+        const b = await assets.blob(clv);
+        if (!b) { aviso('Esa imagen ya no está en este dispositivo.', 'err', 5000); return; }
+        descargar(b, titulo.replace(/[^\wáéíóúñÁÉÍÓÚÑ -]/g, '').trim().replace(/\s+/g, '-') + '.png');
+      });
+    }
+  };
+
+  const cp = $('fichasPortadas');
+  cp.innerHTML = '';
+  for (const ep of P.episodios) {
+    tarjeta(cp, clave.portada(ep.num), 'EP' + pad2(ep.num) + ' — ' + (ep.titulo || ''),
+      repartoDe(ep, 2).length ? 'Con ' + repartoDe(ep, 2).join(' y ') : 'Sin reparto dirigido todavía',
+      (P.portadas || {})[ep.num],
+      async () => { jobMostrar('portada'); await nuevoMotor().generarPortadas([ep.num], fmt); });
+  }
+
+  const cc = $('fichasCarteles');
+  cc.innerHTML = '';
+  for (const c of CARTELES) {
+    tarjeta(cc, clave.cartel(c.id, fmt), c.nombre, c.resumen, (P.carteles || {})[c.id],
+      async () => { jobMostrar('cartel'); await nuevoMotor().generarCarteles([c.id], fmt); });
+  }
+}
 
 async function pintarFichas() {
   const cont = $('fichasElenco');
@@ -1634,6 +1707,39 @@ function cablear() {
     await nuevoMotor().generarReferencias(null, true);
     await guardar(); pintarFichas();
   });
+  // Portadas y carteles
+  $('selFormatoPortada').addEventListener('change', async (e) => {
+    P.config.formatoPortada = e.target.value;
+    await guardar();
+    pintarPortadas();
+    aviso('Formato ' + e.target.value + '. Las que ya estén hechas siguen en su formato; ' +
+      'rehazlas para cambiarlas.', 'ok', 7000);
+  });
+  const conFormato = () => P.config.formatoPortada || FORMATO_PORTADA;
+  $('btnPortadasFaltan').addEventListener('click', async () => {
+    const faltan = P.episodios.filter((e) => !((P.portadas || {})[e.num] || {}).ok).map((e) => e.num);
+    if (!faltan.length) { aviso('Todas las portadas están hechas.', 'ok', 4000); return; }
+    jobMostrar('portadas');
+    await nuevoMotor().generarPortadas(faltan, conFormato());
+  });
+  $('btnPortadasTodas').addEventListener('click', async () => {
+    if (!confirm('Se vuelven a generar las ' + P.episodios.length + ' portadas, y las que ya ' +
+      'estaban se pagan otra vez. ¿Sigo?')) return;
+    jobMostrar('portadas');
+    await nuevoMotor().generarPortadas(null, conFormato());
+  });
+  $('btnCartelesFaltan').addEventListener('click', async () => {
+    const faltan = CARTELES.filter((c) => !((P.carteles || {})[c.id] || {}).ok).map((c) => c.id);
+    if (!faltan.length) { aviso('Todos los carteles están hechos.', 'ok', 4000); return; }
+    jobMostrar('carteles');
+    await nuevoMotor().generarCarteles(faltan, conFormato());
+  });
+  $('btnCartelesTodos').addEventListener('click', async () => {
+    if (!confirm('Se vuelven a generar los ' + CARTELES.length + ' carteles. ¿Sigo?')) return;
+    jobMostrar('carteles');
+    await nuevoMotor().generarCarteles(null, conFormato());
+  });
+
   $('btnFondos').addEventListener('click', async () => {
     jobMostrar('fondos');
     await nuevoMotor().generarFondos(P.lugares.filter((l) => !l.ref).map((l) => l.id));
@@ -2183,6 +2289,7 @@ async function iniciar() {
   cablear();
   pintarTodo();
   pintarFichas();
+  pintarPortadas();
   comprobarConexion();
 
   // El proyecto vive en Google Cloud: al abrir se recupera de ahí, y el

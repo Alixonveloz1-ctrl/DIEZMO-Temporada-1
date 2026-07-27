@@ -16,6 +16,9 @@ import { variantesDe, vestuarioPara } from './biblia.js';
 import { duracionVeo } from './veo.js';
 import { encargarMusica, promptMusica } from './musica.js';
 import {
+  promptPortada, promptCartel, repartoDe, CARTELES, FORMATO_PORTADA,
+} from './portadas.js';
+import {
   cortarEscena, repartirEnBloques, SEGUNDOS_POR_LLAMADA,
   nombreVozChirp, VOZ_CHIRP_DEFECTO, narraEpisodioEntero,
 } from './voz.js';
@@ -28,6 +31,9 @@ export const clave = {
   refLugar: (id) => 'ref/lugar/' + id,
   musica: (ep, esc) => 'ep' + pad(ep) + '/mus/' + pad3(esc),
   vozEpisodio: (ep) => 'ep' + pad(ep) + '/voz-completa',
+  portada: (ep) => 'portada/ep' + pad(ep),
+  // El formato va en la clave: un cartel vertical y uno de muro son dos imágenes.
+  cartel: (id, formato) => 'cartel/' + id + '-' + String(formato).replace(':', 'x'),
   episodio: (ep) => 'ep' + pad(ep) + '/completo',
 };
 
@@ -496,6 +502,116 @@ export class Motor {
       this._prog(ep.tomas.length, ep.tomas.length, 'voz');
       if (this.avisos.cambio) this.avisos.cambio();
       this._log('voz repartida entre las ' + ep.tomas.length + ' tomas', 'ok');
+    });
+  }
+
+  /* ── Portadas y carteles ──────────────────────────────────── */
+
+  /*  Una portada con la cara equivocada es peor que ninguna: es lo primero que
+      ve quien no conoce la serie. Así que van con las hojas de referencia
+      adjuntas, igual que los fotogramas, y si un personaje no tiene hoja se
+      dice en vez de inventarle una cara.                                     */
+  async _refsDe(ids) {
+    const refs = [];
+    const sinCara = [];
+    for (const id of ids) {
+      const per = this.p.elenco.find((x) => x.id === id);
+      if (!per) continue;
+      const k = (per.refs || []).find((r) => /\/rostro$/.test(r)) || (per.refs || [])[0];
+      const b = k ? await assets.blob(k) : null;
+      if (!b) { sinCara.push(per.nombre); continue; }
+      refs.push(await comoReferencia(b));
+    }
+    return { refs, sinCara };
+  }
+
+  async _unaPortada(clave_, prompt, ids, formato, quién) {
+    const cfg = this.p.config;
+    const { refs, sinCara } = await this._refsDe(ids || []);
+    if (sinCara.length) {
+      this._log(quién + ': falta la hoja de ' + sinCara.join(', ') +
+        '; genérala antes o saldrá otra cara', 'aviso');
+    }
+    const r = await api.imagen({
+      prompt,
+      images: refs,
+      model: cfg.modeloImagen,
+      aspectRatio: formato,
+      imageSize: cfg.imageSize,
+      guardarComo: clave_,
+    }, { intentos: 4, señal: this.señal, aviso: (m) => this._log(quién + ': ' + m) });
+
+    const blob = b64toBlob(r.image, r.mimeType);
+    await assets.guardar(clave_, blob, { portada: true, formato });
+    if (nube.disponible) {
+      try { await nube.subir(clave_, r.image, r.mimeType || 'image/png'); }
+      catch (e) { this._log(quién + ': no se pudo subir al bucket', 'aviso'); }
+    }
+    return { ok: true, formato, ts: Date.now() };
+  }
+
+  /** Portadas de episodio. Sin lista, las hace todas las que falten. */
+  async generarPortadas(nums, formato) {
+    const cfg = this.p.config;
+    const ctx = { estilo: cfg.estilo, calidad: cfg.calidad, negativo: cfg.negativo };
+    const eps = this.p.episodios.filter((e) => !nums || nums.indexOf(e.num) !== -1);
+
+    return this._correr(async () => {
+      this.p.portadas = this.p.portadas || {};
+      let hecho = 0;
+      for (const ep of eps) {
+        if (this.señal.aborted) return;
+        const quién = 'portada del episodio ' + ep.num;
+        this._prog(hecho, eps.length, quién);
+        try {
+          const ids = repartoDe(ep, 2);
+          const personajes = ids.map((id) => this.p.elenco.find((x) => x.id === id)).filter(Boolean);
+          const prompt = promptPortada(ep, ctx, personajes, true);
+          this.p.portadas[ep.num] = await this._unaPortada(
+            clave.portada(ep.num), prompt, ids, formato || FORMATO_PORTADA, quién);
+          this._log(quién + ': lista', 'ok');
+        } catch (e) {
+          if (e && e.cancelado) return;
+          this.p.portadas[ep.num] = { ok: false, error: e.message };
+          this._log(quién + ': ' + e.message, 'err');
+        }
+        hecho++;
+        this._prog(hecho, eps.length, 'portadas');
+        if (this.avisos.cambio) this.avisos.cambio();
+      }
+    });
+  }
+
+  /** Carteles de la serie, para anunciarla antes de que exista. */
+  async generarCarteles(ids, formato) {
+    const cfg = this.p.config;
+    const ctx = { estilo: cfg.estilo, calidad: cfg.calidad, negativo: cfg.negativo };
+    const lista = CARTELES.filter((c) => !ids || ids.indexOf(c.id) !== -1);
+
+    return this._correr(async () => {
+      this.p.carteles = this.p.carteles || {};
+      let hecho = 0;
+      for (const c of lista) {
+        if (this.señal.aborted) return;
+        const quién = 'cartel «' + c.nombre + '»';
+        this._prog(hecho, lista.length, quién);
+        try {
+          const personajes = c.reparto
+            .map((id) => this.p.elenco.find((x) => x.id === id)).filter(Boolean);
+          const prompt = promptCartel(c, ctx, personajes, true);
+          this.p.carteles[c.id] = await this._unaPortada(
+            clave.cartel(c.id, formato || FORMATO_PORTADA), prompt, c.reparto,
+            formato || FORMATO_PORTADA, quién);
+          this._log(quién + ': listo', 'ok');
+        } catch (e) {
+          if (e && e.cancelado) return;
+          this.p.carteles[c.id] = { ok: false, error: e.message };
+          this._log(quién + ': ' + e.message, 'err');
+        }
+        hecho++;
+        this._prog(hecho, lista.length, 'carteles');
+        if (this.avisos.cambio) this.avisos.cambio();
+      }
     });
   }
 

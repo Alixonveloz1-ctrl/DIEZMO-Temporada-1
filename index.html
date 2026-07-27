@@ -883,6 +883,34 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
     </div>
     <div class="fichas" id="fichasLugares"></div>
   </div>
+
+  <div class="panel">
+    <h2>Portadas y carteles <span class="cuenta" id="cuentaPortadas"></span></h2>
+    <p class="nota" style="margin-top:0">Las portadas llevan adjuntas las hojas de los
+      personajes que de verdad salen en cada capítulo, así que son la misma cara de siempre.
+      Salen sin texto a propósito: el título se rotula encima, con tipografía de verdad.</p>
+
+    <div class="campo" style="margin-top:12px">
+      <label for="selFormatoPortada">Formato</label>
+      <select id="selFormatoPortada"></select>
+    </div>
+
+    <h3 style="margin:18px 0 8px;font-size:13px;color:var(--tinta-2)">Una portada por capítulo</h3>
+    <div class="fila-btn" style="margin-bottom:14px">
+      <button class="btn primario" id="btnPortadasFaltan">Generar las que falten</button>
+      <button class="btn fantasma" id="btnPortadasTodas">Rehacerlas todas</button>
+    </div>
+    <div class="fichas" id="fichasPortadas"></div>
+
+    <h3 style="margin:22px 0 8px;font-size:13px;color:var(--tinta-2)">Carteles de la serie</h3>
+    <p class="nota" style="margin-top:0">Para anunciar el anime antes de que exista. Cada uno
+      ataca por un lado distinto, para que la página no repita la misma imagen seis veces.</p>
+    <div class="fila-btn" style="margin:12px 0 14px">
+      <button class="btn primario" id="btnCartelesFaltan">Generar los que falten</button>
+      <button class="btn fantasma" id="btnCartelesTodos">Rehacerlos todos</button>
+    </div>
+    <div class="fichas" id="fichasCarteles"></div>
+  </div>
 </section>
 
 <!-- ══════════ SALA ══════════ -->

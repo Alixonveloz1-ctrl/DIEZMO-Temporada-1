@@ -623,6 +623,76 @@ if (!/mode === 'montar'/.test(backM)) {
   }
 }
 
+/* ── 5b-sexies · Portadas y carteles ────────────────────────── */
+titulo('PORTADAS Y CARTELES');
+{
+  const pr = await import(pathToFileURL(path.join(raiz, 'app', 'portadas.js')).href);
+  const bib = await import(pathToFileURL(path.join(raiz, 'app', 'biblia.js')).href);
+  const C = bib.CONFIG_DEFECTO;
+  const ctx = { estilo: C.estilo, calidad: C.calidad, negativo: C.negativo };
+  const dos = bib.ELENCO_DEFECTO.slice(0, 2);
+  const epF = { num: 1, titulo: 'El censo', tomas: [{ i: 0, texto: 'Texto de arranque.' }] };
+  const port = pr.promptPortada(epF, ctx, dos, true);
+  const cart = pr.promptCartel(pr.CARTELES[0], ctx, [bib.ELENCO_DEFECTO[0]], true);
+
+  /*  El modelo escribe mal en cualquier idioma: un título deformado arruina
+      una portada por lo demás buena. Va limpia y se rotula encima.          */
+  const sinTexto = [port, cart].every((p) => /SIN TEXTO DE NINGÚN TIPO/.test(p));
+  /*  Y la cara tiene que ser la de siempre: una portada con otro rostro es lo
+      primero que ve quien no conoce la serie.                               */
+  const conFichas = dos.every((p) => port.indexOf(p.nombre) !== -1) &&
+    /hojas de referencia/.test(port);
+  if (!sinTexto) {
+    mal('las portadas no piden ir sin texto', 'el modelo rotularía con letras deformes');
+  } else if (!conFichas) {
+    mal('la portada no lleva las fichas ni pide respetar las hojas de referencia',
+      'saldrían personajes con otra cara');
+  } else if ([port, cart].some((p) => p.indexOf(C.negativo) === -1)) {
+    mal('las portadas no heredan la lista de lo que hay que evitar');
+  } else ok('portada y cartel van sin texto, con las fichas y con las hojas de referencia');
+
+  // Los carteles no pueden ser el mismo cartel seis veces.
+  const ideas = pr.CARTELES.map((c) => c.idea);
+  const repetidas = ideas.length - new Set(ideas).size;
+  const sinReparto = pr.CARTELES.filter((c) => !c.reparto.length).length;
+  const idsMalos = pr.CARTELES.filter((c) =>
+    c.reparto.some((id) => !bib.ELENCO_DEFECTO.some((p) => p.id === id)));
+  if (repetidas) {
+    mal(repetidas + ' carteles repiten la misma idea');
+  } else if (idsMalos.length) {
+    mal('hay carteles que piden personajes que no existen en el elenco',
+      idsMalos.map((c) => c.id).join(' · '));
+  } else if (sinReparto === 0) {
+    mal('todos los carteles llevan personajes',
+      'hace falta alguno sin figuras, que sirva de fondo y de cabecera');
+  } else {
+    ok(pr.CARTELES.length + ' carteles distintos, ' + sinReparto + ' sin figuras · formatos: ' +
+       pr.FORMATOS.map((f) => f[0]).join(', '));
+  }
+
+  // El reparto de una portada sale de lo que el director anotó, no del texto.
+  const conPlanos = { num: 1, titulo: 'X', tomas: [
+    { i: 0, plano: { personajes: ['sota', 'hina'] } },
+    { i: 1, plano: { personajes: ['sota'] } },
+    { i: 2, plano: { personajes: ['rei'] } },
+  ] };
+  const rep = pr.repartoDe(conPlanos, 2);
+  if (rep[0] !== 'sota' || rep.length !== 2) {
+    mal('el reparto de la portada no sale por presencia real', 'salió: ' + rep.join(', '));
+  } else ok('la portada se reparte por quién sale más, no por quién se menciona');
+
+  /*  Y lo generado para publicar tiene que sobrevivir a una recarga: si no se
+      guarda en el estado, la próxima carga lo da por no hecho y se paga otra vez. */
+  const mainP = leer('app/main.js');
+  const guarda = /portadas: P\.portadas/.test(mainP) && /carteles: P\.carteles/.test(mainP) &&
+    /montaje: e\.montaje/.test(mainP);
+  const recupera = /P\.portadas = compacto\.portadas/.test(mainP) &&
+    /P\.carteles = compacto\.carteles/.test(mainP) && /ep\.montaje = ce\.montaje/.test(mainP);
+  if (!guarda) mal('las portadas, los carteles o el montaje no se guardan en el estado');
+  else if (!recupera) mal('no se recuperan al volver del bucket', 'se darían por no hechos');
+  else ok('portadas, carteles y montaje se guardan y se recuperan: una recarga no los pierde');
+}
+
 /* ── 5b-quinquies · La calidad del montaje ──────────────────── */
 titulo('CALIDAD DEL MONTAJE');
 {

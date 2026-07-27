@@ -160,6 +160,13 @@ export function hojaDeMontaje(ep, cfg) {
     titulo: ep.titulo,
     formato: cfg.formato,
     firma: cfg.firmaActiva === false ? '' : (cfg.firma || ''),
+    /*  Los dos mandos que el montaje lee y la hoja no llevaba: el recorrido de
+        cámara de las tomas fijas y el nivel de la música bajo la narración.
+        scriptFfmpeg los buscaba aquí, no los encontraba y usaba los de fábrica,
+        así que mover esos deslizadores no cambiaba nada en el episodio
+        entregado —solo en la Sala, que lee la configuración directamente.   */
+    intensidadCamara: cfg.intensidadCamara,
+    volumenMusica: cfg.volumenMusica,
     escenas,
     silencioEscena: cfg.silencioEscena || 0,
     duracionTotal: +t0.toFixed(2),
@@ -406,6 +413,13 @@ export function descargasDe(ep, hoja) {
   for (const e of hoja.escenas || []) {
     if (e.musica) mete(clave.musica(ep.num, e.escena), e.musica);
   }
+  /*  Y LA FIRMA VA EN LA MISMA LISTA. Antes era un trato aparte: el montador
+      tenía una línea suya para bajarla. Eso ató el guion a una versión concreta
+      del contenedor, y el contenedor se despliega a mano: el que estaba puesto
+      era anterior a la firma, así que no la bajaba, y ffmpeg moría por un
+      archivo que nadie le había dado. Por la lista no puede volver a pasar,
+      porque el montador no necesita saber qué es lo que copia.              */
+  if (hoja.firma) mete(clave.firma(ep.num), FIRMA_ARCHIVO);
   // Un fotograma reutilizado aparece en varias tomas: se baja una vez y se
   // copia, pero la lista lo pide en cada destino porque los nombres difieren.
   return fuera;

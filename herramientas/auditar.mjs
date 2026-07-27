@@ -588,16 +588,19 @@ if (!/mode === 'montar'/.test(backM)) {
       plano: { tipo: k % 5 === 0 ? 'movimiento' : 'fijo', movimiento: 'travelling de acercamiento lento' },
     }));
   const epF = { num: 1, titulo: 'Prueba', tomas: tomasEp, musica: { 1: { ok: true }, 2: { ok: true } } };
-  const hojaF = hdm(epF, { formato: '16:9', intensidadCamara: 1, volumenMusica: 0.3 });
+  // Con firma: es una pieza del encargo como las demás y tiene que salir en la lista.
+  const hojaF = hdm(epF, { formato: '16:9', firma: 'MI CANAL', firmaActiva: true,
+    intensidadCamara: 1, volumenMusica: 0.3 });
   const guion = sff(hojaF);
   const dan = new Set(dds(epF, hojaF).map((d) => d.destino));
 
   /*  Lo que el script CREA por su cuenta no hace falta bajarlo. Se listan las
       rutas con y sin comillas: mirando solo las entrecomilladas, media cadena
       se quedaba fuera del examen y la comprobación pasaba por suerte.       */
-  /*  firma.png no está entre el material: la dibuja el navegador y viaja con
-      el encargo, y el contenedor la copia junto a hoja.json.                */
-  const creados = /^(segmentos\/|musica\/lecho|voz\/(completa|pieza-)|firma\.png$)/;
+  /*  firma.png YA NO está exento. La dibuja el navegador, pero viaja por la
+      lista de descargas como una pieza más: tenerlo aparte ató el guion a una
+      versión concreta del contenedor y el que estaba desplegado no la bajaba. */
+  const creados = /^(segmentos\/|musica\/lecho|voz\/(completa|pieza-))/;
   const pedidos = new Set();
   for (const m of guion.matchAll(/-i (?:"([^"]+)"|(\S+))/g)) {
     const ruta = m[1] || m[2];
@@ -623,6 +626,36 @@ if (!/mode === 'montar'/.test(backM)) {
     ok('los ' + pedidos.size + ' archivos que pide ffmpeg —con clips y fotogramas ' +
        'reutilizados— están todos en la lista de descargas');
   }
+
+  /*  Y EL MONTADOR NO PUEDE CONOCER NINGUNO POR SU NOMBRE. Esta es la que
+      faltaba. La firma tenía su propia línea en el contenedor —«baja también
+      firma.png»—, así que el guion solo funcionaba con un contenedor que
+      supiera de firmas. El contenedor se despliega a mano y el que estaba
+      puesto era anterior: no la bajaba, y ffmpeg moría con un 254 por un
+      archivo que nadie le había dado. Mientras el montador solo copie lo que
+      dice la lista, el guion puede pedir lo que quiera sin volver a tocarlo. */
+  const sabidos = [...pedidos].filter((p) => contenedor.indexOf(p) !== -1);
+  if (sabidos.length) {
+    mal('el montador nombra ' + sabidos.length + ' archivos del guion: ' + sabidos.join(' · '),
+      'el guion queda atado a esa versión del contenedor, que se despliega a mano');
+  } else ok('el montador no conoce ningún archivo por su nombre: solo copia lo que dice la lista');
+
+  /*  Y la clave de la firma se compone en dos sitios —el navegador la pide, el
+      backend la guarda—, así que tienen que decir lo mismo.                  */
+  const firmaFront = /firma: \(ep\) => 'ep' \+ pad\(ep\) \+ '\/firma'/.test(leer('app/pipeline.js'));
+  const firmaBack = /gcsSubir\(token, bucket, material \+ '\/firma'/.test(backM);
+  if (!firmaFront || !firmaBack) {
+    mal('la firma no se guarda donde la lista dice que está',
+      'el montador la buscaría en un sitio y el backend la habría dejado en otro');
+  } else ok('la firma se pide y se guarda con la misma clave');
+
+  /*  Y los dos mandos que el guion lee tienen que llegar en la hoja. No
+      llegaban: mover el recorrido de cámara o el volumen de la música no
+      cambiaba nada en el episodio entregado.                                */
+  if (!(hojaF.intensidadCamara === 1 && hojaF.volumenMusica === 0.3)) {
+    mal('la hoja de montaje no lleva el recorrido de cámara ni el volumen de la música',
+      'el guion usa los de fábrica y esos dos deslizadores no hacen nada al montar');
+  } else ok('el recorrido de cámara y el volumen de la música llegan al montaje');
 }
 
 /*  Y QUE LA LISTA LLEGUE ENTERA. Estar en la lista no basta: viaja como texto y

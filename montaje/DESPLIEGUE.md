@@ -71,7 +71,6 @@ Abre el **editor de Cloud Shell** y pásale al asistente este bloque completo:
 >   avisa "El montador no pudo leer el encargo:" "$(tail -n 5 encargo.txt)"
 >   exit 1
 > fi
-> gcloud storage cp "$TRABAJO/firma.png" . 2>/dev/null || true
 > if [ -n "${PREFIJO:-}" ]; then
 >   echo "── Material: $PREFIJO"
 >   gcloud storage cp -r "$PREFIJO/**" bajado/ 2>/dev/null || true

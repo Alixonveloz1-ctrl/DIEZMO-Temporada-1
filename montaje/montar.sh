@@ -35,8 +35,6 @@ if ! gcloud storage cp "$TRABAJO/hoja.json" "$TRABAJO/montar.sh" "$TRABAJO/desca
   avisa "El montador no pudo leer el encargo:" "$(tail -n 5 encargo.txt)"
   exit 1
 fi
-# La firma solo existe si está activada; sin ella el guion no la menciona.
-gcloud storage cp "$TRABAJO/firma.png" . 2>/dev/null || true
 
 # Una sola llamada para todo el material del episodio. Bajar 134 archivos con
 # 134 invocaciones costaría más tiempo que el propio montaje.

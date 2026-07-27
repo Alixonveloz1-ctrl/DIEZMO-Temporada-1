@@ -31,6 +31,12 @@ export const clave = {
   refPersonaje: (id, n) => 'ref/personaje/' + id + '/' + n,
   refLugar: (id) => 'ref/lugar/' + id,
   musica: (ep, esc) => 'ep' + pad(ep) + '/mus/' + pad3(esc),
+  /*  La firma es material del episodio como cualquier otra pieza, aunque la
+      dibuje el navegador en vez de un modelo. Tenerla aquí es lo que hace que
+      viaje por la lista de descargas, y no por un trato aparte que el montador
+      tenga que conocer: el contenedor no sabe qué es una firma, solo copia lo
+      que le dice la lista.                                                   */
+  firma: (ep) => 'ep' + pad(ep) + '/firma',
   vozEpisodio: (ep) => 'ep' + pad(ep) + '/voz-completa',
   portada: (ep) => 'portada/ep' + pad(ep),
   // El formato va en la clave: un cartel vertical y uno de muro son dos imágenes.

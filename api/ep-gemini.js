@@ -291,6 +291,47 @@ async function gcsListar(token, bucket, prefijo) {
   return salida;
 }
 
+/*  LO QUE DIJO EL MONTADOR, LEÍDO DESDE AQUÍ. Cloud Run solo devuelve «Task …
+    failed with exit code: N», y ese número no se puede investigar desde un
+    teléfono: hay que abrir la consola de Google. Pero el contenedor escribe sus
+    quejas —las de ffmpeg incluidas— en el registro del proyecto, y la misma
+    credencial que lanza el Job puede leerlo. Así el motivo real llega a la
+    pantalla sin que nadie tenga que salir de la aplicación.
+    Si la cuenta de servicio no tiene permiso para leer el registro, esto
+    devuelve vacío y se enseña el mensaje de Cloud Run de siempre.           */
+async function registroDelMontador(token, project, job, mensaje) {
+  const eje = /Task\s+(\S+?)-task\d+/.exec(String(mensaje || ''));
+  const filtros = [];
+  if (eje) {
+    filtros.push('resource.type="cloud_run_job" AND ' +
+      'labels."run.googleapis.com/execution_name"="' + eje[1] + '"');
+  }
+  filtros.push('resource.type="cloud_run_job" AND resource.labels.job_name="' + job + '"');
+
+  for (const filter of filtros) {
+    const r = await fetch('https://logging.googleapis.com/v2/entries:list', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resourceNames: ['projects/' + project],
+        filter,
+        orderBy: 'timestamp desc',
+        pageSize: 60,
+      }),
+    });
+    if (!r.ok) return '';
+    const j = await r.json();
+    const lineas = (j.entries || [])
+      .map((e) => e.textPayload ||
+        (e.jsonPayload && (e.jsonPayload.message || e.jsonPayload.msg)) || '')
+      .map((t) => String(t).trim())
+      .filter(Boolean)
+      .reverse();
+    if (lineas.length) return lineas.slice(-25).join('\n');
+  }
+  return '';
+}
+
 async function gcsCopiar(token, bucket, origen, destino) {
   const u = 'https://storage.googleapis.com/storage/v1/b/' + encodeURIComponent(bucket) +
     '/o/' + encodeURIComponent(origen) + '/copyTo/b/' + encodeURIComponent(bucket) +
@@ -797,12 +838,28 @@ module.exports = async (req, res) => {
         const material = RAIZ + 'material/ep' + pad2;
         const salida = RAIZ + 'material/ep' + pad2 + '/completo.mp4';
 
+        /*  La firma la dibuja el navegador, así que es lo único del encargo que
+            no estaba ya en el almacén. Se guarda como una pieza más del
+            episodio, con su clave, y entra en la lista de descargas junto al
+            resto: el montador no tiene que saber que existe. Va antes de la
+            comprobación de abajo para que esa comprobación la cubra.        */
+        if (body.hoja.firma && !body.firma) {
+          return res.status(400).json({
+            error: 'El episodio lleva firma del canal pero el navegador no la mandó. ' +
+              'Recarga la página y vuelve a montar, o quita la firma en Ajustes.',
+          });
+        }
+        if (body.firma) {
+          await gcsSubir(token, bucket, material + '/firma',
+            Buffer.from(String(body.firma), 'base64'), 'image/png');
+        }
+
         /*  La lista va como texto separado por tabuladores en vez de JSON: el
             contenedor la lee con un bucle de shell y no necesita intérprete.
             EL SALTO FINAL NO SOBRA. «read» del shell devuelve falso cuando la
             última línea no termina en salto, y el bucle la descarta sin decir
-            nada: se perdía siempre el último archivo del encargo —la música de
-            la última escena— y ffmpeg moría con un 254 sin más explicación.  */
+            nada: se perdía siempre el último archivo del encargo y ffmpeg
+            moría con un 254 sin más explicación.                            */
         const lista = body.descargas
           .map((d) => 'gs://' + bucket + '/' + RAIZ + 'material/' + d.clave + '\t' + d.destino)
           .join('\n') + '\n';
@@ -815,14 +872,9 @@ module.exports = async (req, res) => {
             aparecen en el encargo —normalmente uno— y no objeto por objeto.
             Un archivo vacío cuenta como ausente: existe, pero al abrirlo falla
             igual y el motivo sería todavía menos reconocible.                */
-        const porEpisodio = new Map();
-        for (const d of body.descargas) {
-          const raiz = String(d.clave).split('/')[0];
-          if (!porEpisodio.has(raiz)) porEpisodio.set(raiz, []);
-          porEpisodio.get(raiz).push(d);
-        }
+        const episodios = new Set(body.descargas.map((d) => String(d.clave).split('/')[0]));
         const enElAlmacen = new Map();
-        for (const raiz of porEpisodio.keys()) {
+        for (const raiz of episodios) {
           for (const o of await gcsListar(token, bucket, RAIZ + 'material/' + raiz + '/')) {
             enElAlmacen.set(raiz + '/' + o.clave, o.bytes);
           }
@@ -838,16 +890,6 @@ module.exports = async (req, res) => {
               (ausentes.length > 15 ? ' … y ' + (ausentes.length - 15) + ' más' : ''),
           });
         }
-        /*  Y la firma es el único archivo que NO sale del almacén: la dibuja el
-            navegador. Si la hoja dice que lleva firma y no ha llegado, el guion
-            la pediría igual y ffmpeg moriría por ella.                       */
-        if (body.hoja.firma && !body.firma) {
-          return res.status(400).json({
-            error: 'El episodio lleva firma del canal pero el navegador no la mandó. ' +
-              'Recarga la página y vuelve a montar, o quita la firma en Ajustes.',
-          });
-        }
-
         await gcsSubir(token, bucket, carpeta + '/hoja.json',
           Buffer.from(JSON.stringify(body.hoja)), 'application/json');
         await gcsSubir(token, bucket, carpeta + '/montar.sh',
@@ -857,12 +899,6 @@ module.exports = async (req, res) => {
         /*  El motivo del fallo anterior se borra al empezar. Si no, un montaje
             que falle sin dejar nota heredaría la queja del intento pasado.  */
         await gcsSubir(token, bucket, carpeta + '/error.txt', Buffer.from(''), 'text/plain');
-        // La firma la dibuja el navegador y viaja con el encargo: el montador
-        // solo la superpone, no tiene que saber escribir.
-        if (body.firma) {
-          await gcsSubir(token, bucket, carpeta + '/firma.png',
-            Buffer.from(String(body.firma), 'base64'), 'image/png');
-        }
 
         const url = 'https://run.googleapis.com/v2/projects/' + project +
           '/locations/' + region + '/jobs/' + job + ':run';
@@ -916,6 +952,11 @@ module.exports = async (req, res) => {
             const nota = await gcsBajar(token, bucket,
               RAIZ + 'montaje/ep' + String(parseInt(body.episodio, 10)).padStart(2, '0') + '/error.txt');
             if (nota.ok) motivo = (await nota.text()).trim().slice(0, 700);
+          }
+          // Y si el montador no dejó nota, se le pregunta al registro del proyecto.
+          if (!motivo) {
+            const reg = await registroDelMontador(token, project, job, j.error && j.error.message);
+            if (reg) motivo = 'El montador dijo:\n' + reg.slice(-1200);
           }
           return res.status(200).json({
             done: true,

@@ -7,7 +7,10 @@
    siguiente.
    ============================================================ */
 
-import { api, generarVideo, generarVozLarga, bajarClip, b64aBytes, extraerPCM, crearWav, duracionPCM, blobAb64, comoReferencia } from './api.js';
+import {
+  api, generarVideo, generarVozLarga, bajarClip, b64aBytes, extraerPCM, crearWav,
+  duracionPCM, blobAb64, comoReferencia, ladoDeVideo,
+} from './api.js';
 import { assets } from './db.js';
 import { nube } from './nube.js';
 import { normalizarParaVoz, REEMPLAZOS_BASE } from './texto.js';
@@ -841,7 +844,11 @@ export class Motor {
     try {
       const r = await generarVideo({
         prompt: promptVideo(t.plano, ctx),
-        image: { data: await blobAb64(img), mimeType: img.type || 'image/png' },
+        /*  Al tamaño que Veo va a emitir, y en JPEG casi sin pérdida: es el
+            primer cuadro del clip, no una referencia de estilo, pero mandarlo
+            en PNG de 2K reventaba el cuerpo de la petición en las tomas más
+            detalladas.                                                       */
+        image: await comoReferencia(img, ladoDeVideo(cfg.resolucionVideo), 0.95),
         model: cfg.modeloVideo,
         aspectRatio: cfg.formato,
         durationSeconds: dur,

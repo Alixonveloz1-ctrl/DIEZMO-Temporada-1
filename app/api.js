@@ -375,6 +375,14 @@ export function blobAb64(blob) {
 
 export const LADO_REFERENCIA = 1024;
 
+/*  El fotograma de partida de un clip es otra cosa: no es una referencia de
+    estilo, es literalmente el primer cuadro del vídeo, así que se manda al
+    tamaño que Veo va a emitir y ni un píxel más —lo que sobre lo tira él—.
+    Iba en PNG de 2K y a veces pasaba de los 4,5 MB del cuerpo de la petición:
+    las tomas más detalladas fallaban con un 413 y las demás pasaban, que es
+    por qué solo se caían algunas.                                           */
+export function ladoDeVideo(resolucion) { return resolucion === '720p' ? 1280 : 1920; }
+
 function lienzo(w, h) {
   if (typeof OffscreenCanvas === 'function') return new OffscreenCanvas(w, h);
   const c = document.createElement('canvas');
@@ -411,7 +419,7 @@ async function mapaDeBits(blob) {
  *
  * @returns {{data:string, mimeType:string}} listo para el campo images
  */
-export async function comoReferencia(blob, maxLado) {
+export async function comoReferencia(blob, maxLado, calidad) {
   const lim = maxLado || LADO_REFERENCIA;
   try {
     const bmp = await mapaDeBits(blob);
@@ -430,7 +438,7 @@ export async function comoReferencia(blob, maxLado) {
     g.drawImage(bmp, 0, 0, nw, nh);
     if (bmp.close) bmp.close();
 
-    const jpg = await aBlob(c, 'image/jpeg', 0.92);
+    const jpg = await aBlob(c, 'image/jpeg', calidad || 0.92);
     // Si por lo que sea no adelgaza, no merece la pena perder el original.
     if (jpg.size < blob.size) return { data: await blobAb64(jpg), mimeType: 'image/jpeg' };
   } catch (e) { /* navegador sin lienzo: se manda tal cual */ }

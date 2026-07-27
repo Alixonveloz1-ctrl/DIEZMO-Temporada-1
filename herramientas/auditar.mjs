@@ -212,21 +212,26 @@ if (rendirse) {
   mal('pocos reintentos para las hojas', 'un límite de cuota dejaría al personaje a medias');
 } else ok('ante cualquier fallo se reintenta con el mismo rostro; nunca sin él');
 
-// Una hoja de 2K en base64 pasa de 3 MB; tres no caben en una petición de 4,5 MB.
-// El primer fotograma que se le da a Veo es la excepción: no es una referencia de
-// estilo, es el fotograma inicial del clip, y va a resolución completa.
+/*  Una hoja de 2K en base64 pasa de 3 MB; tres no caben en una petición de
+    4,5 MB. Y EL FOTOGRAMA DE PARTIDA DE VEO YA NO ES LA EXCEPCIÓN. Aquí había
+    escrito que iba entero a propósito, «porque no es una referencia de estilo
+    sino el primer cuadro del clip». Lo segundo es verdad y lo primero era el
+    fallo: un PNG de 2K en base64 son cuatro megas y cuarto, así que las tomas
+    más detalladas se caían con un 413 y las demás pasaban —por eso fallaban
+    unas sí y otras no—. Va al lado que Veo va a emitir, que es todo lo que
+    llega a mirar, y en JPEG casi sin pérdida. Ninguna imagen viaja entera.  */
 const fuentePipeline = leer('app/pipeline.js');
-const inicioVeo = fuentePipeline.indexOf('async _unVideo(');
-const finVeo = fuentePipeline.indexOf('\n  /* ──', inicioVeo);
 const crudos = [...fuentePipeline.matchAll(/data:\s*await blobAb64\(/g)]
-  .filter((m) => !(inicioVeo > 0 && m.index > inicioVeo && (finVeo < 0 || m.index < finVeo)))
   .map((m) => fuentePipeline.slice(m.index, m.index + 60).split('\n')[0].trim());
 if (crudos.length) {
-  mal('se adjunta una imagen de referencia sin reducir', crudos.join(' | ') +
+  mal('se adjunta una imagen sin reducir', crudos.join(' | ') +
     ' — usa comoReferencia(), o el cuerpo de la petición pasa del límite');
 } else if (!/refs\.push\(await comoReferencia\(/.test(fuentePipeline)) {
   mal('los fotogramas no reducen las hojas antes de adjuntarlas');
-} else ok('las referencias se reducen antes de viajar; el fotograma de Veo va entero');
+} else if (!/image: await comoReferencia\(img, ladoDeVideo\(/.test(fuentePipeline)) {
+  mal('el fotograma de partida de Veo viaja a resolución completa',
+    'un PNG de 2K en base64 pasa de los 4,5 MB: las tomas detalladas fallan con 413');
+} else ok('ninguna imagen viaja entera: ni las hojas de referencia ni el fotograma que abre el clip');
 
 // Y la misma regla en el sitio que de verdad importa: las tomas del episodio.
 const unaImagen = (() => {

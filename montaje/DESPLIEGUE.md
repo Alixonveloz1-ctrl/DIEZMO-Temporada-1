@@ -58,26 +58,27 @@ Abre el **editor de Cloud Shell** y pásale al asistente este bloque completo:
 > ```bash
 > #!/bin/bash
 > set -euo pipefail
->
 > : "${TRABAJO:?falta TRABAJO}"
 > : "${SALIDA:?falta SALIDA}"
->
 > obra=/tmp/obra
 > rm -rf "$obra"; mkdir -p "$obra"; cd "$obra"
 > mkdir -p fotogramas voz clips musica segmentos bajado
->
+> avisa() { printf '%s\n' "$@" | tee -a error.txt >&2; }
+> : > error.txt
+> trap 'gcloud storage cp error.txt "$TRABAJO/error.txt" 2>/dev/null || true' EXIT
 > echo "── Encargo: $TRABAJO"
->
-> gcloud storage cp "$TRABAJO/hoja.json" "$TRABAJO/montar.sh" "$TRABAJO/descargas.txt" .
+> if ! gcloud storage cp "$TRABAJO/hoja.json" "$TRABAJO/montar.sh" "$TRABAJO/descargas.txt" . 2> encargo.txt; then
+>   avisa "El montador no pudo leer el encargo:" "$(tail -n 5 encargo.txt)"
+>   exit 1
+> fi
 > gcloud storage cp "$TRABAJO/firma.png" . 2>/dev/null || true
->
 > if [ -n "${PREFIJO:-}" ]; then
 >   echo "── Material: $PREFIJO"
 >   gcloud storage cp -r "$PREFIJO/**" bajado/ 2>/dev/null || true
 > fi
->
 > : > faltan.txt
-> while IFS=$'\t' read -r origen destino; do
+> : > esperados.txt
+> while IFS=$'\t' read -r origen destino || [ -n "${origen:-}" ]; do
 >   [ -z "${origen:-}" ] && continue
 >   copia="bajado/${origen#${PREFIJO:-__nada__}/}"
 >   if [ -f "$copia" ]; then
@@ -85,22 +86,28 @@ Abre el **editor de Cloud Shell** y pásale al asistente este bloque completo:
 >   else
 >     printf '%s\t%s\n' "$origen" "$destino" >> faltan.txt
 >   fi
+>   printf '%s\n' "$destino" >> esperados.txt
 > done < descargas.txt
->
 > if [ -s faltan.txt ]; then
 >   echo "── $(wc -l < faltan.txt) archivos sueltos"
->   awk -F'\t' '{print $1"\n"$2}' faltan.txt | xargs -P 8 -n 2 gcloud storage cp
+>   awk -F'\t' '{print $1"\n"$2}' faltan.txt | xargs -P 8 -n 2 gcloud storage cp || true
 > fi
->
-> echo "── Montando"
-> bash montar.sh
->
-> terminado=$(ls -1 DIEZMO-EP*.mp4 2>/dev/null | head -n 1 || true)
-> if [ -z "$terminado" ]; then
->   echo "El montaje terminó sin producir el MP4" >&2
+> sin=$(while read -r d; do [ -f "$d" ] || printf '%s\n' "$d"; done < esperados.txt)
+> if [ -n "$sin" ]; then
+>   avisa "No llegó todo el material del episodio. Falta:" "$sin" \
+>     "Genera esas piezas en el Estudio y vuelve a montar."
 >   exit 1
 > fi
->
+> echo "── Montando"
+> if ! bash montar.sh 2> ffmpeg.txt; then
+>   avisa "ffmpeg falló al montar:" "$(tail -n 20 ffmpeg.txt)"
+>   exit 1
+> fi
+> terminado=$(ls -1 DIEZMO-EP*.mp4 2>/dev/null | head -n 1 || true)
+> if [ -z "$terminado" ]; then
+>   avisa "El montaje terminó sin producir el MP4."
+>   exit 1
+> fi
 > echo "── Subiendo $terminado ($(du -h "$terminado" | cut -f1))"
 > gcloud storage cp "$terminado" "$SALIDA"
 > echo "Listo."

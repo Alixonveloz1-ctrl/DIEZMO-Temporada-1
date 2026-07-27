@@ -179,8 +179,10 @@ export async function montarEpisodio(params, opciones) {
     if (o.señal && o.señal.aborted) throw new Cancelado();
     await esperar(vuelta === 0 ? 20000 : 15000);
     vuelta++;
+    // El episodio viaja también en la consulta: si el montador dejó escrito por
+    // qué murió, el backend sabe en qué carpeta buscar la nota.
     const est = await api.montarConsultar(
-      { operationName: inicio.operationName },
+      { operationName: inicio.operationName, episodio: params.episodio },
       { señal: o.señal }
     );
     if (est.done) {

@@ -798,10 +798,14 @@ module.exports = async (req, res) => {
         const salida = RAIZ + 'material/ep' + pad2 + '/completo.mp4';
 
         /*  La lista va como texto separado por tabuladores en vez de JSON: el
-            contenedor la lee con un bucle de shell y no necesita intérprete. */
+            contenedor la lee con un bucle de shell y no necesita intérprete.
+            EL SALTO FINAL NO SOBRA. «read» del shell devuelve falso cuando la
+            última línea no termina en salto, y el bucle la descarta sin decir
+            nada: se perdía siempre el último archivo del encargo —la música de
+            la última escena— y ffmpeg moría con un 254 sin más explicación.  */
         const lista = body.descargas
           .map((d) => 'gs://' + bucket + '/' + RAIZ + 'material/' + d.clave + '\t' + d.destino)
-          .join('\n');
+          .join('\n') + '\n';
 
         await gcsSubir(token, bucket, carpeta + '/hoja.json',
           Buffer.from(JSON.stringify(body.hoja)), 'application/json');
@@ -809,6 +813,9 @@ module.exports = async (req, res) => {
           Buffer.from(String(body.script)), 'text/x-shellscript');
         await gcsSubir(token, bucket, carpeta + '/descargas.txt',
           Buffer.from(lista), 'text/plain');
+        /*  El motivo del fallo anterior se borra al empezar. Si no, un montaje
+            que falle sin dejar nota heredaría la queja del intento pasado.  */
+        await gcsSubir(token, bucket, carpeta + '/error.txt', Buffer.from(''), 'text/plain');
         // La firma la dibuja el navegador y viaja con el encargo: el montador
         // solo la superpone, no tiene que saber escribir.
         if (body.firma) {
@@ -860,10 +867,19 @@ module.exports = async (req, res) => {
         j = j || {};
         if (!j.done) return res.status(200).json({ done: false });
         if (j.error) {
+          /*  Cloud Run solo sabe decir «exit code N». El montador deja el motivo
+              de verdad escrito en su carpeta antes de morir, y es lo único que
+              se puede leer desde un teléfono: si está, manda ese.            */
+          let motivo = '';
+          if (body.episodio) {
+            const nota = await gcsBajar(token, bucket,
+              RAIZ + 'montaje/ep' + String(parseInt(body.episodio, 10)).padStart(2, '0') + '/error.txt');
+            if (nota.ok) motivo = (await nota.text()).trim().slice(0, 700);
+          }
           return res.status(200).json({
             done: true,
-            error: (j.error.message || JSON.stringify(j.error)).slice(0, 500) +
-              ' — el registro completo está en Cloud Run, en las ejecuciones del montador.',
+            error: motivo || ((j.error.message || JSON.stringify(j.error)).slice(0, 500) +
+              ' — el registro completo está en Cloud Run, en las ejecuciones del montador.'),
           });
         }
         return res.status(200).json({ done: true });

@@ -625,6 +625,67 @@ if (!/mode === 'montar'/.test(backM)) {
   }
 }
 
+/*  Y QUE LA LISTA LLEGUE ENTERA. Estar en la lista no basta: viaja como texto y
+    el contenedor la lee con «read» del shell, que devuelve falso al leer la
+    última línea cuando el texto no termina en salto. El bucle la descartaba sin
+    decir una palabra, así que el último archivo del encargo —la música de la
+    última escena— no se copiaba nunca y ffmpeg moría con un 254 por no poder
+    abrirlo. Se comprueban las dos mitades: que se escriba con salto final y que
+    el lector no dependa de que lo haya, porque el contenedor se despliega a
+    mano y puede quedarse una versión atrás.                                  */
+{
+  const conSalto = /\.join\('\\n'\) \+ '\\n'/.test(backM);
+  const lectorFirme = /read -r origen destino \|\| \[ -n "\$\{origen:-\}" \]/.test(contenedor);
+  if (!conSalto) {
+    mal('la lista de descargas se escribe sin salto de línea final',
+      'el contenedor se come el último archivo y ffmpeg falla por no encontrarlo');
+  } else if (!lectorFirme) {
+    mal('el lector del contenedor descarta la última línea si no acaba en salto',
+      'basta con desplegar un encargo escrito de otra forma para perder un archivo');
+  } else ok('la lista de descargas llega entera: se escribe con salto final y el lector no depende de él');
+}
+
+/*  Y SI ALGO NO LLEGA, QUE SE DIGA CUÁL. Desde un teléfono no hay manera de
+    abrir el registro de Cloud Run, y «Task failed with exit code 254» no le
+    dice nada a nadie. El montador deja escrito el motivo antes de morir y el
+    backend lo lee al ver el fallo.                                          */
+{
+  const compruebaAntes = /esperados\.txt/.test(contenedor) && /avisa "No llegó todo/.test(contenedor);
+  const suelta = /xargs -P 8 -n 2 gcloud storage cp \|\| true/.test(contenedor);
+  const guarda = /error\.txt" 2>\/dev\/null/.test(contenedor);
+  const lee = /montaje\/ep' \+ String\(parseInt\(body\.episodio/.test(backM);
+  if (!compruebaAntes) {
+    mal('el montador no comprueba que llegó todo antes de montar',
+      'ffmpeg se estrella contra el primero que falte y solo devuelve un número');
+  } else if (!suelta) {
+    mal('una pieza que no esté en el bucket mata el montador antes de la comprobación',
+      'volvería a morir con un número en vez de decir cuál falta');
+  } else if (!guarda || !lee) {
+    mal('el motivo del fallo no llega al Estudio',
+      'en el teléfono solo se vería «exit code 254»');
+  } else ok('si falta material se dice cuál, y el motivo del fallo se lee desde el Estudio');
+}
+
+/*  El .zip de piezas sueltas es el paracaídas, y se abría en el aire: cada
+    fotograma, cada clip y cada voz se traía entero a la memoria de la pestaña y
+    se quedaba allí hasta cerrarlo. Un episodio son casi dos gigas; el navegador
+    del teléfono se quedaba sin sitio y recargaba la página a media descarga. */
+{
+  const expM = leer('app/exportar.js');
+  const i = expM.indexOf('async añadir(');
+  const cuerpo = i < 0 ? '' : expM.slice(i, expM.indexOf('cerrar()', i));
+  if (!cuerpo) {
+    mal('no se encuentra el escritor del .zip');
+  } else if (/arrayBuffer\(\)/.test(cuerpo)) {
+    mal('el .zip trae cada pieza entera a la memoria de la pestaña',
+      'dos gigas en el móvil: la página se recarga sola a media descarga');
+  } else if (!/crc32Blob/.test(cuerpo)) {
+    mal('el CRC del .zip no se calcula a trozos');
+  } else if (!/0xFFFFFFFF/.test(cuerpo)) {
+    mal('el .zip no avisa al pasarse de cuatro gigas', 'escribiría un archivo roto en silencio');
+  } else ok('el .zip no trae ninguna pieza a memoria: CRC a trozos y aviso si se pasa de cuatro gigas');
+}
+
 /* ── 5b-sexies · Portadas y carteles ────────────────────────── */
 /* ── 5b-septies · Nada empuja la página a lo ancho ──────────── */
 titulo('OPERACIONES LARGAS');

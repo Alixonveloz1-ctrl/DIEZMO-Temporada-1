@@ -25,9 +25,24 @@ const TABLA_CRC = (() => {
   return t;
 })();
 
-function crc32(bytes) {
+/*  El CRC se calcula LEYENDO EL BLOB A TROZOS, y el blob nunca se convierte
+    entero a bytes. Antes sí: cada fotograma, cada clip y cada voz se traía a
+    memoria de JavaScript y se quedaba allí hasta cerrar el zip. Un episodio son
+    unos ciento treinta fotogramas de 2K, otros tantos clips y dieciséis minutos
+    de onda: cerca de dos gigas en la pestaña. El navegador del teléfono no
+    aguanta eso y recarga la página a media descarga, que es exactamente lo que
+    pasaba. Leído a trozos, en memoria hay como mucho uno de cuatro megas: el
+    resto se queda donde ya estaba, en el almacén de blobs del navegador.     */
+const TROZO_CRC = 4 << 20;
+
+async function crc32Blob(blob) {
   let c = 0xFFFFFFFF;
-  for (let i = 0; i < bytes.length; i++) c = TABLA_CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  for (let desde = 0; desde < blob.size; desde += TROZO_CRC) {
+    const parte = new Uint8Array(
+      await blob.slice(desde, Math.min(desde + TROZO_CRC, blob.size)).arrayBuffer()
+    );
+    for (let i = 0; i < parte.length; i++) c = TABLA_CRC[(c ^ parte[i]) & 0xFF] ^ (c >>> 8);
+  }
   return (c ^ 0xFFFFFFFF) >>> 0;
 }
 
@@ -47,19 +62,26 @@ export class Zip {
 
   async añadir(ruta, datos) {
     const nombre = new TextEncoder().encode(ruta);
-    const bytes = datos instanceof Uint8Array
-      ? datos
-      : new Uint8Array(await (datos instanceof Blob ? datos.arrayBuffer() : Promise.resolve(datos)));
+    // Lo que entra como Blob sigue siendo un Blob de principio a fin.
+    const pieza = datos instanceof Blob ? datos : new Blob([datos]);
 
-    const crc = crc32(bytes);
+    const crc = await crc32Blob(pieza);
     const cabecera = une(
       u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
-      u32(crc), u32(bytes.length), u32(bytes.length),
+      u32(crc), u32(pieza.size), u32(pieza.size),
       u16(nombre.length), u16(0), nombre
     );
-    this.trozos.push(cabecera, bytes);
-    this.entradas.push({ nombre, crc, tam: bytes.length, offset: this.offset });
-    this.offset += cabecera.length + bytes.length;
+    /*  Este zip guarda los desplazamientos en cuatro bytes, que es el formato
+        de toda la vida y el que abre cualquier teléfono. Pasados los cuatro
+        gigas harían falta las extensiones ZIP64; antes de escribir un archivo
+        roto en silencio, se dice.                                            */
+    if (this.offset + cabecera.length + pieza.size > 0xFFFFFFFF) {
+      throw new Error('El episodio pasa de cuatro gigas y no cabe en un .zip normal. ' +
+        'Monta el episodio en la nube: el MP4 terminado pesa una fracción de esto.');
+    }
+    this.trozos.push(cabecera, pieza);
+    this.entradas.push({ nombre, crc, tam: pieza.size, offset: this.offset });
+    this.offset += cabecera.length + pieza.size;
   }
 
   cerrar() {

@@ -328,6 +328,15 @@ function cifrarRuta(gsUri) {
   return Buffer.concat([iv, c.getAuthTag(), dato]).toString('base64url');
 }
 
+/*  Descifra el nombre de una operación. Si llega en claro —una operación que
+    empezó antes de este cambio— se acepta tal cual, para no dejar colgado lo
+    que ya estuviera en marcha.                                              */
+function abrirOperacion(v) {
+  const t = String(v || '');
+  if (t.indexOf('projects/') === 0) return t;
+  try { return descifrarRuta(t); } catch (e) { return t; }
+}
+
 function descifrarRuta(token) {
   const b = Buffer.from(String(token), 'base64url');
   const d = crypto.createDecipheriv('aes-256-gcm', claveInterna(), b.subarray(0, 12));
@@ -626,12 +635,20 @@ module.exports = async (req, res) => {
             detail: (out.raw || '').slice(0, 800),
           });
         }
-        return res.status(200).json({ operationName: out.json.name, destino: cifrarRuta(destino) });
+        /*  El nombre de la operación lleva dentro el identificador del
+            proyecto, y toda respuesta pasa por el censor: salía como
+            «projects/«oculto»/locations/…» y al devolverlo para consultar,
+            Google lo rechazaba por malformado. Se cifra igual que las rutas
+            de los clips: el navegador recibe algo opaco y aquí se descifra. */
+        return res.status(200).json({
+          operationName: cifrarRuta(out.json.name),
+          destino: cifrarRuta(destino),
+        });
       }
 
       if (accion === 'poll') {
         if (!body.operationName) return res.status(400).json({ error: 'Falta "operationName"' });
-        const url = 'https://texttospeech.googleapis.com/v1beta1/' + String(body.operationName);
+        const url = 'https://texttospeech.googleapis.com/v1beta1/' + abrirOperacion(body.operationName);
         const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
         const raw = await r.text();
         let j = null;
@@ -777,14 +794,14 @@ module.exports = async (req, res) => {
           });
         }
         return res.status(200).json({
-          operationName: (out.json && out.json.name) || '',
+          operationName: cifrarRuta((out.json && out.json.name) || ''),
           salida: cifrarRuta('gs://' + bucket + '/' + salida),
         });
       }
 
       if (accion === 'poll') {
         if (!body.operationName) return res.status(400).json({ error: 'Falta "operationName"' });
-        const url = 'https://run.googleapis.com/v2/' + String(body.operationName);
+        const url = 'https://run.googleapis.com/v2/' + abrirOperacion(body.operationName);
         const r = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
         const raw = await r.text();
         let j = null;
@@ -1036,7 +1053,7 @@ module.exports = async (req, res) => {
             detail: (out.raw || '').slice(0, 800),
           });
         }
-        return res.status(200).json({ operationName: out.json.name, model, location });
+        return res.status(200).json({ operationName: cifrarRuta(out.json.name), model, location });
       }
 
       if (accion === 'poll') {
@@ -1044,7 +1061,7 @@ module.exports = async (req, res) => {
 
         // La región y el modelo se derivan del propio nombre de la operación:
         // así la consulta funciona con cualquier Veo, sin depender del cliente.
-        const op = String(body.operationName);
+        const op = abrirOperacion(body.operationName);
         const recurso = op.split('/operations/')[0];
         const mReg = /\/locations\/([^/]+)\//.exec(op);
         const region = mReg ? mReg[1] : location;

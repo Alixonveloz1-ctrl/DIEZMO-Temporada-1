@@ -627,6 +627,37 @@ if (!/mode === 'montar'/.test(backM)) {
 
 /* ── 5b-sexies · Portadas y carteles ────────────────────────── */
 /* ── 5b-septies · Nada empuja la página a lo ancho ──────────── */
+titulo('OPERACIONES LARGAS');
+{
+  const b = leer('api/ep-gemini.js');
+  /*  El nombre de una operación lleva dentro el identificador del proyecto, y
+      TODA respuesta pasa por el censor: salía como «projects/«oculto»/…» y al
+      devolverlo para consultar, Google lo rechazaba por malformado. Le pasaba
+      a la voz larga, y le habría pasado igual a Veo y al montaje en cuanto se
+      usaran. Tiene que viajar cifrado, como las rutas de los clips.         */
+  /*  Solo lo que SALE hacia el navegador. La petición hacia Google lleva el
+      nombre ya descifrado, y ahí tiene que ir en claro.                     */
+  const salidas = b.split('\n')
+    .filter((l) => /operationName:/.test(l) && !/callVertex/.test(l))
+    .map((l) => l.trim());
+  const enClaro = salidas.filter((x) => x.indexOf('cifrarRuta') === -1);
+  // Por líneas: buscando desde «body.operationName» nunca se vería el String(
+  // que lo envuelve, porque está delante.
+  const lecturas = b.split('\n').filter((l) => /String\(body\.operationName\)/.test(l));
+  if (!salidas.length) {
+    mal('no se encuentran las operaciones largas');
+  } else if (enClaro.length) {
+    mal(enClaro.length + ' operaciones salen sin cifrar',
+      'el censor les borra el proyecto y la consulta falla con 400');
+  } else if (lecturas.length) {
+    mal('hay consultas que usan el nombre de la operación sin descifrar');
+  } else if (!/function abrirOperacion\(/.test(b)) {
+    mal('no existe el descifrado del nombre de operación');
+  } else {
+    ok('las ' + salidas.length + ' operaciones largas —voz, montaje y Veo— viajan cifradas');
+  }
+}
+
 titulo('ANCHO DE LA PANTALLA');
 {
   const h = leer('index.html');

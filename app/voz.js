@@ -98,7 +98,7 @@ export const TONO_POR_DEFECTO = 'narrador';
 
     Son las mismas ocho personalidades que Gemini, con los mismos nombres.   */
 export const VOCES_CHIRP = [
-  ['es-US-Chirp3-HD-Charon', 'Charon — grave e informativa (la que ya usabas)'],
+  ['es-US-Chirp3-HD-Charon', 'Charon — grave (la que ya usabas)'],
   ['es-US-Chirp3-HD-Orus', 'Orus — firme, algo más tensa'],
   ['es-US-Chirp3-HD-Fenrir', 'Fenrir — más áspera y rotunda'],
   ['es-US-Chirp3-HD-Puck', 'Puck — más clara y ligera'],

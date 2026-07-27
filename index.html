@@ -43,8 +43,13 @@
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;background:var(--fondo)}
+/*  Nada empuja la página a lo ancho. Un <select> sin ancho se estira hasta su
+    opción más larga, y en el móvil eso mueve el diálogo entero de lado.      */
+select,input,textarea{max-width:100%;box-sizing:border-box}
+html{overflow-x:hidden}
+
 body{
-  margin:0;background:var(--fondo);color:var(--tinta);
+  margin:0;background:var(--fondo);color:var(--tinta);max-width:100vw;overflow-x:hidden;
   font-family:'Inter',system-ui,-apple-system,sans-serif;
   font-size:15px;line-height:1.5;letter-spacing:-.008em;
   padding-bottom:calc(80px + env(safe-area-inset-bottom));
@@ -165,7 +170,8 @@ h3{font-size:17px;font-weight:600;margin:0 0 6px}
 /* ── Campos ───────────────────────────────────────────────── */
 .campo{margin:0 0 14px}
 .campo label{display:block;font-size:12px;color:var(--tinta-2);margin-bottom:6px;font-weight:600}
-.campo input[type=text],.campo input[type=number],.campo select,.campo textarea{
+.campo input[type=text],.campo input[type=number],.campo select,.campo textarea,
+.selector-modelo select{
   width:100%;background:var(--fondo-2);border:1px solid var(--linea-2);border-radius:var(--r-s);
   color:var(--tinta);font-family:'Inter',sans-serif;font-size:14.5px;padding:11px 12px;
   transition:var(--tr);
@@ -175,12 +181,12 @@ h3{font-size:17px;font-weight:600;margin:0 0 6px}
 }
 .campo textarea{min-height:88px;resize:vertical;line-height:1.55}
 .campo textarea.alto{min-height:150px}
-.campo select{
+.campo select,.selector-modelo select{
   appearance:none;padding-right:34px;
   background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239BA7BB' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat:no-repeat;background-position:right 11px center;
 }
-.campo select option{background:var(--carta);color:var(--tinta)}
+.campo select option,.selector-modelo select option{background:var(--carta);color:var(--tinta)}
 .campo.check{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .campo.check label{margin:0;font-size:14px;color:var(--tinta);font-weight:400}
 .campo.check input{width:19px;height:19px;accent-color:var(--azul);flex:none}
@@ -199,7 +205,7 @@ code{background:var(--carta-3);padding:2px 6px;border-radius:5px;font-size:12.5p
   display:flex;align-items:center;gap:7px;font-size:11px;font-weight:700;
   letter-spacing:.07em;text-transform:uppercase;color:var(--azul-2);margin-bottom:9px;
 }
-.selector-modelo select{background:var(--fondo-2)}
+.selector-modelo select{background-color:var(--fondo-2)}
 .selector-modelo .pista{font-size:11.5px;color:var(--tinta-2);margin:8px 0 0;line-height:1.45}
 
 /* ── Chips y estados ──────────────────────────────────────── */
@@ -660,9 +666,9 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       <div class="campo">
         <label for="selRigor">Cuánto se tienen que parecer para contarlas como el mismo plano</label>
         <select id="selRigor">
-          <option value="0.9">Idénticos — solo si la descripción coincide casi palabra por palabra</option>
+          <option value="0.9">Idénticos — palabra por palabra</option>
           <option value="0.78" selected>Muy parecidos — recomendado</option>
-          <option value="0.65">Parecidos — encuentra más, revisa con más cuidado</option>
+          <option value="0.65">Parecidos — encuentra más</option>
         </select>
       </div>
       <div class="fila-btn">
@@ -1046,8 +1052,8 @@ dialog h2{font-size:18px;text-transform:none;letter-spacing:-.01em;margin-bottom
       Cómo se narra el episodio
     </div>
     <select id="cfgMotorVoz">
-      <option value="largo">Una sola locución por episodio — el mismo narrador de principio a fin</option>
-      <option value="gemini">Por bloques, con Gemini — más expresivo, pero cambia de tono cada 45 s</option>
+      <option value="largo">Una locución por episodio</option>
+      <option value="gemini">Por bloques, con Gemini</option>
     </select>
     <p class="pista" id="pistaMotorVoz">—</p>
 

@@ -626,6 +626,40 @@ if (!/mode === 'montar'/.test(backM)) {
 }
 
 /* ── 5b-sexies · Portadas y carteles ────────────────────────── */
+/* ── 5b-septies · Nada empuja la página a lo ancho ──────────── */
+titulo('ANCHO DE LA PANTALLA');
+{
+  const h = leer('index.html');
+  /*  Un <select> sin ancho se estira hasta su opción más larga y arrastra la
+      página entera de lado: en el móvil el diálogo se ve movido y cortado. Los
+      de .campo iban al 100 %; los que viven sueltos dentro de un
+      .selector-modelo no, y ahí se salía.                                    */
+  const sueltos = [];
+  for (const m of h.matchAll(/<select id="(\w+)"/g)) {
+    const ini = h.lastIndexOf('<div class="campo', m.index);
+    const fin = h.lastIndexOf('</div>', m.index);
+    if (!(ini > fin)) sueltos.push(m[1]);
+  }
+  const cubiertos = /\.selector-modelo select\{/.test(h) &&
+    /,\s*\n\.selector-modelo select\{/.test(h);
+  const tope = /select,input,textarea\{max-width:100%/.test(h);
+  // Y las etiquetas largas ensanchan el desplegable aunque tenga tope: en el
+  // móvil el menú nativo las corta y no se lee ninguna.
+  const largas = [...h.matchAll(/<option value="[^"]*">([^<]{56,})</g)].map((m) => m[1].slice(0, 40));
+  if (!tope) {
+    mal('nada impide que un desplegable ensanche la página',
+      'falta el tope de ancho general');
+  } else if (sueltos.length && !cubiertos) {
+    mal(sueltos.length + ' desplegables viven fuera de .campo y sin ancho propio',
+      sueltos.join(' · '));
+  } else if (largas.length) {
+    mal(largas.length + ' opciones son demasiado largas', largas.join(' · '));
+  } else {
+    ok('los ' + sueltos.length + ' desplegables sueltos van al ancho del contenedor, ' +
+       'con tope general y etiquetas cortas');
+  }
+}
+
 titulo('PORTADAS Y CARTELES');
 {
   const pr = await import(pathToFileURL(path.join(raiz, 'app', 'portadas.js')).href);

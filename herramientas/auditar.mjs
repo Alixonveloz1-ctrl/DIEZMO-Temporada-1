@@ -645,6 +645,34 @@ if (!/mode === 'montar'/.test(backM)) {
   } else ok('la lista de descargas llega entera: se escribe con salto final y el lector no depende de él');
 }
 
+/*  Y ANTES DE GASTAR UNA EJECUCIÓN, QUE SE MIRE SI ESTÁ TODO. La lista puede
+    estar completa y aun así pedir una pieza que nunca llegó al almacén: el
+    Estudio la tiene en el navegador y da por hecho que subió. El montador la
+    abriría con ffmpeg, que ante un archivo que no existe solo sabe morir con un
+    número. Aquí es donde se sabe qué se pidió, así que aquí se comprueba.    */
+{
+  /*  Desde «mode === 'montar'», no desde el primer «start» del archivo: la voz
+      larga también tiene start y poll, y va antes. Buscando a ciegas se medía
+      el bloque equivocado y la comprobación no miraba nada.                  */
+  const modo = backM.indexOf("mode === 'montar'");
+  const inicio = modo < 0 ? -1 : backM.indexOf("if (accion === 'start')", modo);
+  const bloque = inicio < 0 ? '' : backM.slice(inicio, backM.indexOf("if (accion === 'poll')", inicio));
+  const lanza = bloque.indexOf('jobs/');
+  const mira = bloque.indexOf('gcsListar');
+  if (!bloque) {
+    mal('no se encuentra el arranque del montaje');
+  } else if (mira < 0 || mira > lanza) {
+    mal('el montaje se lanza sin comprobar que el material está en el almacén',
+      'se gasta una ejecución entera para acabar en «exit code 254»');
+  } else if (!/enElAlmacen\.get\(d\.clave\) > 0/.test(bloque)) {
+    mal('un archivo vacío en el almacén cuenta como presente',
+      'existe, pero ffmpeg falla igual al abrirlo y el motivo es aún menos claro');
+  } else if (!/body\.hoja\.firma && !body\.firma/.test(bloque)) {
+    mal('no se comprueba que la firma llegó',
+      'es el único archivo que no sale del almacén; si falta, el guion la pide igual');
+  } else ok('antes de lanzar el montador se comprueba que están las piezas y la firma, y se dice cuáles faltan');
+}
+
 /*  Y SI ALGO NO LLEGA, QUE SE DIGA CUÁL. Desde un teléfono no hay manera de
     abrir el registro de Cloud Run, y «Task failed with exit code 254» no le
     dice nada a nadie. El montador deja escrito el motivo antes de morir y el

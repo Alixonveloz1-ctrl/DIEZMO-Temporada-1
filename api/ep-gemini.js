@@ -807,6 +807,47 @@ module.exports = async (req, res) => {
           .map((d) => 'gs://' + bucket + '/' + RAIZ + 'material/' + d.clave + '\t' + d.destino)
           .join('\n') + '\n';
 
+        /*  SE COMPRUEBA QUE ESTÁ TODO ANTES DE LANZAR NADA. El montador abre los
+            archivos con ffmpeg, y ffmpeg ante uno que no existe solo sabe morir
+            con un número: «exit code 254», sin decir cuál. Desde un teléfono no
+            hay forma de mirar el registro, así que la comprobación se hace aquí,
+            que es donde se sabe qué se pidió. Se listan solo los episodios que
+            aparecen en el encargo —normalmente uno— y no objeto por objeto.
+            Un archivo vacío cuenta como ausente: existe, pero al abrirlo falla
+            igual y el motivo sería todavía menos reconocible.                */
+        const porEpisodio = new Map();
+        for (const d of body.descargas) {
+          const raiz = String(d.clave).split('/')[0];
+          if (!porEpisodio.has(raiz)) porEpisodio.set(raiz, []);
+          porEpisodio.get(raiz).push(d);
+        }
+        const enElAlmacen = new Map();
+        for (const raiz of porEpisodio.keys()) {
+          for (const o of await gcsListar(token, bucket, RAIZ + 'material/' + raiz + '/')) {
+            enElAlmacen.set(raiz + '/' + o.clave, o.bytes);
+          }
+        }
+        const ausentes = [...new Set(body.descargas
+          .filter((d) => !(enElAlmacen.get(d.clave) > 0))
+          .map((d) => d.destino))];
+        if (ausentes.length) {
+          return res.status(400).json({
+            error: 'Faltan ' + ausentes.length + ' piezas en el almacén, así que el montaje ' +
+              'no puede empezar. Genéralas en el Estudio y vuelve a montar.',
+            detail: ausentes.slice(0, 15).join(' · ') +
+              (ausentes.length > 15 ? ' … y ' + (ausentes.length - 15) + ' más' : ''),
+          });
+        }
+        /*  Y la firma es el único archivo que NO sale del almacén: la dibuja el
+            navegador. Si la hoja dice que lleva firma y no ha llegado, el guion
+            la pediría igual y ffmpeg moriría por ella.                       */
+        if (body.hoja.firma && !body.firma) {
+          return res.status(400).json({
+            error: 'El episodio lleva firma del canal pero el navegador no la mandó. ' +
+              'Recarga la página y vuelve a montar, o quita la firma en Ajustes.',
+          });
+        }
+
         await gcsSubir(token, bucket, carpeta + '/hoja.json',
           Buffer.from(JSON.stringify(body.hoja)), 'application/json');
         await gcsSubir(token, bucket, carpeta + '/montar.sh',

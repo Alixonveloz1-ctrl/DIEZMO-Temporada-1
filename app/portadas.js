@@ -212,7 +212,11 @@ export function negativoDePortada(negativo) {
 
 function bloqueReparto(personajes, conReferencia) {
   if (!personajes.length) return [];
-  const fichas = personajes.map((p) => '· ' + p.nombre + ': ' + p.ficha);
+  /*  La ficha describe el cuerpo y la cara, que no cambian nunca; la ropa va
+      aparte porque varios personajes se cambian a mitad de temporada. Sin ella
+      el modelo vestía a su gusto, y la portada no coincidía con el episodio. */
+  const fichas = personajes.map((p) => '· ' + p.nombre + ': ' + p.ficha +
+    (p.vestuario && p.vestuario.desc ? ' ROPA: ' + p.vestuario.desc : ''));
   return [
     'PERSONAJES EN LA IMAGEN (' + personajes.length + '):',
     ...fichas,
@@ -225,8 +229,10 @@ function bloqueReparto(personajes, conReferencia) {
     'de cuadro, o de espaldas si eso es lo que la escena pide. Componla como un cartel de ' +
     'anime de los que se recuerdan, no como un retrato posado.',
     conReferencia
-      ? 'Se adjuntan sus hojas de referencia: respeta el rostro, el peinado y las ' +
-        'proporciones EXACTAMENTE. Es la misma persona, en otra escena.'
+      ? 'Se adjuntan sus hojas de referencia, de cuerpo entero y con la ropa que llevan en ' +
+        'este punto de la historia. Respeta EXACTAMENTE el rostro, el peinado, las ' +
+        'proporciones y la ropa: es la misma persona y la misma prenda, en otra escena. ' +
+        'Si la pose que eliges no deja ver alguna prenda, no la sustituyas por otra.'
       : '',
   ].filter(Boolean);
 }

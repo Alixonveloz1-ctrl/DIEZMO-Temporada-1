@@ -686,8 +686,17 @@ titulo('PORTADAS Y CARTELES');
   const sinTexto = conTitulo && conCapitulo && !demasiadas;
   /*  Y la cara tiene que ser la de siempre: una portada con otro rostro es lo
       primero que ve quien no conoce la serie.                               */
+  /*  La hoja que se adjunta tiene que ser la del VESTUARIO del episodio, no la
+      de rostro: con un primer plano recortado el modelo no ve la ropa y la
+      inventa, y con tan poco cuerpo la cara también se le va.               */
+  const conVestuario = dos.map((p) => ({ ...p, vestuario: (p.vestuarios || [])[0] }));
+  const conRopa = pr.promptPortada(epF, ctx, conVestuario, true);
+  const pipeR = leer('app/pipeline.js');
   const conFichas = dos.every((p) => port.indexOf(p.nombre) !== -1) &&
-    /hojas de referencia/.test(port);
+    /hojas de referencia/.test(port) &&
+    /ROPA: /.test(conRopa) &&
+    /vestuarioPara\(per, numEp \|\| 1\)/.test(pipeR) &&
+    !/\/rostro\$\/\.test\(r\)/.test(pipeR);
   if (!sinTexto) {
     mal('el texto de las portadas no está bien pedido',
       'hace falta el título exacto, tipografía de cartel y la letra pequeña prohibida');

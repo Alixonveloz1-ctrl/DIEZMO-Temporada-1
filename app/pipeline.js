@@ -518,13 +518,19 @@ export class Motor {
       ve quien no conoce la serie. Así que van con las hojas de referencia
       adjuntas, igual que los fotogramas, y si un personaje no tiene hoja se
       dice en vez de inventarle una cara.                                     */
-  async _refsDe(ids) {
+  /*  La hoja que se adjunta es la DEL VESTUARIO de ese episodio, igual que en
+      los fotogramas. Antes se cogía la de «rostro», que es un primer plano
+      recortado: el modelo veía la cara pero no la ropa, así que la inventaba, y
+      con tan poco cuerpo de referencia la cara también se le iba. La hoja de
+      vestuario es de cuerpo entero y lleva la cara dentro.                    */
+  async _refsDe(ids, numEp) {
     const refs = [];
     const sinCara = [];
     for (const id of ids) {
       const per = this.p.elenco.find((x) => x.id === id);
       if (!per) continue;
-      const k = (per.refs || []).find((r) => /\/rostro$/.test(r)) || (per.refs || [])[0];
+      const kVest = clave.refPersonaje(per.id, vestuarioPara(per, numEp || 1).id);
+      const k = (per.refs || []).indexOf(kVest) !== -1 ? kVest : (per.refs || [])[0];
       const b = k ? await assets.blob(k) : null;
       if (!b) { sinCara.push(per.nombre); continue; }
       refs.push(await comoReferencia(b));
@@ -532,9 +538,9 @@ export class Motor {
     return { refs, sinCara };
   }
 
-  async _unaPortada(clave_, prompt, ids, formato, quién) {
+  async _unaPortada(clave_, prompt, ids, formato, quién, numEp) {
     const cfg = this.p.config;
-    const { refs, sinCara } = await this._refsDe(ids || []);
+    const { refs, sinCara } = await this._refsDe(ids || [], numEp);
     if (sinCara.length) {
       this._log(quién + ': falta la hoja de ' + sinCara.join(', ') +
         '; genérala antes o saldrá otra cara', 'aviso');
@@ -585,10 +591,11 @@ export class Motor {
         this._prog(hecho, eps.length, quién);
         try {
           const ids = repartoDe(ep, 2);
-          const personajes = ids.map((id) => this.p.elenco.find((x) => x.id === id)).filter(Boolean);
+          const personajes = ids.map((id) => this.p.elenco.find((x) => x.id === id)).filter(Boolean)
+            .map((per) => ({ ...per, vestuario: vestuarioPara(per, ep.num) }));
           const prompt = promptPortada(ep, ctx, personajes, true);
           this.p.portadas[ep.num] = await this._unaPortada(
-            clave.portada(ep.num), prompt, ids, formato || FORMATO_PORTADA, quién);
+            clave.portada(ep.num), prompt, ids, formato || FORMATO_PORTADA, quién, ep.num);
           this._log(quién + ': lista', 'ok');
         } catch (e) {
           if (e && e.cancelado) return;
@@ -617,7 +624,9 @@ export class Motor {
         this._prog(hecho, lista.length, quién);
         try {
           const personajes = c.reparto
-            .map((id) => this.p.elenco.find((x) => x.id === id)).filter(Boolean);
+            .map((id) => this.p.elenco.find((x) => x.id === id)).filter(Boolean)
+            // El cartel no es de ningún episodio: se usa el primer vestuario.
+            .map((per) => ({ ...per, vestuario: vestuarioPara(per, 1) }));
           const prompt = promptCartel(c, ctx, personajes, true);
           this.p.carteles[c.id] = await this._unaPortada(
             clave.cartel(c.id, formato || FORMATO_PORTADA), prompt, c.reparto,

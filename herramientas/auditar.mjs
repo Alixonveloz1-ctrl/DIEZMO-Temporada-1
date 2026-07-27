@@ -1011,11 +1011,21 @@ if (malFormadas.length) {
   mal('hay voces que no son masculinas', 'el proyecto es de narrador masculino');
 } else if (VOCES_CHIRP.every(([id]) => id !== VOZ_CHIRP_DEFECTO)) {
   mal('la voz por defecto no está en el catálogo');
-} else if (VELOCIDAD_DEFECTO <= 1) {
-  mal('la velocidad por defecto no acelera la narración', 'se pidió algo más rápida');
+} else if (VELOCIDAD_DEFECTO !== 1) {
+  /*  Chirp 3: HD no admite el parámetro de velocidad. Mandarlo no genera más
+      rápido: estira el audio después, y eso suena metálico. La velocidad
+      nativa tiene que ser la de fábrica.                                    */
+  mal('la velocidad por defecto no es la nativa',
+    'a cualquier valor distinto de 1 el audio se estira y suena metálico');
+} else if (!/Math\.abs\(vel - 1\) > 0\.005/.test(backVL)) {
+  mal('se manda el parámetro de velocidad aunque no se cambie nada',
+    'basta con mandarlo para que el motor estire el audio');
+} else if ((backVL.match(/Math\.abs\(vel - 1\) > 0\.005/g) || []).length < 2) {
+  mal('la prueba de voz y el episodio no tratan igual la velocidad',
+    'lo que se escucha antes no sería lo que sale después');
 } else {
   ok(VOCES_CHIRP.length + ' voces masculinas de Chirp 3: HD · por defecto ' +
-     VOZ_CHIRP_DEFECTO.split('-').pop() + ' a ' + VELOCIDAD_DEFECTO + 'x');
+     VOZ_CHIRP_DEFECTO.split('-').pop() + ' a velocidad nativa, sin estirar el audio');
 }
 
 /* ── 5c-pre · La semilla no se teclea y llega a lo guardado ── */

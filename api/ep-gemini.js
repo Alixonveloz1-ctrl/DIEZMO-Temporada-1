@@ -579,10 +579,16 @@ module.exports = async (req, res) => {
         if (!body.clave) return res.status(400).json({ error: 'Falta "clave"' });
 
         const audioConfig = { audioEncoding: 'LINEAR16', sampleRateHertz: 24000 };
-        // Chirp 3: HD admite de 0,25x a 2x. Es la velocidad exacta, no una
-        // instrucción que el modelo interprete distinto en cada llamada.
+        /*  La velocidad SOLO se manda si se pide algo distinto de lo nativo.
+            Google documenta que las voces Chirp 3: HD no admiten el parámetro
+            de velocidad, y mandarlo igualmente sale caro: en vez de renderizar
+            más rápido, el audio se estira después, y eso suena metálico —«como
+            un micrófono mal configurado»—. A 1,00 no se manda nada y la voz
+            sale tal como la genera el motor.                                 */
         const vel = Number(body.speakingRate);
-        if (isFinite(vel) && vel > 0) audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));
+        if (isFinite(vel) && vel > 0 && Math.abs(vel - 1) > 0.005) {
+          audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));
+        }
 
         const destino = 'gs://' + bucket + '/' + RAIZ + 'material/' + body.clave + '.wav';
         const url = 'https://texttospeech.googleapis.com/v1beta1/projects/' + project +
@@ -652,9 +658,13 @@ module.exports = async (req, res) => {
           diez segundos, caben de sobra.                                      */
       if (accion === 'prueba') {
         if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
-        const audioConfig = { audioEncoding: 'MP3' };
+        /*  Sin comprimir y al mismo ritmo que el episodio: si la prueba fuera
+            MP3 y el episodio LINEAR16, comparar no serviría de nada.        */
+        const audioConfig = { audioEncoding: 'LINEAR16', sampleRateHertz: 24000 };
         const vel = Number(body.speakingRate);
-        if (isFinite(vel) && vel > 0) audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));
+        if (isFinite(vel) && vel > 0 && Math.abs(vel - 1) > 0.005) {
+          audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));
+        }
 
         const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
           method: 'POST',
@@ -679,7 +689,7 @@ module.exports = async (req, res) => {
             detail: raw.slice(0, 600),
           });
         }
-        return res.status(200).json({ audio: j.audioContent, mimeType: 'audio/mpeg' });
+        return res.status(200).json({ audio: j.audioContent, mimeType: 'audio/wav' });
       }
 
       return res.status(400).json({ error: 'Acción de voz larga desconocida: ' + accion });

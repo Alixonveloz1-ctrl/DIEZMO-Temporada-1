@@ -106,10 +106,12 @@ export const VOCES_CHIRP = [
 
 export const VOZ_CHIRP_DEFECTO = 'es-US-Chirp3-HD-Charon';
 
-/*  La velocidad aquí es un número exacto que aplica el motor, no una petición
-    que el modelo interprete distinto en cada llamada. 1,12 es «un poquito más
-    rápido» sin llegar a atropellarse.                                        */
-export const VELOCIDAD_DEFECTO = 1.12;
+/*  1,00 es la velocidad NATIVA, y es la que suena bien. Google documenta que
+    las voces Chirp 3: HD no admiten el parámetro de velocidad; al mandarlo
+    igualmente, el audio no se genera más rápido sino que se estira después, y
+    eso suena metálico y hueco —«como un micrófono mal configurado»—. El mando
+    sigue ahí porque a veces compensa, pero por defecto no se toca.           */
+export const VELOCIDAD_DEFECTO = 1;
 export const VELOCIDAD_MIN = 0.25;
 export const VELOCIDAD_MAX = 2;
 

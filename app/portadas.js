@@ -34,6 +34,7 @@ export const CARTELES = [
     nombre: 'Anuncio principal',
     resumen: 'El que abre la campaña. Sōta pequeño, la nave enorme.',
     reparto: ['sota'],
+    reclamo: 'PRÓXIMAMENTE',
     idea: 'Plano general vertical. Un chico solo, de espaldas y pequeñísimo en el ' +
       'encuadre inferior, mirando hacia arriba. Sobre él, ocupando cuatro quintos de la ' +
       'imagen, el casco de una nave alienígena inmensa suspendida sobre Tokio, tan grande ' +
@@ -45,6 +46,7 @@ export const CARTELES = [
     nombre: 'La cifra',
     resumen: 'Diez millones dicho sin decirlo: la fila que no termina.',
     reparto: [],
+    reclamo: 'DIEZ MILLONES',
     idea: 'Plano general vertical, ligeramente elevado. Una fila ordenadísima de personas ' +
       'de espaldas que se pierde hacia el horizonte, entrando por una compuerta iluminada. ' +
       'Todos llevan la misma ropa civil corriente y una carpeta en la mano. Nadie forcejea, ' +
@@ -75,6 +77,7 @@ export const CARTELES = [
     nombre: 'El visitante',
     resumen: 'Presenta a los vessari sin enseñarlo todo.',
     reparto: ['vaal'],
+    reclamo: 'YA ESTÁN AQUÍ',
     idea: 'Plano contrapicado vertical de una figura alienígena vessari erguida, vista ' +
       'desde abajo, parcialmente en contraluz para que la silueta y la postura importen más ' +
       'que el detalle. Cortesía en el gesto, nada de agresividad. Neblina y luz dorada ' +
@@ -103,12 +106,37 @@ const ENCARGO =
   'composición cuidada, un punto de interés claro y aire alrededor. No es un fotograma de ' +
   'la serie, es el cartel.';
 
-/*  Sin texto. El modelo escribe mal en cualquier idioma y un título deformado
-    arruina una portada por lo demás buena; el título se pone después, encima,
-    con una tipografía de verdad.                                             */
-const SIN_TEXTO =
-  'SIN TEXTO DE NINGÚN TIPO: ni título, ni logotipo, ni créditos, ni letras, ni números, ' +
-  'ni firmas, ni marcas de agua. La imagen va limpia para poder rotular encima.';
+/*  EL TEXTO VA DENTRO, Y GRANDE.
+
+    El modelo escribe bien cuando la tipografía es de cartel; lo que le sale
+    deforme es la letra pequeña —créditos, fechas, frases sueltas, direcciones—,
+    porque a ese tamaño no le quedan píxeles para dibujar la forma de la letra.
+    Así que no se prohíbe el texto: se prohíbe el texto PEQUEÑO, que es la parte
+    que falla, y se exige un tamaño mínimo para la que se queda.
+
+    Pocas palabras y muy grandes. Cada línea de más es una oportunidad de que
+    algo salga torcido.                                                        */
+function bloqueTexto(lineas) {
+  const filas = lineas.filter(Boolean);
+  return [
+    'TEXTO DENTRO DE LA IMAGEN. Escribe EXACTAMENTE estas ' +
+    (filas.length === 1 ? 'palabras' : filas.length + ' líneas') + ', sin cambiar ni una letra, ' +
+    'sin traducir y sin añadir ninguna más:',
+    ...filas.map((t, k) => (k === 0 ? '  1) ' : '  ' + (k + 1) + ') ') + '«' + t + '»'),
+    '',
+    'TIPOGRAFÍA DE CARTEL, MUY GRANDE. La primera línea ocupa a lo ancho al menos ' +
+    'la mitad de la imagen: es el título y tiene que leerse de lejos. Las demás, algo ' +
+    'menores pero igualmente grandes y perfectamente legibles. Palo seco, gruesa, en ' +
+    'mayúsculas, con muchísimo contraste contra el fondo —o con un reborde limpio si el ' +
+    'fondo es claro—. Letras nítidas, bien formadas y bien espaciadas.',
+    'Colócalo donde no tape ninguna cara: en el tercio superior o en el inferior, sobre ' +
+    'una zona tranquila de la imagen.',
+    'PROHIBIDA LA LETRA PEQUEÑA, sin excepción: nada de créditos, ni fechas, ni nombres de ' +
+    'estudio o distribuidora, ni direcciones web, ni redes sociales, ni eslóganes sueltos, ' +
+    'ni firmas, ni marcas de agua, ni texto de relleno. SOLO las líneas de arriba y a ese ' +
+    'tamaño. La letra menuda es la que sale deforme.',
+  ].join('\n');
+}
 
 function bloqueReparto(personajes, conReferencia) {
   if (!personajes.length) return [];
@@ -148,10 +176,10 @@ export function promptPortada(ep, ctx, personajes, conReferencia) {
     '',
     ...bloqueReparto(personajes, conReferencia),
     '',
-    'COMPOSICIÓN: vertical. Deja aire en el tercio superior para poder rotular el título ' +
-    'encima sin tapar ninguna cara. Un solo punto de interés, profundidad real entre figura ' +
-    'y fondo, iluminación cinematográfica con una fuente clara.',
-    SIN_TEXTO,
+    'COMPOSICIÓN: vertical. Deja una zona tranquila y despejada en el tercio superior ' +
+    'para que el título quepa ahí sin tapar ninguna cara. Un solo punto de interés, ' +
+    'profundidad real entre figura y fondo, iluminación cinematográfica con una fuente clara.',
+    bloqueTexto(['DIEZMO', 'EPISODIO ' + String(ep.num).padStart(2, '0')]),
     ctx.calidad || '',
     'EVITAR: ' + ctx.negativo,
   ].filter((l) => l !== null && l !== undefined).join('\n');
@@ -173,9 +201,9 @@ export function promptCartel(cartel, ctx, personajes, conReferencia) {
     '',
     ...bloqueReparto(personajes, conReferencia),
     '',
-    'COMPOSICIÓN: la de arriba, sin inventar otra. Deja aire para rotular. Iluminación ' +
-    'cinematográfica, profundidad real, un solo punto de interés.',
-    SIN_TEXTO,
+    'COMPOSICIÓN: la de arriba, sin inventar otra. Deja una zona tranquila donde quepa el ' +
+    'título. Iluminación cinematográfica, profundidad real, un solo punto de interés.',
+    bloqueTexto(['DIEZMO'].concat(cartel.reclamo ? [cartel.reclamo] : [])),
     ctx.calidad || '',
     'EVITAR: ' + ctx.negativo,
   ].filter((l) => l !== null && l !== undefined).join('\n');

@@ -635,21 +635,33 @@ titulo('PORTADAS Y CARTELES');
   const port = pr.promptPortada(epF, ctx, dos, true);
   const cart = pr.promptCartel(pr.CARTELES[0], ctx, [bib.ELENCO_DEFECTO[0]], true);
 
-  /*  El modelo escribe mal en cualquier idioma: un título deformado arruina
-      una portada por lo demás buena. Va limpia y se rotula encima.          */
-  const sinTexto = [port, cart].every((p) => /SIN TEXTO DE NINGÚN TIPO/.test(p));
+  /*  El texto va DENTRO y grande. Lo que el modelo deforma es la letra
+      pequeña, no la de cartel, así que se le da el texto exacto, se le exige
+      un tamaño mínimo y se le prohíbe expresamente la letra menuda —créditos,
+      fechas, webs—, que es la parte que falla.                              */
+  const conTitulo = [port, cart].every((p) => /«DIEZMO»/.test(p) &&
+    /TIPOGRAFÍA DE CARTEL, MUY GRANDE/.test(p) && /PROHIBIDA LA LETRA PEQUEÑA/.test(p));
+  const conCapitulo = /«EPISODIO 01»/.test(port);
+  // Pocas palabras: cada línea de más es una ocasión de que algo salga torcido.
+  const lineasPedidas = (p) => (p.match(/^ {2}\d\) «/gm) || []).length;
+  const demasiadas = [port, cart].some((p) => lineasPedidas(p) > 2 || lineasPedidas(p) < 1);
+  const sinTexto = conTitulo && conCapitulo && !demasiadas;
   /*  Y la cara tiene que ser la de siempre: una portada con otro rostro es lo
       primero que ve quien no conoce la serie.                               */
   const conFichas = dos.every((p) => port.indexOf(p.nombre) !== -1) &&
     /hojas de referencia/.test(port);
   if (!sinTexto) {
-    mal('las portadas no piden ir sin texto', 'el modelo rotularía con letras deformes');
+    mal('el texto de las portadas no está bien pedido',
+      'hace falta el título exacto, tipografía de cartel y la letra pequeña prohibida');
   } else if (!conFichas) {
     mal('la portada no lleva las fichas ni pide respetar las hojas de referencia',
       'saldrían personajes con otra cara');
   } else if ([port, cart].some((p) => p.indexOf(C.negativo) === -1)) {
     mal('las portadas no heredan la lista de lo que hay que evitar');
-  } else ok('portada y cartel van sin texto, con las fichas y con las hojas de referencia');
+  } else {
+    ok('portada y cartel llevan el título rotulado en grande —con el capítulo—, la letra ' +
+       'pequeña prohibida, y las hojas de referencia adjuntas');
+  }
 
   // Los carteles no pueden ser el mismo cartel seis veces.
   const ideas = pr.CARTELES.map((c) => c.idea);

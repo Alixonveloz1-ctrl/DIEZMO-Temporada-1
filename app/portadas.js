@@ -116,26 +116,63 @@ const ENCARGO =
 
     Pocas palabras y muy grandes. Cada línea de más es una oportunidad de que
     algo salga torcido.                                                        */
-function bloqueTexto(lineas) {
-  const filas = lineas.filter(Boolean);
+export const TITULO_SERIE = 'DIEZMO';
+
+/*  LA MISMA TIPOGRAFÍA EN LAS DIECIOCHO PIEZAS. Doce portadas y seis carteles
+    con letras distintas son dieciocho imágenes sueltas; con la misma letra son
+    una colección, y eso es lo que hace que una página parezca una serie de
+    verdad. Por eso se describe aquí una sola vez y la usan las dos.          */
+const TIPOGRAFIA =
+  'TIPOGRAFÍA (la misma en toda la colección, no la cambies): grotesca de palo seco ' +
+  'condensada y muy gruesa, en MAYÚSCULAS, de las que se usan en los carteles de cine. ' +
+  'Sin serifas, sin cursiva, sin adornos, sin efectos 3D, sin degradados, sin resplandor. ' +
+  'Color blanco hueso, con un reborde oscuro fino y limpio para que se lea sobre cualquier ' +
+  'fondo. Letras nítidas, bien formadas, bien espaciadas y perfectamente horizontales.';
+
+/**
+ * El bloque de título, ya escrito. El modelo no tiene que inventar ni una
+ * palabra: se le dan las líneas exactas y el tamaño de cada una.
+ *
+ * @param {Array<{texto:string, parte:string}>} filas  de mayor a menor
+ */
+function bloqueTexto(filas) {
+  const buenas = filas.filter((f) => f && f.texto);
   return [
-    'TEXTO DENTRO DE LA IMAGEN. Escribe EXACTAMENTE estas ' +
-    (filas.length === 1 ? 'palabras' : filas.length + ' líneas') + ', sin cambiar ni una letra, ' +
-    'sin traducir y sin añadir ninguna más:',
-    ...filas.map((t, k) => (k === 0 ? '  1) ' : '  ' + (k + 1) + ') ') + '«' + t + '»'),
+    'TEXTO DENTRO DE LA IMAGEN. Va rotulado ya, listo para publicar. Escribe EXACTAMENTE ' +
+    'estas ' + buenas.length + (buenas.length === 1 ? ' línea' : ' líneas') + ', sin cambiar ' +
+    'ni una letra, sin traducir, sin reordenar y sin añadir ninguna más:',
+    ...buenas.map((f, k) => '  ' + (k + 1) + ') «' + f.texto + '»  → ocupando a lo ancho ' +
+      'al menos ' + f.parte + ' de la imagen'),
     '',
-    'TIPOGRAFÍA DE CARTEL, MUY GRANDE. La primera línea ocupa a lo ancho al menos ' +
-    'la mitad de la imagen: es el título y tiene que leerse de lejos. Las demás, algo ' +
-    'menores pero igualmente grandes y perfectamente legibles. Palo seco, gruesa, en ' +
-    'mayúsculas, con muchísimo contraste contra el fondo —o con un reborde limpio si el ' +
-    'fondo es claro—. Letras nítidas, bien formadas y bien espaciadas.',
-    'Colócalo donde no tape ninguna cara: en el tercio superior o en el inferior, sobre ' +
-    'una zona tranquila de la imagen.',
+    TIPOGRAFIA,
+    'COLOCACIÓN: todas las líneas juntas, alineadas entre sí, formando un solo bloque de ' +
+    'título en el tercio superior o en el inferior, sobre una zona tranquila y sin tapar ' +
+    'ninguna cara. Si una línea no cabe de una vez, pártela en dos renglones del mismo ' +
+    'tamaño, nunca la encojas.',
     'PROHIBIDA LA LETRA PEQUEÑA, sin excepción: nada de créditos, ni fechas, ni nombres de ' +
-    'estudio o distribuidora, ni direcciones web, ni redes sociales, ni eslóganes sueltos, ' +
-    'ni firmas, ni marcas de agua, ni texto de relleno. SOLO las líneas de arriba y a ese ' +
-    'tamaño. La letra menuda es la que sale deforme.',
+    'estudio o distribuidora, ni direcciones web, ni redes sociales, ni eslóganes que no ' +
+    'estén en la lista, ni firmas, ni marcas de agua, ni texto de relleno, ni caracteres ' +
+    'japoneses decorativos. SOLO esas líneas y a ese tamaño. La letra menuda es la que ' +
+    'sale deforme.',
   ].join('\n');
+}
+
+/** Las líneas exactas de la portada de un capítulo. */
+export function lineasPortada(ep) {
+  const filas = [
+    { texto: TITULO_SERIE, parte: 'la mitad' },
+    { texto: 'EPISODIO ' + String(ep.num).padStart(2, '0'), parte: 'un cuarto' },
+  ];
+  // El título del capítulo es el que da la pista de qué va: si lo hay, va.
+  if (ep.titulo) filas.push({ texto: ep.titulo.toUpperCase(), parte: 'un tercio' });
+  return filas;
+}
+
+/** Las líneas exactas de un cartel de la serie. */
+export function lineasCartel(cartel) {
+  const filas = [{ texto: TITULO_SERIE, parte: 'dos tercios' }];
+  if (cartel.reclamo) filas.push({ texto: cartel.reclamo, parte: 'un tercio' });
+  return filas;
 }
 
 function bloqueReparto(personajes, conReferencia) {
@@ -179,7 +216,7 @@ export function promptPortada(ep, ctx, personajes, conReferencia) {
     'COMPOSICIÓN: vertical. Deja una zona tranquila y despejada en el tercio superior ' +
     'para que el título quepa ahí sin tapar ninguna cara. Un solo punto de interés, ' +
     'profundidad real entre figura y fondo, iluminación cinematográfica con una fuente clara.',
-    bloqueTexto(['DIEZMO', 'EPISODIO ' + String(ep.num).padStart(2, '0')]),
+    bloqueTexto(lineasPortada(ep)),
     ctx.calidad || '',
     'EVITAR: ' + ctx.negativo,
   ].filter((l) => l !== null && l !== undefined).join('\n');
@@ -203,7 +240,7 @@ export function promptCartel(cartel, ctx, personajes, conReferencia) {
     '',
     'COMPOSICIÓN: la de arriba, sin inventar otra. Deja una zona tranquila donde quepa el ' +
     'título. Iluminación cinematográfica, profundidad real, un solo punto de interés.',
-    bloqueTexto(['DIEZMO'].concat(cartel.reclamo ? [cartel.reclamo] : [])),
+    bloqueTexto(lineasCartel(cartel)),
     ctx.calidad || '',
     'EVITAR: ' + ctx.negativo,
   ].filter((l) => l !== null && l !== undefined).join('\n');

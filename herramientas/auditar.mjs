@@ -640,11 +640,13 @@ titulo('PORTADAS Y CARTELES');
       un tamaño mínimo y se le prohíbe expresamente la letra menuda —créditos,
       fechas, webs—, que es la parte que falla.                              */
   const conTitulo = [port, cart].every((p) => /«DIEZMO»/.test(p) &&
-    /TIPOGRAFÍA DE CARTEL, MUY GRANDE/.test(p) && /PROHIBIDA LA LETRA PEQUEÑA/.test(p));
-  const conCapitulo = /«EPISODIO 01»/.test(port);
+    /grotesca de palo seco/.test(p) && /PROHIBIDA LA LETRA PEQUEÑA/.test(p) &&
+    /ocupando a lo ancho al menos/.test(p));
+  // El capítulo y su título: es lo que distingue una portada de otra.
+  const conCapitulo = /«EPISODIO 01»/.test(port) && /«EL CENSO»/.test(port);
   // Pocas palabras: cada línea de más es una ocasión de que algo salga torcido.
   const lineasPedidas = (p) => (p.match(/^ {2}\d\) «/gm) || []).length;
-  const demasiadas = [port, cart].some((p) => lineasPedidas(p) > 2 || lineasPedidas(p) < 1);
+  const demasiadas = [port, cart].some((p) => lineasPedidas(p) > 3 || lineasPedidas(p) < 1);
   const sinTexto = conTitulo && conCapitulo && !demasiadas;
   /*  Y la cara tiene que ser la de siempre: una portada con otro rostro es lo
       primero que ve quien no conoce la serie.                               */
@@ -680,6 +682,35 @@ titulo('PORTADAS Y CARTELES');
   } else {
     ok(pr.CARTELES.length + ' carteles distintos, ' + sinReparto + ' sin figuras · formatos: ' +
        pr.FORMATOS.map((f) => f[0]).join(', '));
+  }
+
+  /*  Las doce portadas tienen que llevar SU título, escrito por nosotros, y las
+      dieciocho piezas la MISMA tipografía: con letras distintas serían
+      dieciocho imágenes sueltas en vez de una colección.                     */
+  {
+    const tx = await import(pathToFileURL(path.join(raiz, 'app', 'texto.js')).href);
+    const vistos = [];
+    const sinTituloProp = [];
+    for (let n = 1; n <= 12; n++) {
+      const f = 'episodios/ep' + String(n).padStart(2, '0') + '.md';
+      const t = tx.tituloDe(f, leer(f));
+      const ep = { num: n, titulo: t.titulo, tomas: [{ i: 0, texto: 'x' }] };
+      const filas = pr.lineasPortada(ep);
+      const p = pr.promptPortada(ep, ctx, [], false);
+      if (!t.titulo || filas.length !== 3) { sinTituloProp.push(n); continue; }
+      if (p.indexOf('«' + t.titulo.toUpperCase() + '»') === -1) { sinTituloProp.push(n); continue; }
+      vistos.push((p.match(/TIPOGRAFÍA \(la misma[\s\S]*?horizontales\./) || [''])[0]);
+    }
+    const cartelesTipo = pr.CARTELES.map((c) =>
+      (pr.promptCartel(c, ctx, [], false).match(/TIPOGRAFÍA \(la misma[\s\S]*?horizontales\./) || [''])[0]);
+    const todas = new Set(vistos.concat(cartelesTipo));
+    if (sinTituloProp.length) {
+      mal('hay portadas sin su título de capítulo rotulado', 'episodios ' + sinTituloProp.join(', '));
+    } else if (todas.size !== 1 || !vistos[0]) {
+      mal('las dieciocho piezas no comparten tipografía', todas.size + ' descripciones distintas');
+    } else {
+      ok('las 12 portadas llevan su título real y las 18 piezas comparten una sola tipografía');
+    }
   }
 
   // El reparto de una portada sale de lo que el director anotó, no del texto.

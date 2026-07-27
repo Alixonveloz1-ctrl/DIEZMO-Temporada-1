@@ -21,7 +21,7 @@ import {
 import { conFirma } from './firma.js';
 import {
   cortarEscena, repartirEnBloques, SEGUNDOS_POR_LLAMADA,
-  nombreVozChirp, VOZ_CHIRP_DEFECTO, narraEpisodioEntero,
+  nombreVozChirp, VOZ_CHIRP_DEFECTO, narraEpisodioEntero, usaChirp,
 } from './voz.js';
 
 export const clave = {
@@ -363,22 +363,36 @@ export class Motor {
     });
     if (!piezas.some((p) => p)) return;
 
-    const r = await api.tts({
-      text: piezas.filter(Boolean).join('\n\n'),
-      voice: cfg.voz,
-      model: cfg.modeloTts,
-      styleInstruction: cfg.instruccionVoz,
-      temperature: cfg.temperaturaVoz,
-      languageCode: cfg.idioma || undefined,
-      seed: cfg.semillaVoz === '' ? undefined : Number(cfg.semillaVoz),
-    }, {
+    const texto = piezas.filter(Boolean).join('\n\n');
+    /*  Chirp responde por la VÍA DIRECTA, en segundos. Antes lo pasaba por
+        Long Audio Synthesis, que es un servicio por lotes: el episodio tardaba
+        horas por estar en cola, no por generar. Por bloques y por la vía
+        directa tarda lo mismo que Gemini, y sin cambiar de registro entre
+        llamadas, que era el motivo de haber ido a buscar el otro camino.    */
+    const pedir = usaChirp(cfg)
+      ? () => api.vozLargaProbar({
+        text: texto,
+        voice: cfg.vozChirp || VOZ_CHIRP_DEFECTO,
+        languageCode: cfg.idioma || 'es-US',
+        speakingRate: cfg.velocidadVoz,
+      }, { intentos: 3, finales: [504], señal: this.señal, aviso: (m) => this._log(dónde + ': ' + m) })
+      : () => api.tts({
+        text: texto,
+        voice: cfg.voz,
+        model: cfg.modeloTts,
+        styleInstruction: cfg.instruccionVoz,
+        temperature: cfg.temperaturaVoz,
+        languageCode: cfg.idioma || undefined,
+        seed: cfg.semillaVoz === '' ? undefined : Number(cfg.semillaVoz),
+      }, {
       intentos: 3,
       // Un 504 aquí no es mala suerte: es que el bloque era largo. Reintentarlo
       // igual son otros sesenta segundos tirados. Se parte y ya.
       finales: [504],
       señal: this.señal,
       aviso: (m) => this._log(dónde + ': ' + m),
-    });
+      });
+    const r = await pedir();
 
     const ex = extraerPCM(b64aBytes(r.audio), r.sampleRate || 24000);
     const muestras = aInt16(ex.pcm);

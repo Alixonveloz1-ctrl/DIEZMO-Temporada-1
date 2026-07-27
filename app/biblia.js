@@ -430,7 +430,7 @@ export const CONFIG_DEFECTO = {
       y lo reparte después; 'gemini' actúa mejor pero cada llamada es una
       actuación nueva, y en quince minutos eso suena a varios narradores.
       Para una serie de doce episodios la constancia manda.                  */
-  motorVoz: 'largo',
+  motorVoz: 'chirp',
   vozChirp: VOZ_CHIRP_DEFECTO,
   velocidadVoz: VELOCIDAD_DEFECTO,
 

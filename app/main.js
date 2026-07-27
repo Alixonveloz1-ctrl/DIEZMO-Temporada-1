@@ -21,7 +21,7 @@ import { duracionVeo, precioSegundo, tarifaLegible } from './veo.js';
 import { MODELOS_MUSICA, precioPieza, escenasDe } from './musica.js';
 import {
   TONOS, TONO_POR_DEFECTO, SEMILLA_FIJA, tonoPorId, aplicarTono, coincideConTono,
-  VOCES_CHIRP, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO, nombreVozChirp, narraEpisodioEntero,
+  VOCES_CHIRP, VOZ_CHIRP_DEFECTO, VELOCIDAD_DEFECTO, nombreVozChirp, narraEpisodioEntero, motorDe,
 } from './voz.js';
 import { agrupar, ahorroDe, aplicar as aplicarRepes, limpiar as limpiarRepes } from './repetidos.js';
 import { exportarEpisodio, hojaDeMontaje, scriptFfmpeg, descargasDe, descargar, Zip } from './exportar.js';
@@ -516,21 +516,26 @@ function pintarMotorVoz() {
   const sel = $('cfgMotorVoz');
   if (!sel) return;
   const largo = narraEpisodioEntero(P.config);
-  sel.value = largo ? 'largo' : 'gemini';
+  const motor = motorDe(P.config);
+  sel.value = motor;
 
   llenarSelect($('cfgVozChirp'), VOCES_CHIRP, P.config.vozChirp, VOZ_CHIRP_DEFECTO);
   const v = Number(P.config.velocidadVoz) || VELOCIDAD_DEFECTO;
   $('cfgVelocidadVoz').value = v;
   $('valVelocidadVoz').textContent = v.toFixed(2) + 'x';
 
-  $('bloqueVozLarga').hidden = !largo;
+  $('bloqueVozLarga').hidden = motor === 'gemini';
   // Fuera de la vista cuando no es el motor activo: en esta serie no se usa.
-  $('bloqueTonoGemini').hidden = largo;
-  $('pistaMotorVoz').textContent = largo
-    ? 'El episodio entero se narra de una vez y la herramienta lo reparte después entre las ' +
-      'tomas por los silencios. Sin costuras: es una única locución.'
-    : 'Cada 45 segundos es una llamada nueva, y cada llamada es una actuación nueva. Más ' +
-      'expresivo, pero el narrador cambia de tono a lo largo del episodio.';
+  $('bloqueTonoGemini').hidden = motor !== 'gemini';
+  $('pistaMotorVoz').textContent =
+    motor === 'gemini'
+      ? 'Mejor calidad de audio, pero cada llamada es una actuación nueva: el narrador ' +
+        'cambia de tono cada 45 segundos. Unos 10 minutos por episodio.'
+      : largo
+        ? 'El episodio entero en una sola llamada, sin ninguna costura. Pero va por el ' +
+          'servicio POR LOTES de Google y se pasa horas en cola: unas 3 por episodio.'
+        : 'La misma voz de Chirp, pedida por bloques de 45 s por la vía directa. No cambia ' +
+          'de registro entre bloques, y tarda unos 10 minutos por episodio.';
 }
 
 function pintarTonos() {
@@ -1834,10 +1839,10 @@ function cablear() {
     P.config.motorVoz = e.target.value;
     pintarMotorVoz();
     await guardar();
-    aviso(!narraEpisodioEntero(P.config)
-      ? 'Vuelves al modo por bloques. Si ya hay voz generada, hay que rehacerla para oír el cambio.'
-      : 'El episodio se narrará de una vez, con el mismo narrador de principio a fin. ' +
-        'Hay que rehacer la voz para oírlo.', 'ok', 8000);
+    aviso(narraEpisodioEntero(P.config)
+      ? 'Una sola locución: sin costuras, pero son unas 3 horas de cola por episodio.'
+      : 'Por bloques: unos 10 minutos por episodio. Hay que rehacer la voz para oír el cambio.',
+      'ok', 8000);
   });
   $('cfgVozChirp').addEventListener('change', async (e) => {
     P.config.vozChirp = e.target.value;

@@ -135,7 +135,19 @@ export const VELOCIDAD_MAX = 2;
     comparación se escribe suelta en cada botón, tarde o temprano uno se queda
     con el motor antiguo y nadie se entera hasta oírlo.                       */
 export function narraEpisodioEntero(config) {
-  return !config || config.motorVoz !== 'gemini';
+  return motorDe(config) === 'largo';
+}
+
+/*  ¿Qué voz pide cada motor? Chirp responde por la vía directa en segundos;
+    Gemini actúa más pero cambia de registro en cada llamada.                */
+export function usaChirp(config) {
+  return motorDe(config) !== 'gemini';
+}
+
+/** Los tres motores, resueltos en un solo sitio. Nadie compara la cadena. */
+export function motorDe(config) {
+  const m = config && config.motorVoz;
+  return m === 'gemini' ? 'gemini' : (m === 'largo' ? 'largo' : 'chirp');
 }
 
 export function nombreVozChirp(id) {

@@ -1063,6 +1063,17 @@ if (!genVL) {
 const mainVL = leer('app/main.js');
 const sueltasMotor = ['app/main.js', 'app/pipeline.js', 'app/player.js', 'app/exportar.js']
   .filter((f) => /motorVoz\s*[!=]==\s*'/.test(leer(f)));
+
+/*  Chirp responde por la vía DIRECTA en segundos. Pasarlo por Long Audio
+    Synthesis, que es un servicio por lotes, convertía dieciséis minutos de
+    audio en tres horas de cola. Por bloques tarda lo mismo que Gemini.      */
+if (!/usaChirp\(cfg\)/.test(pipeVL) || !/api\.vozLargaProbar\(/.test(pipeVL)) {
+  mal('los bloques de voz no pueden usar Chirp por la vía directa',
+    'quedaría solo el servicio por lotes, que tarda horas');
+} else if (leer('app/biblia.js').indexOf("motorVoz: 'chirp'") === -1) {
+  mal('el motor por defecto no es Chirp por bloques',
+    'lo por lotes tarda tres horas por episodio');
+} else ok('Chirp va por bloques y por la vía directa: minutos, no horas');
 if (!/async generarVozDe\(/.test(pipeVL)) {
   mal('no hay un despachador único de motor de voz');
 } else if (/\.generarVoz\(ep, (false|true)\)/.test(mainVL)) {

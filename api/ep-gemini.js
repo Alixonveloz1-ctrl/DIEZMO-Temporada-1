@@ -678,6 +678,11 @@ module.exports = async (req, res) => {
           No usa Long Audio Synthesis —que es asíncrona y escribe en el bucket—
           sino la síntesis normal, que devuelve el audio en la respuesta: son
           diez segundos, caben de sobra.                                      */
+      /*  SÍNTESIS DIRECTA. Chirp responde también por la vía normal, en
+          segundos, y devuelve el audio en la respuesta. Long Audio Synthesis
+          es un servicio POR LOTES: un episodio tardaba horas por estar en
+          cola, no por generar. Para bloques de menos de un minuto —y para la
+          prueba de voz— esta vía es la correcta.                            */
       if (accion === 'prueba') {
         if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
         /*  Sin comprimir y al mismo ritmo que el episodio: si la prueba fuera
@@ -692,7 +697,7 @@ module.exports = async (req, res) => {
           method: 'POST',
           headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            input: { text: String(body.text).slice(0, 900) },
+            input: { text: String(body.text).slice(0, 4800) },   // el tope de la API son 5.000 bytes
             voice: {
               languageCode: body.languageCode || 'es-US',
               name: body.voice || 'es-US-Chirp3-HD-Charon',
@@ -709,6 +714,11 @@ module.exports = async (req, res) => {
           return res.status(r.ok ? 502 : r.status).json({
             error: 'Prueba de voz ' + r.status + '.' + pista,
             detail: raw.slice(0, 600),
+          });
+        }
+        if (j.audioContent.length > LIMITE_RESPUESTA) {
+          return res.status(413).json({
+            error: 'El bloque de voz no cabe en la respuesta. Pide menos texto por llamada.',
           });
         }
         return res.status(200).json({ audio: j.audioContent, mimeType: 'audio/wav' });

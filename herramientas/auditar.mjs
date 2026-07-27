@@ -751,6 +751,34 @@ titulo('PORTADAS Y CARTELES');
     mal('el reparto de la portada no sale por presencia real', 'salió: ' + rep.join(', '));
   } else ok('la portada se reparte por quién sale más, no por quién se menciona');
 
+  /*  Lo que se genera tiene que LLEGAR al bucket. Estampar la firma obliga a
+      recodificar la imagen, y el PNG de un lienzo es sin pérdida: una portada
+      de 2K engordaba por encima de los 4,5 MB que admite una petición, así que
+      se quedaba solo en el navegador.                                        */
+  {
+    const fir = leer('app/firma.js');
+    const pipeP = leer('app/pipeline.js');
+    const m = /CABE_EN_PETICION = (\d+)/.exec(fir);
+    const limite = m ? Number(m[1]) : 0;
+    // base64 abulta un tercio: lo que se envía es tamaño × 4/3.
+    const enviado = limite * 4 / 3;
+    if (!limite || !/toBlob\(.*image\/jpeg|'image\/jpeg'/.test(fir)) {
+      mal('la portada no tiene salida cuando el PNG no cabe en una petición');
+    } else if (enviado > 4300000) {
+      mal('el tope de la firma no deja margen para el base64',
+        (enviado / 1048576).toFixed(1) + ' MB enviados frente a un techo de 4,5');
+    } else if (!/if \(!ok\) this\._log/.test(pipeP)) {
+      mal('una subida rechazada sin excepción pasa desapercibida',
+        'la portada se quedaría solo en el navegador y nadie se enteraría');
+    } else if (!/e\.message/.test(pipeP.slice(pipeP.indexOf('el bucket rechazó') - 400,
+        pipeP.indexOf('el bucket rechazó') + 400))) {
+      mal('el aviso de subida fallida no dice por qué');
+    } else {
+      ok('la portada se reencoda para caber en la petición (' + (enviado / 1048576).toFixed(1) +
+         ' MB de 4,5) y una subida rechazada se avisa con su causa');
+    }
+  }
+
   /*  Y lo generado para publicar tiene que sobrevivir a una recarga: si no se
       guarda en el estado, la próxima carga lo da por no hecho y se paga otra vez. */
   const mainP = leer('app/main.js');

@@ -59,6 +59,8 @@ function aInt16(bytes) {
   return out;
 }
 
+const kb = (b) => (b.size / 1048576).toFixed(1) + ' MB ' + (b.type || '').replace('image/', '');
+
 function pad(n) { return String(n).padStart(2, '0'); }
 function pad3(n) { return String(n).padStart(3, '0'); }
 
@@ -551,8 +553,15 @@ export class Motor {
 
     await assets.guardar(clave_, blob, { portada: true, formato, firma: !!firma });
     if (nube.disponible) {
-      try { await nube.subir(clave_, await blobAb64(blob), 'image/png'); }
-      catch (e) { this._log(quién + ': no se pudo subir al bucket', 'aviso'); }
+      /*  subir() devuelve false cuando el bucket rechaza sin lanzar: ignorar el
+          booleano dejaba la portada solo en el navegador y nadie se enteraba.
+          Y el aviso tiene que decir POR QUÉ, o no hay nada que corregir.     */
+      try {
+        const ok = await nube.subir(clave_, await blobAb64(blob), blob.type || 'image/png');
+        if (!ok) this._log(quién + ': el bucket rechazó el archivo (' + kb(blob) + ')', 'aviso');
+      } catch (e) {
+        this._log(quién + ': no se pudo subir al bucket (' + kb(blob) + '): ' + e.message, 'aviso');
+      }
     }
     return { ok: true, formato, firma: !!firma, ts: Date.now() };
   }

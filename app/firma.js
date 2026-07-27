@@ -77,6 +77,17 @@ export function firmaPng(w, h, texto) {
  * @param {Blob} blob   la portada o el cartel recién generado
  * @returns {Promise<Blob>}
  */
+/*  El PNG de un lienzo es SIEMPRE sin pérdida, así que una ilustración de 2K
+    recién dibujada engorda hasta varios megas —más que la que devolvió el
+    modelo—. Y subirla al bucket va por el servidor, que no admite más de 4,5 MB
+    de petición: la imagen se guardaba en el navegador y no llegaba a la nube.
+
+    Se prefiere PNG mientras quepa, porque los títulos son tipografía grande y
+    el JPEG les mete halos en los bordes. Cuando no cabe, JPEG de calidad alta:
+    en una ilustración con texto de cartel no se distingue, y lo que sí se nota
+    es que la portada no esté en el bucket.                                    */
+const CABE_EN_PETICION = 2600000;      // en bytes; con base64 quedan ~3,5 MB
+
 export async function conFirma(blob, texto) {
   if (!texto) return blob;
   const bitmap = await crearBitmap(blob);
@@ -87,9 +98,17 @@ export async function conFirma(blob, texto) {
   ctx.drawImage(bitmap, 0, 0);
   dibujarFirma(ctx, c.width, c.height, texto);
   if (bitmap.close) bitmap.close();
+
+  const png = await aBlob(c, 'image/png');
+  if (png && png.size <= CABE_EN_PETICION) return png;
+  const jpg = await aBlob(c, 'image/jpeg', 0.94);
+  return (jpg && jpg.size < (png ? png.size : Infinity)) ? jpg : (png || blob);
+}
+
+function aBlob(lienzo, mime, calidad) {
   return new Promise((listo) => {
-    // PNG: la portada lleva tipografía grande y un JPEG le metería halos.
-    c.toBlob((b) => listo(b || blob), 'image/png');
+    try { lienzo.toBlob((b) => listo(b), mime, calidad); }
+    catch (e) { listo(null); }
   });
 }
 

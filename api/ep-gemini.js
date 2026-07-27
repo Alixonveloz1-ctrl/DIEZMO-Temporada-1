@@ -331,6 +331,14 @@ function cifrarRuta(gsUri) {
 /*  Descifra el nombre de una operación. Si llega en claro —una operación que
     empezó antes de este cambio— se acepta tal cual, para no dejar colgado lo
     que ya estuviera en marcha.                                              */
+/*  El nombre de la voz lleva su idioma dentro —es-ES-Neural2-B no funciona
+    pidiéndolo como es-US—, así que manda el nombre, no lo que venga aparte. */
+function idiomaDeVoz(nombre, porDefecto) {
+  const n = String(nombre || 'es-US-Chirp3-HD-Charon');
+  const m = /^([a-z]{2}-[A-Z0-9]{2,3})-/.exec(n);
+  return { languageCode: m ? m[1] : (porDefecto || 'es-US'), name: n };
+}
+
 function abrirOperacion(v) {
   const t = String(v || '');
   if (t.indexOf('projects/') === 0) return t;
@@ -610,10 +618,7 @@ module.exports = async (req, res) => {
 
         const out = await callVertex(url, token, {
           input: { text: String(body.text) },
-          voice: {
-            languageCode: body.languageCode || 'es-US',
-            name: body.voice || 'es-US-Chirp3-HD-Charon',
-          },
+          voice: idiomaDeVoz(body.voice, body.languageCode),
           audioConfig,
           outputGcsUri: destino,
         }, project);
@@ -698,10 +703,7 @@ module.exports = async (req, res) => {
           headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
           body: JSON.stringify({
             input: { text: String(body.text).slice(0, 4800) },   // el tope de la API son 5.000 bytes
-            voice: {
-              languageCode: body.languageCode || 'es-US',
-              name: body.voice || 'es-US-Chirp3-HD-Charon',
-            },
+            voice: idiomaDeVoz(body.voice, body.languageCode),
             audioConfig,
           }),
         });
@@ -722,6 +724,37 @@ module.exports = async (req, res) => {
           });
         }
         return res.status(200).json({ audio: j.audioContent, mimeType: 'audio/wav' });
+      }
+
+      /*  EL CATÁLOGO REAL de la cuenta. Google tiene varias familias de voz y
+          no todas están en todos los proyectos: listarlas de memoria es
+          adivinar. Se piden y se filtran a las masculinas en español.       */
+      if (accion === 'voces') {
+        const vistas = new Map();
+        for (const idioma of ['es-US', 'es-ES', 'es-419']) {
+          const r = await fetch('https://texttospeech.googleapis.com/v1/voices?languageCode=' + idioma,
+            { headers: { Authorization: 'Bearer ' + token } });
+          if (!r.ok) continue;
+          let j = null;
+          try { j = JSON.parse(await r.text()); } catch (e) { continue; }
+          for (const v of (j && j.voices) || []) {
+            if (v.ssmlGender !== 'MALE') continue;          // el narrador es masculino
+            if (/Standard/.test(v.name)) continue;          // la familia vieja no vale
+            if (!vistas.has(v.name)) {
+              vistas.set(v.name, {
+                nombre: v.name,
+                idioma: (v.languageCodes || [idioma])[0],
+                familia: (/Chirp3-HD/.test(v.name) ? 'Chirp 3: HD'
+                  : /Chirp/.test(v.name) ? 'Chirp'
+                  : /Studio/.test(v.name) ? 'Studio'
+                  : /Neural2/.test(v.name) ? 'Neural2'
+                  : /Polyglot/.test(v.name) ? 'Polyglot'
+                  : /Wavenet/i.test(v.name) ? 'WaveNet' : 'otra'),
+              });
+            }
+          }
+        }
+        return res.status(200).json({ voces: [...vistas.values()] });
       }
 
       return res.status(400).json({ error: 'Acción de voz larga desconocida: ' + accion });

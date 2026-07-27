@@ -512,6 +512,15 @@ function llenarSelect(sel, pares, valor, preferido) {
 /*  El motor decide qué mandos tienen sentido: con una locución por episodio no
     hay tono ni semilla que valgan —Chirp no admite instrucción de estilo—, y
     con Gemini no hay velocidad exacta que aplicar.                          */
+/*  Las cuatro de Chirp vienen de fábrica; si se ha consultado el catálogo de la
+    cuenta, se usan todas las que haya. Se listan por familia para que se vea de
+    dónde sale cada una.                                                       */
+let _vocesCuenta = null;
+function vocesDisponibles() {
+  if (!_vocesCuenta || !_vocesCuenta.length) return VOCES_CHIRP;
+  return _vocesCuenta.map((v) => [v.nombre, v.familia + ' · ' + v.nombre.split('-').pop()]);
+}
+
 function pintarMotorVoz() {
   const sel = $('cfgMotorVoz');
   if (!sel) return;
@@ -519,7 +528,7 @@ function pintarMotorVoz() {
   const motor = motorDe(P.config);
   sel.value = motor;
 
-  llenarSelect($('cfgVozChirp'), VOCES_CHIRP, P.config.vozChirp, VOZ_CHIRP_DEFECTO);
+  llenarSelect($('cfgVozChirp'), vocesDisponibles(), P.config.vozChirp, VOZ_CHIRP_DEFECTO);
   const v = Number(P.config.velocidadVoz) || VELOCIDAD_DEFECTO;
   $('cfgVelocidadVoz').value = v;
   $('valVelocidadVoz').textContent = v.toFixed(2) + 'x';
@@ -2178,6 +2187,23 @@ function cablear() {
   $('btnAjCancelar').addEventListener('click', () => $('dlgAjustes').close());
   $('btnAjGuardar').addEventListener('click', guardarAjustes);
   $('cfgTempVoz').addEventListener('input', (e) => { $('valTempVoz').textContent = Number(e.target.value).toFixed(2); });
+  $('btnBuscarVoces').addEventListener('click', async () => {
+    const btn = $('btnBuscarVoces');
+    btn.disabled = true; btn.textContent = 'buscando…';
+    try {
+      const r = await api.vozLargaVoces();
+      _vocesCuenta = (r.voces || []).sort((a, b) =>
+        (a.familia + a.nombre).localeCompare(b.familia + b.nombre));
+      pintarMotorVoz();
+      const fam = [...new Set(_vocesCuenta.map((v) => v.familia))];
+      $('pistaVoces').textContent = _vocesCuenta.length + ' voces masculinas en español en tu ' +
+        'cuenta · ' + fam.join(', ') + '. Escúchalas antes de rehacer el episodio.';
+    } catch (e) {
+      aviso('No se pudo consultar: ' + e.message, 'err', 8000);
+    }
+    btn.disabled = false; btn.textContent = 'Buscar más voces';
+  });
+
   $('btnProbarVozLarga').addEventListener('click', async () => {
     const btn = $('btnProbarVozLarga');
     btn.disabled = true; btn.textContent = 'generando…';
@@ -2197,7 +2223,7 @@ function cablear() {
     } catch (e) {
       aviso('No se pudo escuchar: ' + e.message, 'err', 8000);
     }
-    btn.disabled = false; btn.textContent = 'Escuchar esta voz (Chirp)';
+    btn.disabled = false; btn.textContent = 'Escuchar esta voz';
   });
 
   $('btnProbarTono').addEventListener('click', async () => {

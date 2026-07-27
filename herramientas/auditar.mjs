@@ -1074,6 +1074,17 @@ if (!/usaChirp\(cfg\)/.test(pipeVL) || !/api\.vozLargaProbar\(/.test(pipeVL)) {
   mal('el motor por defecto no es Chirp por bloques',
     'lo por lotes tarda tres horas por episodio');
 } else ok('Chirp va por bloques y por la vía directa: minutos, no horas');
+
+/*  El catálogo de voces se PIDE a la cuenta, no se escribe de memoria: Google
+    tiene varias familias y no todas están en todos los proyectos.           */
+if (!/accion === 'voces'/.test(backVL) || !/texttospeech\.googleapis\.com\/v1\/voices/.test(backVL)) {
+  mal('no se puede consultar el catálogo de voces de la cuenta');
+} else if (!/ssmlGender !== 'MALE'/.test(backVL)) {
+  mal('el catálogo no se filtra a voces masculinas', 'el narrador de esta serie lo es');
+} else if (!/function idiomaDeVoz\(/.test(backVL)) {
+  mal('el idioma no sale del nombre de la voz',
+    'es-ES-Neural2-B pedido como es-US no funciona');
+} else ok('el catálogo de voces se pide a la cuenta y el idioma sale del nombre de cada una');
 if (!/async generarVozDe\(/.test(pipeVL)) {
   mal('no hay un despachador único de motor de voz');
 } else if (/\.generarVoz\(ep, (false|true)\)/.test(mainVL)) {

@@ -42,6 +42,22 @@ export const TONOS = [
       'suficiente para que no suene plano, lejos de lo teatral.',
   },
   {
+    /*  Lo que molesta de Gemini es que sobreactúa, y eso SÍ se puede corregir:
+        su carácter lo pone la instrucción. Este tono le pide expresamente que
+        no actúe. Queda entre la constancia de Chirp —que no interpreta nada
+        porque no sabe— y el narrador de tráiler, que era lo que sobraba.    */
+    id: 'sobrio',
+    nombre: 'Sobrio — expresivo sin actuar',
+    resumen: 'La calidad de Gemini sin el énfasis. El punto medio con Chirp.',
+    voz: 'Charon',
+    temperatura: 0.45,
+    instruccion: COMUN + ' Tono contenido y adulto, con la inflexión justa para que no ' +
+      'suene plano y ni una gota más. NO ACTÚES: no dramatices, no subrayes las palabras ' +
+      'importantes, no bajes la voz en lo confidencial ni la levantes en lo grave. Cuenta ' +
+      'los hechos como quien los sabe de primera mano y no necesita convencer a nadie. ' +
+      'Si dudas entre dos lecturas, elige siempre la más sobria.',
+  },
+  {
     id: 'informe',
     nombre: 'Informe institucional',
     resumen: 'Más frío y neutro. Para los episodios de burocracia y cifras.',

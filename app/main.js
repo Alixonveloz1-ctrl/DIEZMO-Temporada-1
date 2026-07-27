@@ -522,7 +522,10 @@ function pintarMotorVoz() {
   $('valVelocidadVoz').textContent = v.toFixed(2) + 'x';
 
   $('bloqueVozLarga').hidden = !largo;
-  $('bloqueTonoGemini').hidden = largo;
+  /*  El bloque de Gemini se queda visible aunque no sea el motor activo: su
+      título dice a cuál pertenece, y así se pueden escuchar las dos voces una
+      detrás de otra sin cambiar de motor y volver. Comparar era el problema. */
+  $('bloqueTonoGemini').hidden = false;
   $('pistaMotorVoz').textContent = largo
     ? 'El episodio entero se narra de una vez y la herramienta lo reparte después entre las ' +
       'tomas por los silencios. Sin costuras: es una única locución.'
@@ -2189,7 +2192,7 @@ function cablear() {
     } catch (e) {
       aviso('No se pudo escuchar: ' + e.message, 'err', 8000);
     }
-    btn.disabled = false; btn.textContent = 'Escuchar esta voz';
+    btn.disabled = false; btn.textContent = 'Escuchar esta voz (Chirp)';
   });
 
   $('btnProbarTono').addEventListener('click', async () => {
@@ -2215,7 +2218,7 @@ function cablear() {
     } catch (e) {
       alert('La prueba falló: ' + e.message);
     }
-    btn.disabled = false; btn.textContent = 'Escuchar este tono';
+    btn.disabled = false; btn.textContent = 'Escuchar este tono (Gemini)';
   });
 
   window.addEventListener('beforeunload', (ev) => {

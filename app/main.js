@@ -518,7 +518,10 @@ function llenarSelect(sel, pares, valor, preferido) {
 let _vocesCuenta = null;
 function vocesDisponibles() {
   if (!_vocesCuenta || !_vocesCuenta.length) return VOCES_CHIRP;
-  return _vocesCuenta.map((v) => [v.nombre, v.familia + ' · ' + v.nombre.split('-').pop()]);
+  return _vocesCuenta.map((v) => [
+    v.nombre,
+    v.nombre.split('-').pop() + ' · ' + v.familia + ' · ' + v.idioma,
+  ]);
 }
 
 function pintarMotorVoz() {
@@ -2196,8 +2199,9 @@ function cablear() {
         (a.familia + a.nombre).localeCompare(b.familia + b.nombre));
       pintarMotorVoz();
       const fam = [...new Set(_vocesCuenta.map((v) => v.familia))];
-      $('pistaVoces').textContent = _vocesCuenta.length + ' voces masculinas en español en tu ' +
-        'cuenta · ' + fam.join(', ') + '. Escúchalas antes de rehacer el episodio.';
+      $('pistaVoces').textContent = _vocesCuenta.length + ' voces masculinas en español ' +
+        'LATINO · ' + fam.join(', ') + '. El castellano de España queda fuera. Escúchalas ' +
+        'antes de rehacer el episodio.';
     } catch (e) {
       aviso('No se pudo consultar: ' + e.message, 'err', 8000);
     }

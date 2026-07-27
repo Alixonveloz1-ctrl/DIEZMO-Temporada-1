@@ -1084,7 +1084,16 @@ if (!/accion === 'voces'/.test(backVL) || !/texttospeech\.googleapis\.com\/v1\/v
 } else if (!/function idiomaDeVoz\(/.test(backVL)) {
   mal('el idioma no sale del nombre de la voz',
     'es-ES-Neural2-B pedido como es-US no funciona');
-} else ok('el catálogo de voces se pide a la cuenta y el idioma sale del nombre de cada una');
+} else if (/'es-ES'/.test(backVL) || /es-ES', 'es-419'/.test(backVL)) {
+  /*  es-ES es castellano de España. La serie es en latino, y colarlo llenó la
+      lista de voces inservibles que además se confundían con las buenas.    */
+  mal('el catálogo pide voces de España', 'la serie es en español latino');
+} else if (!/Standard\|Wavenet\|Polyglot/.test(backVL)) {
+  mal('el catálogo no descarta las familias viejas', 'suenan a locutor de contestador');
+} else if (!/v\.idioma/.test(leer('app/main.js'))) {
+  mal('la etiqueta de la voz no dice el país',
+    'dos voces con el mismo nombre y distinto país se ven iguales');
+} else ok('el catálogo se limita a español latino, sin familias viejas, y la etiqueta dice el país');
 if (!/async generarVozDe\(/.test(pipeVL)) {
   mal('no hay un despachador único de motor de voz');
 } else if (/\.generarVoz\(ep, (false|true)\)/.test(mainVL)) {

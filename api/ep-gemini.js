@@ -731,7 +731,11 @@ module.exports = async (req, res) => {
           adivinar. Se piden y se filtran a las masculinas en español.       */
       if (accion === 'voces') {
         const vistas = new Map();
-        for (const idioma of ['es-US', 'es-ES', 'es-419']) {
+        /*  SOLO ESPAÑOL LATINO. es-ES es castellano de España y no pinta nada
+            en esta serie; incluirlo llenó la lista de voces que no se pueden
+            usar y, con etiquetas que no decían el país, se confundían con las
+            latinas que ya estaban elegidas.                                  */
+        for (const idioma of ['es-US', 'es-419']) {
           const r = await fetch('https://texttospeech.googleapis.com/v1/voices?languageCode=' + idioma,
             { headers: { Authorization: 'Bearer ' + token } });
           if (!r.ok) continue;
@@ -739,7 +743,9 @@ module.exports = async (req, res) => {
           try { j = JSON.parse(await r.text()); } catch (e) { continue; }
           for (const v of (j && j.voices) || []) {
             if (v.ssmlGender !== 'MALE') continue;          // el narrador es masculino
-            if (/Standard/.test(v.name)) continue;          // la familia vieja no vale
+            if (v.languageCodes && v.languageCodes.every((c) => /^es-ES/.test(c))) continue;
+            // Las familias viejas suenan a locutor de contestador: fuera.
+            if (/Standard|Wavenet|Polyglot|News|Casual/i.test(v.name)) continue;
             if (!vistas.has(v.name)) {
               vistas.set(v.name, {
                 nombre: v.name,
@@ -748,8 +754,7 @@ module.exports = async (req, res) => {
                   : /Chirp/.test(v.name) ? 'Chirp'
                   : /Studio/.test(v.name) ? 'Studio'
                   : /Neural2/.test(v.name) ? 'Neural2'
-                  : /Polyglot/.test(v.name) ? 'Polyglot'
-                  : /Wavenet/i.test(v.name) ? 'WaveNet' : 'otra'),
+                  : 'otra'),
               });
             }
           }

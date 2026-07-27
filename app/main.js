@@ -146,6 +146,7 @@ function estadoCompacto() {
       titulo: e.titulo,
       musica: e.musica || null,
       montaje: e.montaje || null,
+      vozLarga: e.vozLarga || null,
       tomas: (e.tomas || []).map((t) => ({
         i: t.i,
         plano: t.plano || null,
@@ -215,6 +216,7 @@ async function rehidratar(compacto) {
     ep.titulo = ce.titulo || ep.titulo;
     if (ce.musica) ep.musica = ce.musica;
     if (ce.montaje) ep.montaje = ce.montaje;
+    if (ce.vozLarga) ep.vozLarga = ce.vozLarga;
     (ce.tomas || []).forEach((ct, k) => {
       const t = ep.tomas[k];
       if (!t) return;

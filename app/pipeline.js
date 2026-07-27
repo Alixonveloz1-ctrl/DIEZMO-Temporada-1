@@ -453,6 +453,13 @@ export class Motor {
         texto.length + ' caracteres · voz ' + nombreVozChirp(cfg.vozChirp) +
         ' a ' + Number(cfg.velocidadVoz).toFixed(2) + 'x', 'info');
 
+      /*  La operación queda ANOTADA en el episodio. Long Audio Synthesis puede
+          tardar horas y el teléfono no va a estar abierto todo ese rato: si se
+          cierra la pestaña o se agota la espera, al volver a pulsar se retoma
+          la que ya estaba en marcha en vez de encargar —y pagar— otra.      */
+      const enCurso = ep.vozLarga && ep.vozLarga.operationName ? ep.vozLarga : null;
+      if (enCurso) this._log('hay una narración en marcha: se retoma donde iba', 'info');
+
       let ref;
       try {
         ref = await generarVozLarga({
@@ -463,8 +470,15 @@ export class Motor {
           clave: clave.vozEpisodio(ep.num),
         }, {
           señal: this.señal,
+          operacion: enCurso ? enCurso.operationName : null,
+          destino: enCurso ? enCurso.destino : null,
+          alEmpezar: async (i) => {
+            ep.vozLarga = { operationName: i.operationName, destino: i.destino, ts: Date.now() };
+            if (this.avisos.cambio) this.avisos.cambio();
+          },
           aviso: (m) => this._prog(0, 1, 'voz · ' + m),
         });
+        ep.vozLarga = null;      // terminada: la próxima vez se encarga de nuevo
       } catch (e) {
         if (e && e.cancelado) return;
         for (const t of ep.tomas) t.audio = { ok: false, error: e.message };

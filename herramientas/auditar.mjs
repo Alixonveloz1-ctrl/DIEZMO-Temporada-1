@@ -991,6 +991,30 @@ if (!genVL) {
   mal('la voz repartida no se guarda donde el resto de la herramienta la busca');
 } else ok('la locución se reparte con el mismo cortador de silencios y se guarda toma a toma');
 
+/*  Long Audio Synthesis es un servicio por lotes: un episodio puede tardar
+    HORAS, y el teléfono no va a estar abierto todo ese rato. Si la operación no
+    queda anotada, cerrar la pestaña obliga a encargarla —y pagarla— otra vez. */
+{
+  const apiV = leer('app/api.js');
+  const mainV = leer('app/main.js');
+  const mTope = /tiempoMaximo \|\| (\d+) \* 60 \* 60 \* 1000/.exec(apiV);
+  if (!/o\.operacion/.test(apiV) || !/alEmpezar/.test(apiV)) {
+    mal('la narración larga no se puede retomar',
+      'cerrar la pestaña obligaría a encargarla otra vez');
+  } else if (!mTope || Number(mTope[1]) < 3) {
+    mal('la espera de la narración es demasiado corta',
+      'un episodio de dieciséis minutos puede tardar horas');
+  } else if (!/vozLarga: e\.vozLarga/.test(mainV) || !/ep\.vozLarga = ce\.vozLarga/.test(mainV)) {
+    mal('la operación en curso no se guarda en el proyecto',
+      'al recargar se daría por perdida');
+  } else if (!/quedan unos/.test(apiV)) {
+    mal('no se dice cuánto falta', 'saber si son diez minutos o dos horas cambia qué haces');
+  } else {
+    ok('la narración se puede retomar, se guarda en el proyecto y dice cuánto le falta ' +
+       '(espera de hasta ' + mTope[1] + ' h)');
+  }
+}
+
 /*  Y tiene que aguantar un episodio ENTERO, que es el caso nuevo: 134 tomas y
     dieciséis minutos, no seis tomas y un minuto. Se prueba de verdad, con una
     locución falsa de ritmo irregular —un narrador no lee a velocidad fija.  */

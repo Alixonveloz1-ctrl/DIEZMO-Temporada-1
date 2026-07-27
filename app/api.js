@@ -199,15 +199,22 @@ export async function montarEpisodio(params, opciones) {
  */
 export async function generarVozLarga(params, opciones) {
   const o = opciones || {};
-  const inicio = await api.vozLargaIniciar(params, o);
-  if (o.aviso) o.aviso('en cola en Cloud Text-to-Speech…');
+  /*  Long Audio Synthesis es un servicio por lotes: un episodio de dieciséis
+      minutos puede tardar HORAS, no minutos. Si ya había una operación en
+      marcha se retoma en vez de empezar otra —y de pagarla otra vez—.       */
+  const inicio = o.operacion
+    ? { operationName: o.operacion, destino: o.destino }
+    : await api.vozLargaIniciar(params, o);
+  if (!o.operacion && o.alEmpezar) await o.alEmpezar(inicio);
+  if (o.aviso) o.aviso(o.operacion ? 'retomando la narración en curso…' : 'en cola…');
 
-  const limite = Date.now() + (o.tiempoMaximo || 20 * 60 * 1000);
+  const limite = Date.now() + (o.tiempoMaximo || 5 * 60 * 60 * 1000);
+  const arranque = Date.now();
   let vuelta = 0;
 
   while (Date.now() < limite) {
     if (o.señal && o.señal.aborted) throw new Cancelado();
-    await esperar(vuelta === 0 ? 10000 : 8000);
+    await esperar(vuelta === 0 ? 10000 : 20000);
     vuelta++;
     const est = await api.vozLargaConsultar(
       { operationName: inicio.operationName },
@@ -218,12 +225,17 @@ export async function generarVozLarga(params, opciones) {
       return inicio.destino;
     }
     if (o.aviso) {
-      o.aviso(est.progreso ? 'narrando… ' + Math.round(est.progreso) + ' %'
-        : 'narrando… ' + Math.round(vuelta * 8 / 60) + ' min esperando');
+      /*  Con el porcentaje se puede estimar lo que falta, y saber si faltan
+          diez minutos o dos horas cambia lo que uno hace con el teléfono.   */
+      const min = (Date.now() - arranque) / 60000;
+      const queda = est.progreso > 1
+        ? ' · quedan unos ' + Math.max(1, Math.round(min * (100 - est.progreso) / est.progreso)) + ' min'
+        : '';
+      o.aviso('narrando… ' + Math.round(est.progreso || 0) + ' %' + queda);
     }
   }
-  throw new Error('La narración tardó más de lo previsto. Vuelve a intentarlo: ' +
-    'si ya estaba escrita en el bucket, se reaprovecha.');
+  throw new Error('La narración sigue en marcha en Google, pero se dejó de esperar. ' +
+    'Vuelve a pulsar «Generar la voz» y se retoma donde iba, sin pagarla otra vez.');
 }
 
 /** Descarga el clip por su referencia opaca. El navegador nunca ve el origen. */

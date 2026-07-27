@@ -1012,20 +1012,24 @@ if (malFormadas.length) {
 } else if (VOCES_CHIRP.every(([id]) => id !== VOZ_CHIRP_DEFECTO)) {
   mal('la voz por defecto no está en el catálogo');
 } else if (VELOCIDAD_DEFECTO !== 1) {
-  /*  Chirp 3: HD no admite el parámetro de velocidad. Mandarlo no genera más
-      rápido: estira el audio después, y eso suena metálico. La velocidad
-      nativa tiene que ser la de fábrica.                                    */
+  /*  La velocidad SÍ funciona —cambiarla cambia el ritmo—, pero por defecto se
+      deja la nativa: es la única que no pasa por ningún ajuste posterior, y si
+      algo suena raro conviene que el punto de partida sea el crudo.        */
   mal('la velocidad por defecto no es la nativa',
-    'a cualquier valor distinto de 1 el audio se estira y suena metálico');
-} else if (!/Math\.abs\(vel - 1\) > 0\.005/.test(backVL)) {
-  mal('se manda el parámetro de velocidad aunque no se cambie nada',
-    'basta con mandarlo para que el motor estire el audio');
+    'el punto de partida tiene que ser el audio sin tocar');
 } else if ((backVL.match(/Math\.abs\(vel - 1\) > 0\.005/g) || []).length < 2) {
   mal('la prueba de voz y el episodio no tratan igual la velocidad',
     'lo que se escucha antes no sería lo que sale después');
+} else if (/sampleRateHertz/.test(backVL)) {
+  /*  Forzar la frecuencia obliga al motor a remuestrear su salida, y ahí la voz
+      pierde aire: queda estrecha y apagada, como grabada con un micrófono
+      malo. extraerPCM lee la frecuencia de la cabecera, así que dejarla nativa
+      no rompe nada de lo que viene después.                                 */
+  mal('se fuerza la frecuencia de muestreo de la voz',
+    'remuestrear estrecha la voz; extraerPCM ya lee la que venga');
 } else {
   ok(VOCES_CHIRP.length + ' voces masculinas de Chirp 3: HD · por defecto ' +
-     VOZ_CHIRP_DEFECTO.split('-').pop() + ' a velocidad nativa, sin estirar el audio');
+     VOZ_CHIRP_DEFECTO.split('-').pop() + ' a velocidad y frecuencia nativas');
 }
 
 /* ── 5c-pre · La semilla no se teclea y llega a lo guardado ── */

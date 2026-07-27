@@ -578,7 +578,12 @@ module.exports = async (req, res) => {
         if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
         if (!body.clave) return res.status(400).json({ error: 'Falta "clave"' });
 
-        const audioConfig = { audioEncoding: 'LINEAR16', sampleRateHertz: 24000 };
+        /*  SIN forzar la frecuencia. Pedir 24 kHz obliga al motor a remuestrear
+            su salida hacia abajo, y ahí se pierde el aire de la voz: queda
+            apagada y estrecha, como grabada con un micrófono malo. Se deja que
+            entregue la suya; extraerPCM la lee de la cabecera del WAV, así que
+            todo lo de después se adapta solo.                                */
+        const audioConfig = { audioEncoding: 'LINEAR16' };
         /*  La velocidad SOLO se manda si se pide algo distinto de lo nativo.
             Google documenta que las voces Chirp 3: HD no admiten el parámetro
             de velocidad, y mandarlo igualmente sale caro: en vez de renderizar
@@ -660,7 +665,7 @@ module.exports = async (req, res) => {
         if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
         /*  Sin comprimir y al mismo ritmo que el episodio: si la prueba fuera
             MP3 y el episodio LINEAR16, comparar no serviría de nada.        */
-        const audioConfig = { audioEncoding: 'LINEAR16', sampleRateHertz: 24000 };
+        const audioConfig = { audioEncoding: 'LINEAR16' };   // frecuencia nativa, ver arriba
         const vel = Number(body.speakingRate);
         if (isFinite(vel) && vel > 0 && Math.abs(vel - 1) > 0.005) {
           audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));

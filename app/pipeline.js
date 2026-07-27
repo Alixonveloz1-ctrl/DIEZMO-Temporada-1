@@ -50,10 +50,14 @@ export function claveVideoDe(numEp, t) {
 }
 
 /*  El PCM viaja como bytes; el reparto por silencios necesita muestras de 16
-    bits. Se copia en vez de reinterpretar el búfer porque el desplazamiento
-    puede ser impar y Int16Array exige alineación par.                        */
+    bits. Cuando el desplazamiento es par —lo normal en un WAV— se reinterpreta
+    el mismo búfer sin copiar nada: un episodio de dieciséis minutos a 48 kHz
+    son noventa y cinco megas, y copiarlo duplicaba eso en el móvil. Solo se
+    copia cuando el desplazamiento es impar, que es cuando Int16Array no puede
+    apuntar ahí.                                                              */
 function aInt16(bytes) {
   const n = bytes.length >> 1;
+  if (bytes.byteOffset % 2 === 0) return new Int16Array(bytes.buffer, bytes.byteOffset, n);
   const out = new Int16Array(n);
   for (let i = 0; i < n; i++) out[i] = (bytes[i * 2] | (bytes[i * 2 + 1] << 8)) << 16 >> 16;
   return out;

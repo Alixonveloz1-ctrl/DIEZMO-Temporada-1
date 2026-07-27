@@ -2170,6 +2170,28 @@ function cablear() {
   $('btnAjCancelar').addEventListener('click', () => $('dlgAjustes').close());
   $('btnAjGuardar').addEventListener('click', guardarAjustes);
   $('cfgTempVoz').addEventListener('input', (e) => { $('valTempVoz').textContent = Number(e.target.value).toFixed(2); });
+  $('btnProbarVozLarga').addEventListener('click', async () => {
+    const btn = $('btnProbarVozLarga');
+    btn.disabled = true; btn.textContent = 'generando…';
+    try {
+      const muestra = 'Así llegó la especie humana al mundo-astillero: descargando cajas. ' +
+        'Nadie dio un discurso. Quedaban seis ciclos.';
+      const r = await api.vozLargaProbar({
+        text: $('cfgNormalizar').checked ? normalizarParaVoz(muestra, REEMPLAZOS_BASE) : muestra,
+        voice: $('cfgVozChirp').value,
+        languageCode: P.config.idioma || 'es-US',
+        speakingRate: Number($('cfgVelocidadVoz').value),
+      });
+      const a = $('audioPruebaLarga');
+      a.src = URL.createObjectURL(b64toBlob(r.audio, r.mimeType || 'audio/mpeg'));
+      a.style.display = 'block';
+      a.play().catch(() => { /* el navegador pedirá un gesto */ });
+    } catch (e) {
+      aviso('No se pudo escuchar: ' + e.message, 'err', 8000);
+    }
+    btn.disabled = false; btn.textContent = 'Escuchar esta voz';
+  });
+
   $('btnProbarTono').addEventListener('click', async () => {
     const btn = $('btnProbarTono');
     btn.disabled = true; btn.textContent = 'generando…';

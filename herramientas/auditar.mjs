@@ -722,6 +722,24 @@ titulo('PORTADAS Y CARTELES');
     }
   }
 
+  /*  LA CARA MANDA. Salían los personajes de espaldas —dos de mis propias ideas
+      de cartel lo pedían—, y entonces las hojas de referencia adjuntas no
+      servían de nada: no hay rostro que respetar en una nuca.               */
+  const deEspaldas = pr.CARTELES.filter((c) => /de espaldas|de nuca/i.test(c.idea));
+  const conRostro = /ROSTRO VISIBLE/.test(port) && /mirando a cámara/.test(port);
+  const antiRetro = [port, cart].every((p) => /ACABADO CONTEMPORÁNEO/.test(p) &&
+    /virado sepia/.test(p));
+  if (deEspaldas.length) {
+    mal(deEspaldas.length + ' carteles piden al personaje de espaldas',
+      'con la nuca a cámara, la hoja de referencia no sirve de nada: ' +
+      deEspaldas.map((c) => c.id).join(' · '));
+  } else if (!conRostro) {
+    mal('la portada no exige el rostro visible', 'la cara es lo que vende una portada');
+  } else if (!antiRetro) {
+    mal('las portadas no piden acabado de hoy ni rechazan el virado a un tono',
+      'la paleta de bronce y ámbar sola se lee como cartel de los ochenta');
+  } else ok('los personajes van de cara, grandes, y con acabado de anime actual');
+
   // El reparto de una portada sale de lo que el director anotó, no del texto.
   const conPlanos = { num: 1, titulo: 'X', tomas: [
     { i: 0, plano: { personajes: ['sota', 'hina'] } },

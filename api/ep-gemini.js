@@ -646,6 +646,42 @@ module.exports = async (req, res) => {
         return res.status(200).json({ done: true });
       }
 
+      /*  Una muestra corta para escuchar la voz antes de pagar el episodio.
+          No usa Long Audio Synthesis —que es asíncrona y escribe en el bucket—
+          sino la síntesis normal, que devuelve el audio en la respuesta: son
+          diez segundos, caben de sobra.                                      */
+      if (accion === 'prueba') {
+        if (!body.text) return res.status(400).json({ error: 'Falta "text"' });
+        const audioConfig = { audioEncoding: 'MP3' };
+        const vel = Number(body.speakingRate);
+        if (isFinite(vel) && vel > 0) audioConfig.speakingRate = Math.min(2, Math.max(0.25, vel));
+
+        const r = await fetch('https://texttospeech.googleapis.com/v1/text:synthesize', {
+          method: 'POST',
+          headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            input: { text: String(body.text).slice(0, 900) },
+            voice: {
+              languageCode: body.languageCode || 'es-US',
+              name: body.voice || 'es-US-Chirp3-HD-Charon',
+            },
+            audioConfig,
+          }),
+        });
+        const raw = await r.text();
+        let j = null;
+        try { j = JSON.parse(raw); } catch (e) { /* respuesta no-JSON */ }
+        if (!r.ok || !j || !j.audioContent) {
+          const pista = r.status === 403
+            ? ' Puede que falte habilitar la API de Cloud Text-to-Speech en tu proyecto.' : '';
+          return res.status(r.ok ? 502 : r.status).json({
+            error: 'Prueba de voz ' + r.status + '.' + pista,
+            detail: raw.slice(0, 600),
+          });
+        }
+        return res.status(200).json({ audio: j.audioContent, mimeType: 'audio/mpeg' });
+      }
+
       return res.status(400).json({ error: 'Acción de voz larga desconocida: ' + accion });
     }
 

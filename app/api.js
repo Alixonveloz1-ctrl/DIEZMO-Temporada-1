@@ -151,6 +151,8 @@ export const api = {
 
   vozLargaConsultar: (p, o) => llamar({ mode: 'vozlarga', action: 'poll', ...p }, { intentos: 2, ...o }),
 
+  vozLargaProbar: (p, o) => llamar({ mode: 'vozlarga', action: 'prueba', ...p }, { intentos: 2, ...o }),
+
   montarIniciar: (p, o) => llamar({ mode: 'montar', action: 'start', ...p }, o),
 
   montarConsultar: (p, o) => llamar({ mode: 'montar', action: 'poll', ...p }, { intentos: 2, ...o }),

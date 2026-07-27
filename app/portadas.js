@@ -37,11 +37,12 @@ export const CARTELES = [
     resumen: 'El que abre la campaña. Sōta pequeño, la nave enorme.',
     reparto: ['sota'],
     reclamo: 'PRÓXIMAMENTE',
-    idea: 'Plano general vertical. Un chico solo, de espaldas y pequeñísimo en el ' +
-      'encuadre inferior, mirando hacia arriba. Sobre él, ocupando cuatro quintos de la ' +
-      'imagen, el casco de una nave alienígena inmensa suspendida sobre Tokio, tan grande ' +
-      'que no cabe entera. Luz fría descendente, la ciudad en penumbra. La escala lo dice ' +
-      'todo: no hay lucha posible.',
+    idea: 'El chico en PRIMER TÉRMINO y grande, de cintura para arriba, ligeramente ' +
+      'descentrado, con la cara vuelta hacia la cámara y la barbilla algo alzada: se le ve ' +
+      'el rostro entero, iluminado, con la expresión de quien acaba de entender algo. ' +
+      'Detrás y muy por encima, el casco de una nave alienígena inmensa sobre Tokio, tan ' +
+      'grande que no cabe en el encuadre, con la ciudad diminuta abajo. La escala la da el ' +
+      'contraste entre su cara nítida en primer término y la inmensidad del fondo.',
   },
   {
     id: 'diezmo',
@@ -50,9 +51,10 @@ export const CARTELES = [
     reparto: [],
     reclamo: 'DIEZ MILLONES',
     idea: 'Plano general vertical, ligeramente elevado. Una fila ordenadísima de personas ' +
-      'de espaldas que se pierde hacia el horizonte, entrando por una compuerta iluminada. ' +
-      'Todos llevan la misma ropa civil corriente y una carpeta en la mano. Nadie forcejea, ' +
-      'nadie llora: es un trámite. El horror está en la calma y en que la fila no acaba.',
+      'vistas de tres cuartos que se pierde hacia el horizonte, entrando por una compuerta ' +
+      'iluminada. Los tres primeros están cerca de la cámara y se les ven las caras: serenas, ' +
+      'resignadas, corrientes. Todos llevan ropa civil y una carpeta en la mano. Nadie ' +
+      'forcejea, nadie llora: es un trámite. El horror está en la calma y en que no acaba.',
   },
   {
     id: 'rostros',
@@ -107,6 +109,17 @@ const ENCARGO =
   'PORTADA DE ANIME (key visual). Ilustración única y acabada, pensada para verse sola: ' +
   'composición cuidada, un punto de interés claro y aire alrededor. No es un fotograma de ' +
   'la serie, es el cartel.';
+
+/*  La paleta de la serie —bronce, ámbar, hueso— funciona dentro de un episodio,
+    pero en una ilustración suelta se lee como virado sepia de cartel antiguo, y
+    eso es exactamente lo que salía: parecían carteles de los ochenta. Aquí se
+    dice el año: acabado de anime de HOY, color saturado y limpio, digital.    */
+const ACTUAL =
+  'ACABADO CONTEMPORÁNEO, de anime estrenado este año, del que se anuncia hoy en las ' +
+  'plataformas. Color rico, saturado y limpio, de acabado digital moderno, con negros ' +
+  'profundos y luces bien separadas. La paleta de la serie da el ambiente, pero la imagen ' +
+  'NO va virada a un solo tono: mantiene variedad cromática y contraste alto. Línea de ' +
+  'tinta nítida y sombreado cel actual.';
 
 /*  EL TEXTO VA DENTRO, Y GRANDE.
 
@@ -184,12 +197,20 @@ export function lineasCartel(cartel) {
     quitan solo esos términos; el resto de la lista sigue entera.            */
 const PERMITIDO_EN_PORTADA = /^(texto|letras|subt[íi]tulos|marca de agua|logotipo|firma)$/i;
 
+/*  Y un cartel tiene achaques propios que un fotograma no tiene: el virado a un
+    solo tono, la aerografía, el aire de cartel de videoclub. Se nombran como
+    defectos, nunca describiendo la imagen indeseada.                        */
+const ACHAQUES_DE_CARTEL =
+  'virado sepia, monocromía, imagen a un solo tono, aerografía de los ochenta, ' +
+  'cartel de videoclub, ilustración occidental, cómic americano, pintura al óleo, ' +
+  'personajes de espaldas, rostros ocultos, figuras diminutas e irreconocibles';
+
 export function negativoDePortada(negativo) {
-  return String(negativo || '')
+  const base = String(negativo || '')
     .split(',')
     .map((t) => t.trim())
-    .filter((t) => t && !PERMITIDO_EN_PORTADA.test(t))
-    .join(', ');
+    .filter((t) => t && !PERMITIDO_EN_PORTADA.test(t));
+  return base.concat(ACHAQUES_DE_CARTEL.split(', ')).join(', ');
 }
 
 function bloqueReparto(personajes, conReferencia) {
@@ -198,6 +219,10 @@ function bloqueReparto(personajes, conReferencia) {
   return [
     'PERSONAJES EN LA IMAGEN (' + personajes.length + '):',
     ...fichas,
+    'ENCUADRE DE LOS PERSONAJES: en primer término y grandes, con el ROSTRO VISIBLE y bien ' +
+    'iluminado, mirando a cámara o de tres cuartos. La cara es lo que vende una portada: ' +
+    'tiene que reconocerse el personaje de un vistazo, con los ojos nítidos y la expresión ' +
+    'clara. Colócalos ocupando al menos un tercio del alto de la imagen.',
     conReferencia
       ? 'Se adjuntan sus hojas de referencia: respeta el rostro, el peinado y las ' +
         'proporciones EXACTAMENTE. Es la misma persona, en otra escena.'
@@ -219,7 +244,7 @@ export function promptPortada(ep, ctx, personajes, conReferencia) {
     .replace(/\s+/g, ' ').slice(0, 700);
 
   return [
-    ENCARGO + ' ' + ctx.estilo,
+    ENCARGO + ' ' + ctx.estilo + ' ' + ACTUAL,
     '',
     'SERIE: DIEZMO. Ciencia ficción oscura, seinen. Una civilización alienígena exige diez ' +
     'millones de humanos entregados voluntariamente, y los gobiernos de la Tierra fabrican ' +
@@ -244,7 +269,7 @@ export function promptPortada(ep, ctx, personajes, conReferencia) {
  */
 export function promptCartel(cartel, ctx, personajes, conReferencia) {
   return [
-    ENCARGO + ' ' + ctx.estilo,
+    ENCARGO + ' ' + ctx.estilo + ' ' + ACTUAL,
     '',
     'SERIE: DIEZMO. Ciencia ficción oscura, seinen. Una civilización alienígena exige diez ' +
     'millones de humanos entregados voluntariamente, y los gobiernos de la Tierra fabrican ' +

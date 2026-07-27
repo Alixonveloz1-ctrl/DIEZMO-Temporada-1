@@ -676,7 +676,7 @@ titulo('PORTADAS Y CARTELES');
       un tamaño mínimo y se le prohíbe expresamente la letra menuda —créditos,
       fechas, webs—, que es la parte que falla.                              */
   const conTitulo = [port, cart].every((p) => /«DIEZMO»/.test(p) &&
-    /grotesca de palo seco/.test(p) && /PROHIBIDA LA LETRA PEQUEÑA/.test(p) &&
+    /LOGOTIPO DE LA SERIE/.test(p) && /PROHIBIDA LA LETRA PEQUEÑA/.test(p) &&
     /ocupando a lo ancho al menos/.test(p));
   // El capítulo y su título: es lo que distingue una portada de otra.
   const conCapitulo = /«EPISODIO 01»/.test(port) && /«EL CENSO»/.test(port);
@@ -742,10 +742,10 @@ titulo('PORTADAS Y CARTELES');
       const p = pr.promptPortada(ep, ctx, [], false);
       if (!t.titulo || filas.length !== 3) { sinTituloProp.push(n); continue; }
       if (p.indexOf('«' + t.titulo.toUpperCase() + '»') === -1) { sinTituloProp.push(n); continue; }
-      vistos.push((p.match(/TIPOGRAFÍA \(la misma[\s\S]*?horizontales\./) || [''])[0]);
+      vistos.push((p.match(/LOGOTIPO DE LA SERIE[\s\S]*?sin serifas\./) || [''])[0]);
     }
     const cartelesTipo = pr.CARTELES.map((c) =>
-      (pr.promptCartel(c, ctx, [], false).match(/TIPOGRAFÍA \(la misma[\s\S]*?horizontales\./) || [''])[0]);
+      (pr.promptCartel(c, ctx, [], false).match(/LOGOTIPO DE LA SERIE[\s\S]*?sin serifas\./) || [''])[0]);
     const todas = new Set(vistos.concat(cartelesTipo));
     if (sinTituloProp.length) {
       mal('hay portadas sin su título de capítulo rotulado', 'episodios ' + sinTituloProp.join(', '));
@@ -759,20 +759,27 @@ titulo('PORTADAS Y CARTELES');
   /*  LA CARA MANDA. Salían los personajes de espaldas —dos de mis propias ideas
       de cartel lo pedían—, y entonces las hojas de referencia adjuntas no
       servían de nada: no hay rostro que respetar en una nuca.               */
-  const deEspaldas = pr.CARTELES.filter((c) => /de espaldas|de nuca/i.test(c.idea));
-  const conRostro = /ROSTRO VISIBLE/.test(port) && /mirando a cámara/.test(port);
+  // Ninguna idea puede volver a fijar la pose: ni la espalda ni la mirada.
+  const deEspaldas = pr.CARTELES.filter((c) =>
+    /de espaldas|de nuca|mirando a cámara|cara vuelta hacia la cámara/i.test(c.idea));
+  /*  Ni todos de espaldas ni todos posando: el encuadre lo decide el modelo.
+      Las dos versiones anteriores eran extremos míos.                       */
+  const conRostro = /PUESTA EN ESCENA: libre/.test(port) &&
+    !/mirando a cámara o de tres cuartos/.test(port);
   const antiRetro = [port, cart].every((p) => /ACABADO CONTEMPORÁNEO/.test(p) &&
     /virado sepia/.test(p));
   if (deEspaldas.length) {
-    mal(deEspaldas.length + ' carteles piden al personaje de espaldas',
-      'con la nuca a cámara, la hoja de referencia no sirve de nada: ' +
+    mal(deEspaldas.length + ' carteles dictan la pose del personaje',
+      'la idea dice qué cuenta el cartel; cómo se coloca es del modelo: ' +
       deEspaldas.map((c) => c.id).join(' · '));
   } else if (!conRostro) {
-    mal('la portada no exige el rostro visible', 'la cara es lo que vende una portada');
+    mal('la portada dicta la pose de los personajes',
+      'obligar a mirar a cámara da un retrato de orla; obligar a la espalda desperdicia ' +
+      'las hojas de referencia. El encuadre lo decide el modelo');
   } else if (!antiRetro) {
     mal('las portadas no piden acabado de hoy ni rechazan el virado a un tono',
       'la paleta de bronce y ámbar sola se lee como cartel de los ochenta');
-  } else ok('los personajes van de cara, grandes, y con acabado de anime actual');
+  } else ok('el encuadre lo decide el modelo, con acabado de anime actual');
 
   // El reparto de una portada sale de lo que el director anotó, no del texto.
   const conPlanos = { num: 1, titulo: 'X', tomas: [

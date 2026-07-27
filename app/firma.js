@@ -15,8 +15,13 @@ export const FIRMA_DEFECTO = 'Mundo Isekai';
 
 /*  Proporciones respecto al alto del fotograma, no en píxeles: así la firma se
     ve igual de grande en 1080p que en un cartel vertical.                    */
-const ALTO_TEXTO = 0.032;     // cuerpo de la letra
-const MARGEN = 0.030;         // separación al borde
+/*  Una firma de canal es una marca discreta, no un rótulo. Iba al 3,2 % del
+    alto y con opacidad casi plena, así que competía con el título y se leía
+    como texto puesto encima con prisa. Pequeña, en versalitas espaciadas y
+    traslúcida es como se firma una imagen.                                   */
+const ALTO_TEXTO = 0.019;     // cuerpo de la letra
+const MARGEN = 0.034;         // separación al borde
+const ESPACIADO = 0.18;       // separación entre letras, en cuerpos
 
 /**
  * Dibuja la firma sobre un lienzo ya existente, arriba a la izquierda.
@@ -26,20 +31,25 @@ const MARGEN = 0.030;         // separación al borde
  * @param {string} texto
  */
 export function dibujarFirma(ctx, w, h, texto) {
-  const cuerpo = Math.max(11, Math.round(h * ALTO_TEXTO));
+  const cuerpo = Math.max(9, Math.round(h * ALTO_TEXTO));
   const m = Math.round(h * MARGEN);
   ctx.save();
-  ctx.font = '600 ' + cuerpo + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  ctx.font = '500 ' + cuerpo + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
-  /*  Sombra en vez de caja: una caja opaca tapa la ilustración, y sobre un
-      fondo claro el texto blanco solo se pierde si no lleva nada debajo.     */
-  ctx.shadowColor = 'rgba(0,0,0,0.85)';
-  ctx.shadowBlur = Math.round(cuerpo * 0.5);
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = Math.round(cuerpo * 0.9);
   ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = Math.max(1, Math.round(cuerpo * 0.06));
-  ctx.fillStyle = 'rgba(255,255,255,0.92)';
-  ctx.fillText(texto, m, m);
+  ctx.shadowOffsetY = 1;
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  /*  El espaciado entre letras no existe en canvas, así que se dibuja letra a
+      letra. Es lo que separa una firma de una etiqueta.                      */
+  const paso = cuerpo * ESPACIADO;
+  let x = m;
+  for (const ch of texto.toUpperCase()) {
+    ctx.fillText(ch, x, m);
+    x += ctx.measureText(ch).width + paso;
+  }
   ctx.restore();
 }
 
@@ -47,10 +57,13 @@ export function dibujarFirma(ctx, w, h, texto) {
 export function medidaFirma(w, h, texto) {
   const c = document.createElement('canvas');
   const ctx = c.getContext('2d');
-  const cuerpo = Math.max(11, Math.round(h * ALTO_TEXTO));
-  ctx.font = '600 ' + cuerpo + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+  const cuerpo = Math.max(9, Math.round(h * ALTO_TEXTO));
+  ctx.font = '500 ' + cuerpo + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
   const m = Math.round(h * MARGEN);
-  return { cuerpo, margen: m, ancho: Math.ceil(ctx.measureText(texto).width) };
+  const letras = [...String(texto).toUpperCase()];
+  const ancho = letras.reduce((a, ch) => a + ctx.measureText(ch).width, 0) +
+    cuerpo * ESPACIADO * Math.max(0, letras.length - 1);
+  return { cuerpo, margen: m, ancho: Math.ceil(ancho) };
 }
 
 /**

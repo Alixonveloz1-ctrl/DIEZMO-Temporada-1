@@ -37,12 +37,9 @@ export const CARTELES = [
     resumen: 'El que abre la campaña. Sōta pequeño, la nave enorme.',
     reparto: ['sota'],
     reclamo: 'PRÓXIMAMENTE',
-    idea: 'El chico en PRIMER TÉRMINO y grande, de cintura para arriba, ligeramente ' +
-      'descentrado, con la cara vuelta hacia la cámara y la barbilla algo alzada: se le ve ' +
-      'el rostro entero, iluminado, con la expresión de quien acaba de entender algo. ' +
-      'Detrás y muy por encima, el casco de una nave alienígena inmensa sobre Tokio, tan ' +
-      'grande que no cabe en el encuadre, con la ciudad diminuta abajo. La escala la da el ' +
-      'contraste entre su cara nítida en primer término y la inmensidad del fondo.',
+    idea: 'La escala: un chico y una nave alienígena inmensa suspendida sobre Tokio, tan ' +
+      'grande que no cabe en el encuadre. Lo que tiene que quedar es que no hay lucha ' +
+      'posible. Luz fría descendente, la ciudad debajo. Resuélvelo como quieras.',
   },
   {
     id: 'diezmo',
@@ -50,21 +47,17 @@ export const CARTELES = [
     resumen: 'Diez millones dicho sin decirlo: la fila que no termina.',
     reparto: [],
     reclamo: 'DIEZ MILLONES',
-    idea: 'Plano general vertical, ligeramente elevado. Una fila ordenadísima de personas ' +
-      'vistas de tres cuartos que se pierde hacia el horizonte, entrando por una compuerta ' +
-      'iluminada. Los tres primeros están cerca de la cámara y se les ven las caras: serenas, ' +
-      'resignadas, corrientes. Todos llevan ropa civil y una carpeta en la mano. Nadie ' +
-      'forcejea, nadie llora: es un trámite. El horror está en la calma y en que no acaba.',
+    idea: 'Una fila ordenadísima de gente corriente, con ropa de calle y una carpeta en la ' +
+      'mano, entrando por una compuerta iluminada. La fila no termina. Nadie forcejea, nadie ' +
+      'llora: es un trámite. El horror está en la calma y en que no acaba.',
   },
   {
     id: 'rostros',
     nombre: 'Los que se van',
     resumen: 'Retrato doble de los protagonistas. Para presentar personajes.',
     reparto: ['sota', 'hina'],
-    idea: 'Retrato vertical de dos personajes en primer plano corto, uno ligeramente ' +
-      'delante del otro, ambos mirando a cámara sin sonreír. Fondo desenfocado en tonos ' +
-      'fríos con la silueta de la nave apenas insinuada. Iluminación de contorno recortando ' +
-      'las caras. Es un cartel de personajes: las miradas mandan.',
+    idea: 'Cartel de personajes: los dos hermanos, cerca, con la nave apenas insinuada al ' +
+      'fondo. Aquí lo que manda es quiénes son y qué les está pasando. Sin sonrisas.',
   },
   {
     id: 'oficina',
@@ -82,10 +75,9 @@ export const CARTELES = [
     resumen: 'Presenta a los vessari sin enseñarlo todo.',
     reparto: ['vaal'],
     reclamo: 'YA ESTÁN AQUÍ',
-    idea: 'Plano contrapicado vertical de una figura alienígena vessari erguida, vista ' +
-      'desde abajo, parcialmente en contraluz para que la silueta y la postura importen más ' +
-      'que el detalle. Cortesía en el gesto, nada de agresividad. Neblina y luz dorada ' +
-      'detrás. Debe intrigar sin resolver qué son.',
+    idea: 'Un vessari, con la silueta y la postura importando más que el detalle: cortesía ' +
+      'en el gesto, nada de agresividad. Neblina y luz dorada. Debe intrigar sin resolver ' +
+      'qué son.',
   },
   {
     id: 'ciudad',
@@ -138,11 +130,16 @@ export const TITULO_SERIE = 'DIEZMO';
     una colección, y eso es lo que hace que una página parezca una serie de
     verdad. Por eso se describe aquí una sola vez y la usan las dos.          */
 const TIPOGRAFIA =
-  'TIPOGRAFÍA (la misma en toda la colección, no la cambies): grotesca de palo seco ' +
-  'condensada y muy gruesa, en MAYÚSCULAS, de las que se usan en los carteles de cine. ' +
-  'Sin serifas, sin cursiva, sin adornos, sin efectos 3D, sin degradados, sin resplandor. ' +
-  'Color blanco hueso, con un reborde oscuro fino y limpio para que se lea sobre cualquier ' +
-  'fondo. Letras nítidas, bien formadas, bien espaciadas y perfectamente horizontales.';
+  'LOGOTIPO DE LA SERIE (el mismo en toda la colección, no lo cambies). No es una etiqueta ' +
+  'puesta encima: es un logotipo diseñado, de los que llevan los carteles de anime. ' +
+  'Grotesca condensada muy gruesa en mayúsculas, con las letras MUY juntas, casi tocándose, ' +
+  'de terminaciones rectas y contornos limpios. Acabado de metal pálido desgastado: base ' +
+  'hueso, un punto de grano y arañazos finísimos, y un borde oscuro apenas perceptible que ' +
+  'lo separa del fondo. Debajo del título, una línea horizontal fina que lo subraya y sobre ' +
+  'la que se apoya la línea siguiente. ' +
+  'Va INTEGRADO en la ilustración —comparte su luz y sus sombras, como si estuviera ahí—, ' +
+  'no pegado encima como un rótulo plano. Sin efectos 3D, sin biselados, sin resplandor, ' +
+  'sin degradados de colores, sin cursiva, sin serifas.';
 
 /**
  * El bloque de título, ya escrito. El modelo no tiene que inventar ni una
@@ -162,7 +159,7 @@ function bloqueTexto(filas) {
     TIPOGRAFIA,
     'COLOCACIÓN: todas las líneas juntas, alineadas entre sí, formando un solo bloque de ' +
     'título en el tercio superior o en el inferior, sobre una zona tranquila y sin tapar ' +
-    'ninguna cara. Si una línea no cabe de una vez, pártela en dos renglones del mismo ' +
+    'ninguna cara. Deja libre la esquina superior izquierda, que lleva la marca del canal. Si una línea no cabe de una vez, pártela en dos renglones del mismo ' +
     'tamaño, nunca la encojas.',
     'PROHIBIDA LA LETRA PEQUEÑA, sin excepción: nada de créditos, ni fechas, ni nombres de ' +
     'estudio o distribuidora, ni direcciones web, ni redes sociales, ni eslóganes que no ' +
@@ -203,7 +200,7 @@ const PERMITIDO_EN_PORTADA = /^(texto|letras|subt[íi]tulos|marca de agua|logoti
 const ACHAQUES_DE_CARTEL =
   'virado sepia, monocromía, imagen a un solo tono, aerografía de los ochenta, ' +
   'cartel de videoclub, ilustración occidental, cómic americano, pintura al óleo, ' +
-  'personajes de espaldas, rostros ocultos, figuras diminutas e irreconocibles';
+  'retrato posado de estudio, foto de orla, personajes alineados mirando al frente';
 
 export function negativoDePortada(negativo) {
   const base = String(negativo || '')
@@ -219,10 +216,14 @@ function bloqueReparto(personajes, conReferencia) {
   return [
     'PERSONAJES EN LA IMAGEN (' + personajes.length + '):',
     ...fichas,
-    'ENCUADRE DE LOS PERSONAJES: en primer término y grandes, con el ROSTRO VISIBLE y bien ' +
-    'iluminado, mirando a cámara o de tres cuartos. La cara es lo que vende una portada: ' +
-    'tiene que reconocerse el personaje de un vistazo, con los ojos nítidos y la expresión ' +
-    'clara. Colócalos ocupando al menos un tercio del alto de la imagen.',
+    /*  El encuadre lo decide el modelo. Obligar a que todos miren a cámara da
+        una foto de colegio; obligar a que estén de espaldas desperdicia las
+        hojas de referencia. Lo único innegociable es la identidad: cuando se
+        vea una cara, que sea la suya.                                       */
+    'PUESTA EN ESCENA: libre. Decide tú el encuadre, la distancia y hacia dónde miran, lo ' +
+    'que mejor cuente esta imagen: de frente, de tres cuartos, de perfil mirando algo fuera ' +
+    'de cuadro, o de espaldas si eso es lo que la escena pide. Componla como un cartel de ' +
+    'anime de los que se recuerdan, no como un retrato posado.',
     conReferencia
       ? 'Se adjuntan sus hojas de referencia: respeta el rostro, el peinado y las ' +
         'proporciones EXACTAMENTE. Es la misma persona, en otra escena.'

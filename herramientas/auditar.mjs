@@ -1780,16 +1780,46 @@ if (!/catch \(e\)[\s\S]{0,320}err\.red = true/.test(apiJs)) {
     'el usuario vería «Load failed» sin saber que es su conexión');
 } else if (!/const red = !!e\.red \|\| !e\.status/.test(apiJs)) {
   mal('el reintento no clasifica los cortes de red');
-} else if (!/red \? intentos \+ \d+ : intentos/.test(apiJs)) {
+} else if (!/red \? intentos \+ \d+/.test(apiJs)) {
   mal('un corte de red se reintenta las mismas veces que un error del servidor',
     'tres intentos en seis segundos caen todos dentro del mismo bache');
 } else ok('un corte de red se distingue, se explica y se reintenta con más margen');
 
 // No sirve de nada disparar peticiones contra una pestaña dormida.
 if (!/function esperarVisible\(/.test(apiJs)) mal('no se espera a que la pestaña vuelva a estar visible');
-else if (!/await esperarVisible\(señal\)[\s\S]{0,200}crudo\(/.test(apiJs)) {
+else if (!/await esperarVisible\(señal\)[\s\S]{0,900}crudo\(/.test(apiJs)) {
   mal('se llama al servidor sin comprobar que la pestaña esté delante');
 } else ok('con la app en segundo plano la cola espera en vez de fallar');
+
+/*  LA CUOTA NO ES UN FALLO DE UNA LLAMADA. Un 429 lo devuelve el proyecto
+    entero, así que reintentar solo la que falló —mientras las otras siguen
+    entrando— mantiene la cuota pinchada y no se recupera nunca: con dos hilos
+    generando fotogramas se turnaban para agotarla, y cada toma se daba por
+    perdida a los ocho y dieciséis segundos, que es dentro de la misma ventana
+    de un minuto que Google acababa de cerrar. La espera tiene que ser de
+    todos, y tiene que durar lo que dura la ventana.                         */
+{
+  const puertaCompartida = /let _puerta = 0/.test(apiJs) &&
+    /for \(let falta = _puerta - Date\.now\(\)/.test(apiJs) &&
+    /cerrarPuerta\(espera\)/.test(apiJs);
+  const primeraEspera = (/const ESPERA_429 = \[(\d+)/.exec(apiJs) || [])[1];
+  const escucha = /Number\(e\.retrasoMs\)/.test(apiJs) &&
+    /function esperaQuePide\(/.test(leer('api/ep-gemini.js'));
+  const masIntentos = /e\.status === 429 \? Math\.max\(intentos, INTENTOS_429\)/.test(apiJs);
+  if (!puertaCompartida) {
+    mal('la espera por cuota no se comparte entre llamadas',
+      'un hilo espera mientras el otro sigue disparando: la cuota no se recupera nunca');
+  } else if (!primeraEspera || Number(primeraEspera) < 20000) {
+    mal('la primera espera tras un 429 es de ' + ((Number(primeraEspera) || 0) / 1000) + ' s',
+      'la cuota de Vertex se cuenta por minuto: reintentar antes es chocar con la misma ventana');
+  } else if (!escucha) {
+    mal('no se hace caso de cuánto pide esperar Google',
+      'cuando lo dice en la cabecera o en el error, su número vale más que el nuestro');
+  } else if (!masIntentos) {
+    mal('a la cuota se le dan los mismos intentos que a un error corriente',
+      'esperar de verdad solo sirve si además se insiste');
+  } else ok('un 429 para toda la aplicación, espera lo que dura la ventana y sale despacio');
+}
 
 // Y mejor aún: que el teléfono no se duerma mientras trabaja.
 if (!/wakeLock/.test(mainJs2)) {

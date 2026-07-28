@@ -88,7 +88,23 @@ async function callVertex(url, token, body, project) {
   const raw = await r.text();
   let json = null;
   try { json = JSON.parse(raw); } catch (e) { /* respuesta no-JSON */ }
-  return { ok: r.ok, status: r.status, json, raw };
+  return { ok: r.ok, status: r.status, json, raw, retrasoMs: esperaQuePide(r, json) };
+}
+
+/*  Cuánto dice Google que hay que esperar antes de volver. Lo pone de dos
+    maneras según el servicio: la cabecera Retry-After (segundos) o un bloque
+    RetryInfo dentro de los detalles del error, con un "retryDelay" tipo "38s".
+    Vale más su número que cualquiera que se invente el cliente, así que se
+    reenvía tal cual. Si no dice nada, el cliente pone el suyo.              */
+function esperaQuePide(r, json) {
+  const cab = r.headers && r.headers.get && r.headers.get('retry-after');
+  if (cab && isFinite(Number(cab))) return Math.round(Number(cab) * 1000);
+  const detalles = (json && json.error && json.error.details) || [];
+  for (const d of detalles) {
+    const m = /^([\d.]+)s$/.exec(String(d && d.retryDelay || ''));
+    if (m) return Math.round(parseFloat(m[1]) * 1000);
+  }
+  return 0;
 }
 
 function pickInlinePart(json) {
@@ -997,6 +1013,7 @@ module.exports = async (req, res) => {
         return res.status(out.status).json({
           error: 'Vertex texto ' + out.status,
           detail: (out.raw || '').slice(0, 800),
+          retrasoMs: out.retrasoMs || undefined,
         });
       }
       const text = textoDe(out.json);
@@ -1083,6 +1100,7 @@ module.exports = async (req, res) => {
       return res.status((last && last.status) || 500).json({
         error: (last && last.motivo) || ('Vertex rechazó la imagen (' + ((last && last.status) || '?') + ')'),
         detail: ((last && last.raw) || '').slice(0, 800),
+        retrasoMs: (last && last.retrasoMs) || undefined,
       });
     }
 
@@ -1191,6 +1209,7 @@ module.exports = async (req, res) => {
           return res.status(out.status).json({
             error: 'Veo inicio ' + out.status,
             detail: (out.raw || '').slice(0, 800),
+            retrasoMs: out.retrasoMs || undefined,
           });
         }
         if (!out.json || !out.json.name) {

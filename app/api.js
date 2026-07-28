@@ -73,12 +73,44 @@ async function crudo(cuerpo, señal) {
     const det = j.detail ? ' — ' + String(j.detail).slice(0, 400) : '';
     const err = new Error('[' + r.status + '] ' + msg + pista + det);
     err.status = r.status;
+    // Cuando Google dice cuánto hay que esperar, el backend lo reenvía aquí.
+    if (j.retrasoMs) err.retrasoMs = Number(j.retrasoMs) || 0;
     throw err;
   }
   return j;
 }
 
 const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* ── Puerta de cuota ─────────────────────────────────────────
+   UN 429 NO ES UN FALLO DE ESTA LLAMADA: es el proyecto entero diciendo
+   «para». Reintentar solo la que falló, mientras las demás siguen entrando,
+   mantiene la cuota pinchada y no se recupera nunca —dos hilos generando
+   fotogramas se turnaban para agotarla—. Por eso la espera es COMPARTIDA: la
+   fija quien recibe el 429 y la respetan todas las llamadas de la aplicación.
+
+   Las esperas son largas a propósito. La cuota de Vertex se cuenta por minuto,
+   así que reintentar a los ocho segundos es volver a chocar contra la misma
+   ventana. Se empieza en veinte segundos y se dobla.
+
+   Y se sale despacio. Volver a toda velocidad en cuanto una llamada acierta
+   provoca el siguiente 429 en segundos, así que la presión baja de una en una:
+   hacen falta varios aciertos seguidos para recuperar el ritmo normal.      */
+const ESPERA_429 = [20000, 40000, 80000, 160000];
+const TOPE_429 = 180000;
+const ESPACIADO_APRETADO = 4000;
+const INTENTOS_429 = 6;
+
+let _puerta = 0;    // instante hasta el que nadie debe llamar
+let _apreton = 0;   // 429 seguidos; mientras sea alto se llama de uno en uno
+
+/** Cuánto falta para que se pueda volver a llamar. Para la interfaz. */
+export function esperaDeCuota() { return Math.max(0, _puerta - Date.now()); }
+
+function cerrarPuerta(ms) {
+  _apreton = Math.min(6, _apreton + 1);
+  _puerta = Math.max(_puerta, Date.now() + ms);
+}
 
 /**
  * Llama al backend reintentando los fallos transitorios.
@@ -97,8 +129,23 @@ export async function llamar(cuerpo, opciones) {
     // Si la app está en segundo plano, esperar aquí en vez de fallar fuera.
     await esperarVisible(señal);
     if (señal && señal.aborted) throw new Cancelado();
+
+    /*  La puerta es de todos: si otra llamada se topó con el límite, aquí se
+        espera. Se comprueba en trozos para poder cancelar y para ir contando
+        en pantalla en vez de dejar la barra congelada.                      */
+    for (let falta = _puerta - Date.now(); falta > 0; falta = _puerta - Date.now()) {
+      if (o.aviso) o.aviso('cuota agotada; esperando ' + Math.ceil(falta / 1000) + ' s');
+      await esperar(Math.min(falta, 5000));
+      if (señal && señal.aborted) throw new Cancelado();
+    }
+    // Con la cuota apretada se pasa de uno en uno: al cruzar se deja hueco al
+    // siguiente, y así dos hilos no vuelven a entrar juntos.
+    if (_apreton >= 2) _puerta = Date.now() + ESPACIADO_APRETADO;
+
     try {
-      return await crudo(cuerpo, señal);
+      const salida = await crudo(cuerpo, señal);
+      _apreton = Math.max(0, _apreton - 1);
+      return salida;
     } catch (e) {
       if (e.name === 'AbortError') throw new Cancelado();
       ultimo = e;
@@ -113,16 +160,28 @@ export async function llamar(cuerpo, opciones) {
           nada que corregir, solo esperar a tener conexión otra vez. Se le da
           más margen y esperas más largas, porque tres intentos en seis
           segundos caen todos dentro del mismo bache.                        */
-      const limite = red ? intentos + 4 : intentos;
+      /*  A la cuota se le dan más oportunidades que al resto, porque ahora
+          esperar de verdad tiene sentido: no es un fallo que corregir, es un
+          reloj que hay que dejar correr.                                     */
+      const limite = red ? intentos + 4
+        : (e.status === 429 ? Math.max(intentos, INTENTOS_429) : intentos);
       if (!transitorio || n >= limite) break;
-      const espera = red
-        ? Math.min(45000, 4000 * n)
-        : (e.status === 429 ? 8000 : 2000) * n;
-      if (o.aviso) {
-        o.aviso((red ? 'sin conexión; ' : '') + 'reintento ' + (n + 1) + '/' + limite +
-          ' en ' + Math.round(espera / 1000) + ' s');
+
+      let espera;
+      if (e.status === 429) {
+        // Si Google dice cuánto hay que esperar, manda él.
+        const dicho = Number(e.retrasoMs) || 0;
+        espera = Math.min(TOPE_429,
+          Math.max(dicho, ESPERA_429[Math.min(n - 1, ESPERA_429.length - 1)]));
+        cerrarPuerta(espera);   // la espera vale para TODAS las llamadas, no solo esta
+      } else {
+        espera = red ? Math.min(45000, 4000 * n) : 2000 * n;
       }
-      await esperar(espera);
+      if (o.aviso) {
+        o.aviso((red ? 'sin conexión; ' : e.status === 429 ? 'cuota agotada; ' : '') +
+          'reintento ' + (n + 1) + '/' + limite + ' en ' + Math.round(espera / 1000) + ' s');
+      }
+      if (e.status !== 429) await esperar(espera);   // el 429 ya espera en la puerta
     }
   }
   throw ultimo || new Error('La llamada falló');

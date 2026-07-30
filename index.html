@@ -187,6 +187,23 @@ h3{font-size:17px;font-weight:600;margin:0 0 6px}
   background-repeat:no-repeat;background-position:right 11px center;
 }
 .campo select option,.selector-modelo select option{background:var(--carta);color:var(--tinta)}
+/*  DIECISÉIS PÍXELES NO ES UN CAPRICHO DE ESTILO. Safari en el teléfono hace
+    zoom él solo al enfocar cualquier control cuya letra mida MENOS de 16 px, y
+    la página se queda a esa escala nueva: a partir de ahí se arrastra a los
+    lados —ya no se ve centrada— y la barra de navegación, que está fija al
+    borde inferior de la ventana de maquetación, deja de caer en el borde de la
+    pantalla y aparece en mitad de la imagen. Los 14,5 px de arriba disparaban
+    eso en 38 de los 51 controles de la aplicación.
+    Solo en pantallas táctiles: en un ratón no existe ese zoom y 14,5 px se ve
+    mejor. Se repiten los mismos selectores porque una consulta de medios no
+    añade especificidad y «select» a secas perdería contra «.campo select».   */
+@media (pointer: coarse) {
+  .campo input[type=text],.campo input[type=number],.campo select,.campo textarea,
+  .selector-modelo select,
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),select,textarea{
+    font-size:16px;
+  }
+}
 .campo.check{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .campo.check label{margin:0;font-size:14px;color:var(--tinta);font-weight:400}
 .campo.check input{width:19px;height:19px;accent-color:var(--azul);flex:none}

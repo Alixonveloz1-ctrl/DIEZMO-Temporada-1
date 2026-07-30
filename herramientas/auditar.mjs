@@ -816,6 +816,28 @@ titulo('ANCHO DE LA PANTALLA');
     ok('los ' + sueltos.length + ' desplegables sueltos van al ancho del contenedor, ' +
        'con tope general y etiquetas cortas');
   }
+
+  /*  Y LA LETRA DE LOS CONTROLES, QUE ES LA OTRA FORMA DE MOVER LA PÁGINA.
+      Safari en el teléfono hace zoom él solo al enfocar un campo cuya letra
+      mida menos de 16 px, y la página se queda a esa escala: se arrastra a los
+      lados y la barra de navegación —fija al borde inferior de la ventana de
+      maquetación— aparece en mitad de la imagen en vez de abajo. Con 14,5 px
+      le pasaba a 38 de los 51 controles. No se comprueba el valor de escritorio,
+      que puede ser el que sea: se comprueba que exista la excepción táctil y
+      que repita los selectores, porque una consulta de medios no añade
+      especificidad y «select» a secas perdería contra «.campo select».      */
+  const bloque = (h.match(/@media \(pointer: coarse\)\s*\{[\s\S]*?\n\}/) || [''])[0];
+  const px = (/font-size:\s*(\d+(?:\.\d+)?)px/.exec(bloque) || [])[1];
+  if (!bloque) {
+    mal('nada sube la letra de los campos en pantalla táctil',
+      'Safari hace zoom al tocarlos y la página deja de estar centrada');
+  } else if (!(Number(px) >= 16)) {
+    mal('los campos táctiles se quedan en ' + (px || '?') + ' px',
+      '16 es el umbral exacto por debajo del cual Safari hace zoom solo');
+  } else if (!/\.campo select/.test(bloque)) {
+    mal('la excepción táctil no repite los selectores de .campo',
+      'una consulta de medios no añade especificidad: «.campo select» ganaría igual');
+  } else ok('en pantalla táctil los campos miden ' + px + ' px, que es lo que evita el zoom de Safari');
 }
 
 titulo('PORTADAS Y CARTELES');

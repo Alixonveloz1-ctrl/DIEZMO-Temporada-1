@@ -840,6 +840,45 @@ titulo('ANCHO DE LA PANTALLA');
   } else ok('en pantalla táctil los campos miden ' + px + ' px, que es lo que evita el zoom de Safari');
 }
 
+/*  UNA TOMA CON PLANO DE RESPALDO NO ESTÁ DIRIGIDA. Cuando un lote de dirección
+    falla —una cuota agotada basta—, sus dieciocho tomas se rellenan con una
+    ficha genérica: plano general, nadie en cuadro y el PRIMER lugar de la
+    lista. Después piden «un plano atmosférico del entorno», así que salen todas
+    idénticas, y rehacer el fotograma no las arregla nunca porque el fallo está
+    en la dirección. Contarlas como dirigidas era lo que dejaba pasar el fallo
+    en silencio: el episodio decía «dirigido» y el usuario se quedaba rehaciendo
+    imágenes que no podían mejorar.                                          */
+{
+  const m = leer('app/main.js');
+  const pipe = leer('app/pipeline.js');
+  const dir = leer('app/director.js');
+  const marca = /respaldo: true/.test(dir);
+  const noCuenta = /dirigido: cuenta\(\(t\) => t\.plano && !t\.plano\.respaldo\)/.test(pipe) &&
+    /respaldo: cuenta\(\(t\) => t\.plano && t\.plano\.respaldo\)/.test(pipe);
+  const seVe = /' respaldo'/.test(m) && /PLANO DE RESPALDO/.test(m) &&
+    /\.toma\.respaldo\{/.test(leer('index.html'));
+  const seArregla = /dirigir\(epActual\(\), true\)/.test(m) &&
+    /soloRespaldo\s*\n?\s*\?\s*ep\.tomas\.filter\(\(t\) => !t\.plano \|\| t\.plano\.respaldo\)/.test(m);
+  // Y redirigir un puñado suelto no puede desordenar los resultados.
+  const porPosicion = /const posDe = new Map\(tomas\.map\(\(t, k\) => \[t, k\]\)\)/.test(dir) &&
+    !/planos\[t\.i\]/.test(dir);
+  if (!marca) {
+    mal('el plano de respaldo no se distingue de uno de verdad');
+  } else if (!noCuenta) {
+    mal('una toma con plano de respaldo cuenta como dirigida',
+      'el episodio dice «dirigido» y esas tomas salen todas iguales');
+  } else if (!seVe) {
+    mal('la toma con plano de respaldo no se ve marcada en la rejilla',
+      'es indistinguible de una buena, y rehacer su fotograma no sirve de nada');
+  } else if (!seArregla) {
+    mal('no se pueden redirigir solo las tomas que quedaron con respaldo',
+      'obligaría a rehacer la dirección del episodio entero y perder lo ajustado a mano');
+  } else if (!porPosicion) {
+    mal('el director indexa por el número de toma y no por su posición en el lote',
+      'redirigir un puñado suelto dejaría huecos y descolocaría los planos');
+  } else ok('una toma sin dirigir de verdad se ve, no cuenta como dirigida y se puede redirigir sola');
+}
+
 /*  REHACER UNA TOMA DESDE LA REJILLA. Los botones de la tarjeta y los del
     detalle tienen que llamar a lo MISMO: si un día se cambia cómo se rehace una
     toma y solo cambia uno de los dos caminos, el usuario tendría dos botones

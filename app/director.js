@@ -132,6 +132,11 @@ export async function dirigirEpisodio(ctx, opciones) {
   const idsLugar = new Set(lugares.map((l) => l.id));
   const idsElenco = new Set(elenco.map((p) => p.id));
 
+  /*  Los resultados van por POSICIÓN en la lista que se recibe, no por el
+      índice de la toma dentro del episodio. Así se puede pedir la dirección de
+      un puñado de tomas sueltas —las que quedaron con respaldo— sin que los
+      índices altos abran huecos en el array.                                */
+  const posDe = new Map(tomas.map((t, k) => [t, k]));
   const planos = new Array(tomas.length).fill(null);
   let resumenPrevio = '';
 
@@ -168,8 +173,8 @@ export async function dirigirEpisodio(ctx, opciones) {
 
     for (const t of grupo) {
       const p = porIndice.get(t.i);
-      if (!p) { planos[t.i] = respaldo(t, lugares); continue; }
-      planos[t.i] = {
+      if (!p) { planos[posDe.get(t)] = respaldo(t, lugares); continue; }
+      planos[posDe.get(t)] = {
         i: t.i,
         lugar: idsLugar.has(p.lugar) ? p.lugar : (lugares[0] && lugares[0].id),
         personajes: (p.personajes || []).filter((x) => idsElenco.has(x)).slice(0, 3),
@@ -183,7 +188,7 @@ export async function dirigirEpisodio(ctx, opciones) {
       };
     }
 
-    const ultimo = planos[grupo[grupo.length - 1].i];
+    const ultimo = planos[posDe.get(grupo[grupo.length - 1])];
     resumenPrevio = ultimo
       ? 'último plano planificado — ' + ultimo.encuadre + ' en ' + ultimo.lugar + ': ' + ultimo.descripcion
       : '';

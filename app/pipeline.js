@@ -986,7 +986,13 @@ export function estadoEpisodio(ep) {
   const segundos = (ep.tomas || []).reduce((a, t) => a + (t.segundos || t.segEstimados || 0), 0);
   return {
     tomas: n,
-    dirigido: cuenta((t) => !!t.plano),
+    /*  Una toma con plano DE RESPALDO no está dirigida. Contarla como dirigida
+        era lo que dejaba pasar el fallo sin que se notara: el episodio decía
+        «dirigido» entero, y esas tomas pedían al modelo un plano atmosférico
+        del primer lugar de la lista, así que salía siempre el mismo cuarto
+        vacío por más veces que se rehiciera la imagen.                      */
+    dirigido: cuenta((t) => t.plano && !t.plano.respaldo),
+    respaldo: cuenta((t) => t.plano && t.plano.respaldo),
     voz: cuenta((t) => t.audio && t.audio.ok),
     imagen: cuenta((t) => t.imagen && t.imagen.ok),
     movimiento: cuenta((t) => t.plano && t.plano.tipo === 'movimiento'),

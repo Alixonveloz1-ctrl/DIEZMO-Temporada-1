@@ -946,35 +946,65 @@ function abrirFicha(tipo, obj) {
 
 /* ── Guion técnico ──────────────────────────────────────────── */
 
-async function dirigir(ep) {
+/**
+ * Planifica los planos de un episodio.
+ *
+ * @param {boolean} soloRespaldo  rehacer únicamente las tomas que quedaron con
+ *   plano de respaldo. Un lote de dirección que falla —una cuota agotada, sin
+ *   ir más lejos— rellena sus dieciocho tomas con una ficha genérica: plano
+ *   general, sin nadie en cuadro y en el PRIMER lugar de la lista. Esas tomas
+ *   piden después «un plano atmosférico del entorno», así que salen todas
+ *   iguales y rehacer la imagen no las arregla nunca: el fallo está en la
+ *   dirección, no en el fotograma. Esto las vuelve a dirigir sin tocar las que
+ *   estaban bien ni el trabajo ya hecho encima de ellas.
+ */
+async function dirigir(ep, soloRespaldo) {
   if (!ep) return;
+  const pendientes = soloRespaldo
+    ? ep.tomas.filter((t) => !t.plano || t.plano.respaldo)
+    : ep.tomas;
+  if (!pendientes.length) {
+    estado('estadoGuion', 'No hay ninguna toma con plano de respaldo en este episodio.', 'ok');
+    return;
+  }
   const ctx = {
     episodio: ep,
     elenco: P.elenco,
     lugares: P.lugares,
-    tomas: ep.tomas,
+    tomas: pendientes,
     modelo: P.config.modeloTexto,
   };
   jobMostrar('dirección');
-  estado('estadoGuion', 'El director está planificando ' + ep.tomas.length + ' tomas…', 'info');
+  estado('estadoGuion', 'El director está planificando ' + pendientes.length + ' tomas…', 'info');
   try {
     const planos = await dirigirEpisodio(ctx, {
       progreso: (h, t, txt) => jobAvance(h, t, txt),
       aviso: (m) => log('EP' + pad2(ep.num) + ': ' + m),
       señal: undefined,
     });
-    const conTipo = repartirMovimiento(planos, P.config.proporcionMovimiento);
-    ep.tomas.forEach((t, i) => {
-      t.plano = conTipo[i];
+    pendientes.forEach((t, k) => {
+      if (!planos[k]) return;
+      t.plano = planos[k];
       // El prompt se regenera salvo que lo hayas editado a mano.
       if (!t.promptEditado) t.promptImagen = null;
     });
-    const respaldos = conTipo.filter((p) => p.respaldo).length;
+    /*  El reparto de movimiento se rehace sobre el EPISODIO ENTERO: la
+        proporción es del episodio, no del puñado que se acaba de redirigir. */
+    if (ep.tomas.every((t) => t.plano)) {
+      const conTipo = repartirMovimiento(ep.tomas.map((t) => t.plano), P.config.proporcionMovimiento);
+      ep.tomas.forEach((t, i) => { t.plano = conTipo[i]; });
+    }
+    const respaldos = ep.tomas.filter((t) => t.plano && t.plano.respaldo).length;
     estado('estadoGuion',
-      'Listo: ' + ep.tomas.length + ' tomas planificadas, ' +
-      conTipo.filter((p) => p.tipo === 'movimiento').length + ' con movimiento real' +
-      (respaldos ? ' · ' + respaldos + ' tomas quedaron con plano de respaldo, revísalas' : ''),
-      respaldos ? 'info' : 'ok');
+      'Listo: ' + pendientes.length + ' tomas planificadas, ' +
+      ep.tomas.filter((t) => t.plano && t.plano.tipo === 'movimiento').length + ' con movimiento real' +
+      (respaldos ? ' · quedan ' + respaldos + ' con plano de respaldo: saldrían todas iguales, ' +
+        'vuelve a pulsar «Redirigir las de respaldo»' : ''),
+      respaldos ? 'err' : 'ok');
+    if (respaldos) {
+      log('EP' + pad2(ep.num) + ': ' + respaldos + ' tomas se quedaron con plano de respaldo. ' +
+        'Rehacer su fotograma no sirve de nada hasta redirigirlas.', 'err');
+    }
   } catch (e) {
     estado('estadoGuion', 'La dirección falló: ' + e.message, 'err');
   }
@@ -989,6 +1019,7 @@ function resumenGuion(ep) {
   const cob = ep.cobertura;
   return s.tomas + ' tomas · ' + fmtDur(s.segundos) + ' estimados · ' +
     s.movimiento + ' con movimiento · ' + (s.tomas - s.movimiento) + ' fijas' +
+    (s.respaldo ? ' · ⚠ ' + s.respaldo + ' SIN DIRIGIR DE VERDAD (plano de respaldo)' : '') +
     (cob ? ' · cobertura de texto ' + (cob.ok ? 'exacta' : 'DESAJUSTADA (' + cob.diferencia + ' caracteres)') : '');
 }
 
@@ -1047,10 +1078,12 @@ function tarjetaToma(ep, t, conAcciones) {
   const p = t.plano || {};
   const hayErr = (t.audio && t.audio.ok === false) || (t.imagen && t.imagen.ok === false) ||
     (t.video && t.video.ok === false);
+  const deRespaldo = !!(t.plano && t.plano.respaldo);
   d.className = 'toma' + (tomaSel === t.i ? ' sel' : '') + (hayErr ? ' err' : '') +
-    (P.config.formato === '9:16' ? ' v916' : '');
+    (deRespaldo ? ' respaldo' : '') + (P.config.formato === '9:16' ? ' v916' : '');
   d.innerHTML =
-    '<div class="lienzo"><div class="ph">' + (p.encuadre ? esc(p.encuadre) : 'SIN DIRIGIR') + '</div>' +
+    '<div class="lienzo"><div class="ph">' +
+    (deRespaldo ? 'PLANO DE RESPALDO' : p.encuadre ? esc(p.encuadre) : 'SIN DIRIGIR') + '</div>' +
     '<span class="n">' + pad2(t.i + 1) + '</span>' +
     '<span class="marcas">' +
     '<i class="voz' + (t.audio && t.audio.ok ? ' on' : '') + '"></i>' +
@@ -1123,6 +1156,8 @@ function pintarRejillaProd() {
   const c = $('rejillaProd');
   c.innerHTML = '';
   $('resumenGuion').textContent = resumenGuion(ep);
+  // El botón solo existe cuando hay algo que redirigir; si no, es ruido.
+  $('btnRedirigirRespaldo').hidden = !(ep && estadoEpisodio(ep).respaldo);
   if (!ep) return;
   const lista = ep.tomas.filter((t) => {
     if (filtro === 'faltan') {
@@ -1160,6 +1195,9 @@ async function seleccionarToma(ep, t) {
     ' · lugar: ' + (p.lugar || '—') +
     ' · en cuadro: ' + ((p.personajes && p.personajes.length) ? p.personajes.join(', ') : 'nadie') +
     (t.imagen && t.imagen.refs !== undefined ? ' · ' + t.imagen.refs + ' referencias usadas' : '') +
+    (p.respaldo ? ' · ⚠ PLANO DE RESPALDO: esta toma no llegó a dirigirse, por eso sale ' +
+      'un espacio vacío. Rehacer el fotograma no la arregla: usa «Redirigir las de respaldo» ' +
+      'en el guion técnico.' : '') +
     (t.bloqueada ? ' · BLOQUEADA' : '') +
     (t.imagen && t.imagen.error ? ' · error de imagen: ' + t.imagen.error : '') +
     (t.video && t.video.error ? ' · error de video: ' + t.video.error : '');
@@ -1880,6 +1918,7 @@ function cablear() {
   // Guion
   $('selEpGuion').addEventListener('change', (e) => { P.sel = Number(e.target.value); guardar(); pintarTodo(); });
   $('btnDirigir').addEventListener('click', () => dirigir(epActual()));
+  $('btnRedirigirRespaldo').addEventListener('click', () => dirigir(epActual(), true));
   $('btnDirigirTodo').addEventListener('click', async () => {
     if (!confirm('Se planificarán los ' + P.episodios.length + ' episodios. Puede tardar bastante. ¿Seguir?')) return;
     for (const ep of P.episodios) { P.sel = ep.num; pintarSelectores(); await dirigir(ep); }

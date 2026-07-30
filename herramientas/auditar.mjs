@@ -840,6 +840,37 @@ titulo('ANCHO DE LA PANTALLA');
   } else ok('en pantalla táctil los campos miden ' + px + ' px, que es lo que evita el zoom de Safari');
 }
 
+/*  REHACER UNA TOMA DESDE LA REJILLA. Los botones de la tarjeta y los del
+    detalle tienen que llamar a lo MISMO: si un día se cambia cómo se rehace una
+    toma y solo cambia uno de los dos caminos, el usuario tendría dos botones
+    que dicen lo mismo y hacen cosas distintas, y no habría forma de saberlo
+    mirando la pantalla.                                                      */
+{
+  const m = leer('app/main.js');
+  const i = m.indexOf('async function rehacerToma(');
+  const cuerpo = i < 0 ? '' : m.slice(i, m.indexOf('\nfunction pintarRejillaProd', i));
+  const paraLaTarjeta = /generarImagenes\(ep, false, \[t\.i\]\)/.test(cuerpo) &&
+    /generarVideos\(ep, false, \[t\.i\]\)/.test(cuerpo);
+  // Y el detalle, que es el camino viejo, tiene que seguir llamando igual.
+  const paraElDetalle = /btnRegenImg[\s\S]{0,400}generarImagenes\(ep, false, \[t\.i\]\)/.test(m) &&
+    /btnRegenVid[\s\S]{0,400}generarVideos\(ep, false, \[t\.i\]\)/.test(m);
+  if (!cuerpo) {
+    mal('no se puede rehacer una toma desde la rejilla',
+      'obliga a abrir el detalle y bajar la página por cada toma mala');
+  } else if (!paraLaTarjeta || !paraElDetalle) {
+    mal('los botones de la tarjeta y los del detalle no rehacen igual',
+      'dos botones que prometen lo mismo y hacen cosas distintas');
+  } else if (!/ev\.stopPropagation\(\)/.test(m)) {
+    mal('el botón de rehacer abre además el detalle de la toma');
+  } else if (!/que === 'vid'[\s\S]{0,600}confirm\(/.test(cuerpo)) {
+    mal('rehacer un clip no pregunta',
+      'el botón está encima de la miniatura: un roce al desplazar cuesta minutos y dinero');
+  } else if (!/if \(trabajando\)/.test(cuerpo)) {
+    mal('se puede lanzar una toma con otro trabajo en marcha',
+      'el motor lo rechaza con un error críptico en vez de decirlo');
+  } else ok('cada toma se rehace desde su tarjeta, por el mismo camino que el detalle');
+}
+
 titulo('PORTADAS Y CARTELES');
 {
   const pr = await import(pathToFileURL(path.join(raiz, 'app', 'portadas.js')).href);

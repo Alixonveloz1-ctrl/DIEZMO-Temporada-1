@@ -397,6 +397,25 @@ code{background:var(--carta-3);padding:2px 6px;border-radius:5px;font-size:12.5p
 .toma .marcas i.on{background:var(--verde);box-shadow:0 0 6px rgba(34,197,94,.8)}
 .toma .marcas i.img.on{background:var(--azul-2);box-shadow:0 0 6px rgba(76,141,255,.8)}
 .toma .marcas i.vid.on{background:var(--violeta);box-shadow:0 0 6px rgba(168,85,247,.8)}
+/*  Rehacer desde la propia rejilla, sin abrir el detalle ni bajar la página.
+    Abajo a la derecha de la miniatura: es donde cae el pulgar y es la zona con
+    menos información de la imagen. Treinta y cuatro píxeles para poder darle
+    con el dedo sin apuntar.                                                  */
+.toma .rehacer{position:absolute;right:6px;bottom:6px;z-index:3;display:flex;gap:5px}
+.toma .rehacer button{
+  appearance:none;padding:0;width:34px;height:34px;border-radius:10px;
+  border:1px solid rgba(255,255,255,.2);background:rgba(5,8,15,.7);
+  backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);
+  color:#DCE3EE;display:grid;place-items:center;cursor:pointer;
+  touch-action:manipulation;transition:var(--tr);
+}
+.toma .rehacer button.vid{color:#C9A6FF}
+.toma .rehacer button:hover{background:var(--azul);border-color:transparent;color:#fff}
+.toma .rehacer button:active{transform:scale(.92)}
+.toma .rehacer button:disabled{opacity:.55;cursor:default}
+.toma .rehacer button svg{width:16px;height:16px}
+.toma .rehacer button.yendo svg{animation:girando 1s linear infinite}
+@keyframes girando{to{transform:rotate(360deg)}}
 .toma .txt{padding:9px 10px 5px;font-size:11.5px;color:var(--tinta-2);line-height:1.45;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:52px}
 .toma .meta{padding:0 10px 9px;font-size:10px;color:var(--tinta-3s);display:flex;justify-content:space-between;gap:6px;font-weight:600}
 .toma .meta .mov{color:var(--violeta)}

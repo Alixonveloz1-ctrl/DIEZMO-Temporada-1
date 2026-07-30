@@ -1015,6 +1015,33 @@ function ponerImagen(caja, id, alt, modo) {
   }).catch(() => { /* el almacén no responde: se queda sin miniatura */ });
 }
 
+/*  REHACER SIN SALIR DE LA REJILLA. Antes había que tocar la toma, esperar a
+    que se abriera el detalle y bajar la página entera hasta los botones; con
+    diez tomas malas eso son diez viajes. Los mismos dos botones van encima de
+    la miniatura y hacen exactamente lo mismo.
+
+    El de movimiento solo sale donde tiene sentido —toma dirigida como
+    movimiento y con su fotograma hecho—, y el de fotograma solo si la toma
+    está dirigida: sin plano no hay nada que pedirle al modelo.             */
+const FLECHA_REHACER =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" ' +
+  'stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M21 12a9 9 0 11-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
+
+function botonesRehacer(t, conAcciones) {
+  if (!conAcciones || !t.plano) return '';
+  const hayImagen = !!(t.imagen && t.imagen.ok);
+  const conMovimiento = t.plano.tipo === 'movimiento' && hayImagen;
+  return '<span class="rehacer">' +
+    '<button type="button" data-que="img" title="Rehacer el fotograma" ' +
+    'aria-label="Rehacer el fotograma de la toma ' + (t.i + 1) + '">' + FLECHA_REHACER + '</button>' +
+    (conMovimiento
+      ? '<button type="button" class="vid" data-que="vid" title="Rehacer el movimiento" ' +
+        'aria-label="Rehacer el movimiento de la toma ' + (t.i + 1) + '">' + FLECHA_REHACER + '</button>'
+      : '') +
+    '</span>';
+}
+
 function tarjetaToma(ep, t, conAcciones) {
   const d = document.createElement('div');
   const p = t.plano || {};
@@ -1029,7 +1056,7 @@ function tarjetaToma(ep, t, conAcciones) {
     '<i class="voz' + (t.audio && t.audio.ok ? ' on' : '') + '"></i>' +
     '<i class="img' + (t.imagen && t.imagen.ok ? ' on' : '') + '"></i>' +
     '<i class="vid' + (t.video && t.video.ok ? ' on' : '') + '"></i>' +
-    '</span></div>' +
+    '</span>' + botonesRehacer(t, conAcciones) + '</div>' +
     '<div class="txt">' + esc(t.texto.slice(0, 150)) + '</div>' +
     '<div class="meta"><span>esc ' + t.escena + ' · ' + (t.segundos || t.segEstimados).toFixed(1) + ' s</span>' +
     '<span class="' + (p.tipo === 'movimiento' ? 'mov' : '') + '">' +
@@ -1037,10 +1064,58 @@ function tarjetaToma(ep, t, conAcciones) {
 
   d.addEventListener('click', () => seleccionarToma(ep, t));
 
+  for (const b of d.querySelectorAll('.rehacer button')) {
+    b.addEventListener('click', (ev) => {
+      // Sin esto, tocar el botón abriría además el detalle de la toma.
+      ev.stopPropagation();
+      rehacerToma(ep, t, b.dataset.que, b);
+    });
+  }
+
   if (t.imagen && t.imagen.ok) {
     ponerImagen(d.querySelector('.lienzo'), claveImagenDe(ep.num, t), 'toma ' + (t.i + 1));
   }
   return d;
+}
+
+/*  El trabajo lo hace el MISMO motor que los botones del detalle, con la misma
+    llamada: si alguna vez cambia el modo de rehacer una toma, cambia en los dos
+    sitios a la vez porque solo hay uno.                                      */
+async function rehacerToma(ep, t, que, boton) {
+  if (trabajando) {
+    aviso('Ya hay un trabajo en marcha. Espera a que termine o púlsale a Detener.', 'err');
+    return;
+  }
+  if (que === 'vid') {
+    if (!(t.imagen && t.imagen.ok)) { aviso('Genera antes el fotograma de esta toma.', 'err'); return; }
+    /*  Un clip son minutos de espera y bastante más dinero que un fotograma, y
+        estos botones están encima de la miniatura: un roce al desplazar no
+        puede costar eso. El fotograma no pregunta, que es lo que se rehace a
+        cada rato.                                                            */
+    if (!confirm('Rehacer el movimiento de la toma ' + (t.i + 1) + '. Tarda unos minutos ' +
+      'y se cobra el clip entero.\n\n¿Lo rehago?')) return;
+  }
+
+  boton.disabled = true;
+  boton.classList.add('yendo');
+  try {
+    jobMostrar((que === 'img' ? 'fotograma' : 'movimiento') + ' · toma ' + (t.i + 1));
+    const m = nuevoMotor();
+    if (que === 'img') {
+      // Rehacer a mano una toma bloqueada es una orden, no un descuido.
+      t.bloqueada = false;
+      await m.generarImagenes(ep, false, [t.i]);
+    } else {
+      await m.generarVideos(ep, false, [t.i]);
+    }
+    await guardar();
+  } catch (e) {
+    if (!(e && e.cancelado)) aviso('No se pudo rehacer: ' + e.message, 'err');
+  } finally {
+    // La rejilla puede haberse repintado y dejado este botón fuera del documento.
+    boton.disabled = false;
+    boton.classList.remove('yendo');
+  }
 }
 
 function pintarRejillaProd() {

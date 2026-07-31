@@ -1084,11 +1084,14 @@ function tarjetaToma(ep, t, conAcciones) {
   const hayErr = (t.audio && t.audio.ok === false) || (t.imagen && t.imagen.ok === false) ||
     (t.video && t.video.ok === false);
   const deRespaldo = !!(t.plano && t.plano.respaldo);
+  const esCopia = !!t.reusa;
   d.className = 'toma' + (tomaSel === t.i ? ' sel' : '') + (hayErr ? ' err' : '') +
-    (deRespaldo ? ' respaldo' : '') + (P.config.formato === '9:16' ? ' v916' : '');
+    (deRespaldo ? ' respaldo' : '') + (esCopia ? ' copia' : '') +
+    (P.config.formato === '9:16' ? ' v916' : '');
   d.innerHTML =
     '<div class="lienzo"><div class="ph">' +
-    (deRespaldo ? 'PLANO DE RESPALDO' : p.encuadre ? esc(p.encuadre) : 'SIN DIRIGIR') + '</div>' +
+    (deRespaldo ? 'PLANO DE RESPALDO' : esCopia ? 'COPIA DE OTRA TOMA'
+      : p.encuadre ? esc(p.encuadre) : 'SIN DIRIGIR') + '</div>' +
     '<span class="n">' + pad2(t.i + 1) + '</span>' +
     '<span class="marcas">' +
     '<i class="voz' + (t.audio && t.audio.ok ? ' on' : '') + '"></i>' +
@@ -1175,10 +1178,16 @@ async function correrCola() {
           (colaRehacer.length > 1 ? ' · ' + (colaRehacer.length - 1) + ' más en cola' : ''));
         const m = nuevoMotor();
         if (it.que === 'img') {
-          // Rehacer a mano una toma bloqueada es una orden, no un descuido.
+          /*  Rehacer a mano es una ORDEN, no un descuido: se levanta el bloqueo
+              y se rompe la reutilización. Una toma marcada como copia de otra no
+              genera nada —solo vuelve a apuntar al original—, así que el botón
+              parecía averiado: la barra pasaba de largo y la imagen seguía
+              siendo la misma de siempre. Si la pides, es tuya.               */
           t.bloqueada = false;
+          delete t.reusa;
           await m.generarImagenes(ep, false, [t.i]);
         } else {
+          delete t.reusaVideo;
           await m.generarVideos(ep, false, [t.i]);
         }
       } catch (e) {
@@ -1241,6 +1250,8 @@ async function seleccionarToma(ep, t) {
     (p.respaldo ? ' · ⚠ PLANO DE RESPALDO: esta toma no llegó a dirigirse, por eso sale ' +
       'un espacio vacío. Rehacer el fotograma no la arregla: usa «Redirigir las de respaldo» ' +
       'en el guion técnico.' : '') +
+    (t.reusa ? ' · COPIA: usa el fotograma de otra toma con el mismo plano. ' +
+      'Rehacerlo aquí le da uno propio.' : '') +
     (t.bloqueada ? ' · BLOQUEADA' : '') +
     (t.imagen && t.imagen.error ? ' · error de imagen: ' + t.imagen.error : '') +
     (t.video && t.video.error ? ' · error de video: ' + t.video.error : '');
@@ -2202,6 +2213,7 @@ function cablear() {
   $('btnRegenImg').addEventListener('click', conToma(async (ep, t) => {
     jobMostrar('fotograma');
     t.bloqueada = false;
+    delete t.reusa;                 // pedirla a mano rompe la reutilización
     await nuevoMotor().generarImagenes(ep, false, [t.i]);
   }));
   $('btnRegenVoz').addEventListener('click', conToma(async (ep, t) => {
@@ -2223,6 +2235,7 @@ function cablear() {
   $('btnRegenVid').addEventListener('click', conToma(async (ep, t) => {
     if (!t.imagen || !t.imagen.ok) { alert('Genera antes el fotograma de esta toma.'); return; }
     jobMostrar('movimiento');
+    delete t.reusaVideo;
     await nuevoMotor().generarVideos(ep, false, [t.i]);
   }));
   $('btnAlternarTipo').addEventListener('click', conToma(async (ep, t) => {

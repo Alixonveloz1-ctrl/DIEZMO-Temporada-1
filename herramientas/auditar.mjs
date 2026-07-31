@@ -913,7 +913,20 @@ titulo('ANCHO DE LA PANTALLA');
   } else if (!/colaRehacer\.length = 0;[\s\S]{0,120}motor\.detener\(\)/.test(m)) {
     mal('detener no vacía la cola',
       'se para la que va y arranca la siguiente: no hay forma de parar de verdad');
-  } else ok('las tomas se encolan y se rehacen de una en una, por el mismo camino que el detalle');
+  } else if (!/delete t\.reusa;/.test(cuerpo) || !/delete t\.reusaVideo;/.test(cuerpo)) {
+    /*  Una toma marcada como copia de otra no genera nada: _unaImagen ve el
+        «reusa», vuelve a apuntar al original y sale. El botón parecía averiado
+        —la barra pasaba de largo y la imagen seguía siendo la misma— sin decir
+        por qué. Pedirla a mano es una orden: rompe la reutilización.        */
+    mal('rehacer una toma no rompe su reutilización',
+      'la que es copia de otra no genera nada y el botón parece averiado');
+  } else if ((leer('app/main.js').match(/delete t\.reusa;/g) || []).length < 2) {
+    mal('el botón del detalle sí reutiliza y el de la tarjeta no, o al revés',
+      'el mismo gesto daría resultados distintos según desde dónde se pulse');
+  } else if (!/COPIA DE OTRA TOMA/.test(m) || !/\.toma\.copia /.test(leer('index.html'))) {
+    mal('no se ve que una toma sea copia de otra',
+      'es la explicación de por qué salen varias imágenes idénticas');
+  } else ok('las tomas se encolan, se rehacen de una en una y pedirlas a mano rompe la reutilización');
 }
 
 titulo('PORTADAS Y CARTELES');

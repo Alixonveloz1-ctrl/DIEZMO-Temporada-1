@@ -904,10 +904,16 @@ titulo('ANCHO DE LA PANTALLA');
   } else if (!/que === 'vid'[\s\S]{0,600}confirm\(/.test(cuerpo)) {
     mal('rehacer un clip no pregunta',
       'el botón está encima de la miniatura: un roce al desplazar cuesta minutos y dinero');
-  } else if (!/if \(trabajando\)/.test(cuerpo)) {
-    mal('se puede lanzar una toma con otro trabajo en marcha',
-      'el motor lo rechaza con un error críptico en vez de decirlo');
-  } else ok('cada toma se rehace desde su tarjeta, por el mismo camino que el detalle');
+  } else if (!/const colaRehacer = \[\]/.test(m) || !/colaRehacer\.push\(/.test(cuerpo)) {
+    mal('rehacer una toma no se encola',
+      'hay que esperar a que termine una para poder pedir la siguiente');
+  } else if (!/if \(colaCorriendo\) return;/.test(m)) {
+    mal('la cola puede tener dos vaciadores a la vez',
+      'saldrían dos peticiones en paralelo y agotarían antes la cuota del proyecto');
+  } else if (!/colaRehacer\.length = 0;[\s\S]{0,120}motor\.detener\(\)/.test(m)) {
+    mal('detener no vacía la cola',
+      'se para la que va y arranca la siguiente: no hay forma de parar de verdad');
+  } else ok('las tomas se encolan y se rehacen de una en una, por el mismo camino que el detalle');
 }
 
 titulo('PORTADAS Y CARTELES');

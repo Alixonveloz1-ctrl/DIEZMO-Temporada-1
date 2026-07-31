@@ -1059,15 +1059,20 @@ const FLECHA_REHACER =
   'stroke-linecap="round" stroke-linejoin="round">' +
   '<path d="M21 12a9 9 0 11-3.2-6.9"/><path d="M21 3v6h-6"/></svg>';
 
-function botonesRehacer(t, conAcciones) {
+function botonesRehacer(ep, t, conAcciones) {
   if (!conAcciones || !t.plano) return '';
+  const estado = (que) => {
+    const k = puestoEnCola(ep, t, que);
+    if (k < 0) return '';
+    return (k === 0 && colaCorriendo) ? ' yendo' : ' encola';
+  };
   const hayImagen = !!(t.imagen && t.imagen.ok);
   const conMovimiento = t.plano.tipo === 'movimiento' && hayImagen;
   return '<span class="rehacer">' +
-    '<button type="button" data-que="img" title="Rehacer el fotograma" ' +
+    '<button type="button" data-que="img" class="' + estado('img').trim() + '" title="Rehacer el fotograma" ' +
     'aria-label="Rehacer el fotograma de la toma ' + (t.i + 1) + '">' + FLECHA_REHACER + '</button>' +
     (conMovimiento
-      ? '<button type="button" class="vid" data-que="vid" title="Rehacer el movimiento" ' +
+      ? '<button type="button" class="vid' + estado('vid') + '" data-que="vid" title="Rehacer el movimiento" ' +
         'aria-label="Rehacer el movimiento de la toma ' + (t.i + 1) + '">' + FLECHA_REHACER + '</button>'
       : '') +
     '</span>';
@@ -1089,7 +1094,7 @@ function tarjetaToma(ep, t, conAcciones) {
     '<i class="voz' + (t.audio && t.audio.ok ? ' on' : '') + '"></i>' +
     '<i class="img' + (t.imagen && t.imagen.ok ? ' on' : '') + '"></i>' +
     '<i class="vid' + (t.video && t.video.ok ? ' on' : '') + '"></i>' +
-    '</span>' + botonesRehacer(t, conAcciones) + '</div>' +
+    '</span>' + botonesRehacer(ep, t, conAcciones) + '</div>' +
     '<div class="txt">' + esc(t.texto.slice(0, 150)) + '</div>' +
     '<div class="meta"><span>esc ' + t.escena + ' · ' + (t.segundos || t.segEstimados).toFixed(1) + ' s</span>' +
     '<span class="' + (p.tipo === 'movimiento' ? 'mov' : '') + '">' +
@@ -1101,7 +1106,7 @@ function tarjetaToma(ep, t, conAcciones) {
     b.addEventListener('click', (ev) => {
       // Sin esto, tocar el botón abriría además el detalle de la toma.
       ev.stopPropagation();
-      rehacerToma(ep, t, b.dataset.que, b);
+      rehacerToma(ep, t, b.dataset.que);
     });
   }
 
@@ -1114,11 +1119,24 @@ function tarjetaToma(ep, t, conAcciones) {
 /*  El trabajo lo hace el MISMO motor que los botones del detalle, con la misma
     llamada: si alguna vez cambia el modo de rehacer una toma, cambia en los dos
     sitios a la vez porque solo hay uno.                                      */
+/*  COLA DE REHACER. Antes había que esperar a que terminara un fotograma para
+    poder pedir el siguiente, y revisar un episodio son veinte esperas. Ahora se
+    van marcando los que se quieran y se hacen solos, uno detrás de otro.
+
+    De uno en uno a propósito, no en paralelo: el límite de peticiones por
+    minuto de Vertex es del proyecto entero, así que dos a la vez solo adelantan
+    el momento de agotarlo. Y no hace falta pausa artificial entre ellos: la
+    puerta de cuota de api.js ya es compartida, así que si uno se topa con el
+    límite, el siguiente espera lo que toque antes de salir.                  */
+const colaRehacer = [];
+let colaCorriendo = false;
+
+/** Posición en la cola, o -1. Sirve para pintar el estado en la tarjeta. */
+function puestoEnCola(ep, t, que) {
+  return colaRehacer.findIndex((x) => x.num === ep.num && x.i === t.i && x.que === que);
+}
+
 async function rehacerToma(ep, t, que, boton) {
-  if (trabajando) {
-    aviso('Ya hay un trabajo en marcha. Espera a que termine o púlsale a Detener.', 'err');
-    return;
-  }
   if (que === 'vid') {
     if (!(t.imagen && t.imagen.ok)) { aviso('Genera antes el fotograma de esta toma.', 'err'); return; }
     /*  Un clip son minutos de espera y bastante más dinero que un fotograma, y
@@ -1128,29 +1146,54 @@ async function rehacerToma(ep, t, que, boton) {
     if (!confirm('Rehacer el movimiento de la toma ' + (t.i + 1) + '. Tarda unos minutos ' +
       'y se cobra el clip entero.\n\n¿Lo rehago?')) return;
   }
-
-  boton.disabled = true;
-  boton.classList.add('yendo');
-  try {
-    jobMostrar((que === 'img' ? 'fotograma' : 'movimiento') + ' · toma ' + (t.i + 1));
-    const m = nuevoMotor();
-    if (que === 'img') {
-      // Rehacer a mano una toma bloqueada es una orden, no un descuido.
-      t.bloqueada = false;
-      await m.generarImagenes(ep, false, [t.i]);
-    } else {
-      await m.generarVideos(ep, false, [t.i]);
-    }
-    await guardar();
-  } catch (e) {
-    if (!(e && e.cancelado)) aviso('No se pudo rehacer: ' + e.message, 'err');
-  } finally {
-    // La rejilla puede haberse repintado y dejado este botón fuera del documento.
-    boton.disabled = false;
-    boton.classList.remove('yendo');
+  // Volver a pulsar lo que ya está en cola —y aún no ha empezado— lo quita.
+  const puesto = puestoEnCola(ep, t, que);
+  if (puesto > 0 || (puesto === 0 && !colaCorriendo)) {
+    colaRehacer.splice(puesto, 1);
+    pintarRejillaProd();
+    return;
   }
+  if (puesto === 0) return;               // ya se está haciendo: no se toca
+  colaRehacer.push({ num: ep.num, i: t.i, que });
+  pintarRejillaProd();
+  correrCola();
 }
 
+/** Vacía la cola de una en una. Solo hay una instancia corriendo a la vez. */
+async function correrCola() {
+  if (colaCorriendo) return;
+  colaCorriendo = true;
+  try {
+    while (colaRehacer.length) {
+      const it = colaRehacer[0];
+      const ep = P.episodios.find((e) => e.num === it.num);
+      const t = ep && ep.tomas[it.i];
+      if (!t) { colaRehacer.shift(); continue; }
+      pintarRejillaProd();
+      try {
+        jobMostrar((it.que === 'img' ? 'fotograma' : 'movimiento') + ' · toma ' + (it.i + 1) +
+          (colaRehacer.length > 1 ? ' · ' + (colaRehacer.length - 1) + ' más en cola' : ''));
+        const m = nuevoMotor();
+        if (it.que === 'img') {
+          // Rehacer a mano una toma bloqueada es una orden, no un descuido.
+          t.bloqueada = false;
+          await m.generarImagenes(ep, false, [t.i]);
+        } else {
+          await m.generarVideos(ep, false, [t.i]);
+        }
+      } catch (e) {
+        // Detener vacía la cola entera: si no, seguiría con la siguiente.
+        if (e && e.cancelado) { colaRehacer.length = 0; break; }
+        aviso('Toma ' + (it.i + 1) + ': ' + e.message, 'err');
+      }
+      colaRehacer.shift();
+      await guardar();
+    }
+  } finally {
+    colaCorriendo = false;
+    pintarRejillaProd();
+  }
+}
 function pintarRejillaProd() {
   const ep = epActual();
   const c = $('rejillaProd');
@@ -2125,7 +2168,11 @@ function cablear() {
     aviso(n + ' tomas vuelven a generarse por su cuenta.', 'info', 6000);
   });
   $('selModMusProd').addEventListener('change', (e) => fijarModelo('musica', e.target.value));
-  const detener = () => { if (motor) motor.detener(); log('detención solicitada', 'err'); };
+  const detener = () => {
+    colaRehacer.length = 0;      // lo que aún no ha empezado, se descarta
+    if (motor) motor.detener();
+    log('detención solicitada', 'err');
+  };
   $('btnDetenerProd').addEventListener('click', detener);
   $('btnDetenerGlobal').addEventListener('click', detener);
 

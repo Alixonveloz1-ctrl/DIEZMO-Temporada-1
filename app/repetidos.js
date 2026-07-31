@@ -21,6 +21,11 @@ const VACIAS = new Set([
   'este', 'sobre', 'entre', 'como', 'mas', 'muy', 'ya', 'desde', 'hasta', 'hacia', 'ante',
 ]);
 
+/*  Tomas de separación mínima entre dos usos del mismo fotograma. Una toma
+    dura unos siete segundos de media, así que ocho tomas son cerca de un
+    minuto: tiempo de sobra para que no se note la repetición.               */
+export const SEPARACION_MINIMA = 8;
+
 export function normalizar(s) {
   return String(s || '')
     .toLowerCase()
@@ -103,15 +108,39 @@ export function agrupar(episodios, opciones) {
       }
       if (juntos.length < 2) continue;
       juntos.sort((a, b) => a.ep - b.ep || a.i - b.i);
+
+      /*  SEPARACIÓN MÍNIMA. Reutilizar un fotograma es de cajón cuando las dos
+          tomas están lejos: nadie recuerda un fondo de hace un minuto. Pero
+          diez tomas seguidas con la misma imagen no es un ahorro, es una
+          imagen congelada durante minuto y medio, y eso se ve.
+
+          Así que una toma solo reutiliza si está a SEPARACION_MINIMA tomas o
+          más de la ÚLTIMA que ya está usando ese mismo fotograma —no del
+          maestro—, porque lo que se nota es ver la misma imagen dos veces
+          seguidas, no que se repita a lo largo del episodio. Las que quedan
+          demasiado cerca se caen del grupo y generan la suya.
+
+          Entre episodios distintos no hay límite: nunca se ven seguidas.   */
+      const separados = [juntos[0]];
+      let ultimoUso = juntos[0];
+      for (let k = 1; k < juntos.length; k++) {
+        const x = juntos[k];
+        if (x.ep !== ultimoUso.ep || (x.i - ultimoUso.i) >= SEPARACION_MINIMA) {
+          separados.push(x);
+          ultimoUso = x;
+        }
+      }
+      if (separados.length < 2) continue;
+      const juntosFinal = separados;
       grupos.push({
         huella: h,
-        maestro: { ep: juntos[0].ep, i: juntos[0].i },
+        maestro: { ep: juntosFinal[0].ep, i: juntosFinal[0].i },
         lugar: cabeza.plano.lugar,
         personajes: cabeza.plano.personajes || [],
         encuadre: cabeza.plano.encuadre,
         descripcion: cabeza.plano.descripcion,
-        miembros: juntos.map((x) => ({ ep: x.ep, i: x.i, escena: x.escena, segundos: x.segundos })),
-        episodios: [...new Set(juntos.map((x) => x.ep))].sort((a, b) => a - b),
+        miembros: juntosFinal.map((x) => ({ ep: x.ep, i: x.i, escena: x.escena, segundos: x.segundos })),
+        episodios: [...new Set(juntosFinal.map((x) => x.ep))].sort((a, b) => a - b),
       });
     }
   }

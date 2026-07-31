@@ -1838,6 +1838,27 @@ else if (gs[0].maestro.ep !== 1) mal('el maestro no es la primera aparición');
 else if (gs[0].miembros.length !== 2) mal('el grupo no reúne las dos apariciones');
 else ok('el mismo plano en dos episodios se agrupa, y manda la primera aparición');
 
+/*  PERO NO TOMAS SEGUIDAS. Reutilizar un fotograma es de cajón cuando las dos
+    tomas están lejos; diez seguidas con la misma imagen no es un ahorro, es una
+    imagen congelada durante minuto y medio. Se comprueba con el caso real que
+    lo destapó: diez tomas consecutivas del mismo plano.                      */
+{
+  const p = { lugar: 'tienda', personajes: ['sota'], encuadre: 'plano medio',
+    descripcion: 'Sota tras el mostrador, luz fluorescente cruda.' };
+  const t = (i) => ({ i, escena: 1, segEstimados: 7, plano: { ...p } });
+  const copias = (episodios) =>
+    agrupar(episodios, { umbral: 0.8 }).reduce((a, g) => a + g.miembros.length - 1, 0);
+  const seguidas = copias([{ num: 1, tomas: Array.from({ length: 10 }, (_, k) => t(40 + k)) }]);
+  const lejanas = copias([{ num: 1, tomas: [t(0), t(30), t(60), t(90)] }]);
+  if (seguidas > 1) {
+    mal(seguidas + ' de diez tomas seguidas se convierten en copias',
+      'sale la misma imagen diez veces seguidas, que es una imagen congelada');
+  } else if (lejanas !== 3) {
+    mal('las tomas separadas dejaron de reutilizarse', lejanas + ' copias de 3',
+      'se paga varias veces el mismo fotograma sin motivo');
+  } else ok('solo se reutiliza a distancia: diez tomas seguidas generan las suyas, las lejanas no');
+}
+
 // Aplicar marca a los demás, nunca al maestro, y es reversible.
 const claves = {
   imagen: (e, i) => 'ep' + e + '/img' + i,
